@@ -1,11 +1,8 @@
 export type Mapping = {
   tournaments: {
-    [tournamentName: string]: { eventId: string };
-  };
-  players: {
-    // key: exact player name as it appears in bets (e.g. "JT", "Chan Kim")
-    [playerName: string]: { espnId: string; espnName: string };
+    // value is the "Rxxxxxxx" id from the pgatour.com tournament URL
+    [tournamentName: string]: { pgaId: string };
   };
 };
 
-export const EMPTY_MAPPING: Mapping = { tournaments: {}, players: {} };
+export const EMPTY_MAPPING: Mapping = { tournaments: {} };

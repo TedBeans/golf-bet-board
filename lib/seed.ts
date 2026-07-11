@@ -1,13 +1,15 @@
 export type AutoStats = {
   thru: number | null;
   scoreToPar: number | null;
+  // Not yet wired up - these need a second PGA Tour query captured (the
+  // per-player "Stats" tab), separate from the leaderboard query.
   birdies: number | null;
   bogeys: number | null;
   pars: number | null;
   eagles: number | null;
   doubleBogeys: number | null;
-  gir: string | null; // e.g. "10/14"
-  fairways: string | null; // e.g. "8/11"
+  gir: string | null;
+  fairways: string | null;
   updatedAt: string | null;
 };
 
