@@ -71,9 +71,20 @@ export function autoGradeStatus(
   thru: number | null,
   holesTotal = 18
 ): "hit" | "miss" | null {
-  if (parsed.type === "generic" || parsed.label === "SCORE") return null;
-  if (stat === null || stat === undefined || thru === null || thru === undefined) return null;
+  if (parsed.type === "generic") return null;
+  if (stat === null || stat === undefined) return null;
   if (parsed.target === null || parsed.target === undefined) return null;
+  if (thru === null || thru === undefined) return null;
+
+  // Round score can move either direction on any hole, so it's only safe to
+  // grade once the round is actually finished - a direct final comparison,
+  // not a worst/best-case bound.
+  if (parsed.label === "SCORE") {
+    if (thru < holesTotal) return null;
+    if (parsed.type === "max") return stat <= parsed.target ? "hit" : "miss";
+    if (parsed.type === "min") return stat >= parsed.target ? "hit" : "miss";
+    return null;
+  }
 
   const remaining = holesTotal - thru;
   if (remaining < 0) return null;
