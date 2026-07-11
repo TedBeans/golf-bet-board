@@ -65,9 +65,17 @@ h1 span{ color: var(--gold-bright); }
 main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
 .tourn{ margin-bottom: 26px; }
 .tourn-head{
-  display:flex; align-items:baseline; justify-content:space-between;
+  display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:6px 14px;
   margin-bottom: 10px; padding-bottom:6px; border-bottom: 1px solid var(--line);
 }
+.tourn-summary{ display:flex; gap:12px; }
+.tsum{
+  font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:0.06em; font-weight:600;
+}
+.tsum.win{ color: var(--live); }
+.tsum.loss{ color: var(--clay); }
+.tsum.live{ color: var(--gold-bright); }
+.tsum.tbd{ color: var(--cream-dim); }
 .tourn-head h2{
   font-family:'Oswald',sans-serif; font-size:15px; font-weight:600;
   letter-spacing:0.05em; text-transform:uppercase; margin:0; color: var(--gold-bright);

@@ -168,10 +168,20 @@ export default function Page() {
       <main>
         {bets.length === 0 && <div className="empty">No bets loaded.</div>}
 
-        {Object.keys(groups).map((tourn) => (
+        {Object.keys(groups).map((tourn) => {
+          const tournBets = Object.values(groups[tourn]).flat();
+          const tc = { hit: 0, miss: 0, live: 0, pending: 0 } as Record<string, number>;
+          tournBets.forEach((b) => (tc[b.status] = (tc[b.status] || 0) + 1));
+          return (
           <div className="tourn" key={tourn}>
             <div className="tourn-head">
               <h2>{tourn}</h2>
+              <div className="tourn-summary">
+                <span className="tsum win">WIN {tc.hit || 0}</span>
+                <span className="tsum loss">LOSS {tc.miss || 0}</span>
+                <span className="tsum live">LIVE {tc.live || 0}</span>
+                <span className="tsum tbd">TBD {tc.pending || 0}</span>
+              </div>
             </div>
             {Object.keys(groups[tourn]).map((round) => {
               const items = groups[tourn][round]
@@ -316,7 +326,8 @@ export default function Page() {
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </main>
     </>
   );
