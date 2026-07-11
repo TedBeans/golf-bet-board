@@ -13,3 +13,4 @@ const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TO
 export const redis = new Redis({ url, token });
 
 export const BETS_KEY = "golf-bet-board:bets";
+export const MAPPING_KEY = "golf-bet-board:mapping";

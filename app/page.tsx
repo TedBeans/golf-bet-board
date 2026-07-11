@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Bet } from "../lib/seed";
 import { parseBetType, trend, timeToMinutes } from "../lib/betLogic";
+
+const SYNC_INTERVAL_MS = 60000;
 
 export default function Page() {
   const [bets, setBets] = useState<Bet[] | null>(null);
@@ -10,24 +13,43 @@ export default function Page() {
   const [unlocked, setUnlocked] = useState(false);
   const [lockError, setLockError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [syncNote, setSyncNote] = useState("");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    fetch("/api/bets")
+  function loadBets() {
+    return fetch("/api/bets")
       .then((r) => r.json())
       .then((d) => setBets(d.bets))
-      .catch(() => setBets([]));
+      .catch(() => {});
+  }
+
+  function runSync() {
+    fetch("/api/sync")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.updated > 0) loadBets();
+        if (d.errors && d.errors.length > 0) {
+          setSyncNote(`Auto-sync: ${d.errors[0]}`);
+        } else if (d.updated > 0) {
+          setSyncNote("");
+        }
+      })
+      .catch(() => setSyncNote("Auto-sync unreachable"));
+  }
+
+  useEffect(() => {
+    loadBets().then(() => runSync());
+    const interval = setInterval(runSync, SYNC_INTERVAL_MS);
 
     const stored = typeof window !== "undefined" ? sessionStorage.getItem("bb_passcode") : null;
     if (stored) {
       setPasscode(stored);
       setUnlocked(true);
     }
+    return () => clearInterval(interval);
   }, []);
 
   function tryUnlock() {
-    // Real check happens server-side on save; this just lets the UI open.
-    // We verify by doing a harmless save attempt first.
     setLockError("");
     fetch("/api/bets", {
       method: "POST",
@@ -61,6 +83,16 @@ export default function Page() {
   function updateBet(id: string, patch: Partial<Bet>) {
     if (!bets) return;
     persist(bets.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  }
+
+  // Manually editing a stat/thru value locks that bet out of auto-sync,
+  // so the next sync tick won't stomp on what was just typed.
+  function updateBetManually(id: string, patch: Partial<Bet>) {
+    updateBet(id, { ...patch, autoEnabled: false });
+  }
+
+  function resumeAuto(id: string) {
+    updateBet(id, { autoEnabled: true });
   }
 
   function cycleStatus(id: string, target: Bet["status"]) {
@@ -103,7 +135,10 @@ export default function Page() {
 
           <div className="lock">
             {unlocked ? (
-              <span className="unlocked">✓ editing unlocked</span>
+              <>
+                <span className="unlocked">✓ editing unlocked</span>
+                <Link href="/admin" className="admin-link">auto-sync setup</Link>
+              </>
             ) : (
               <>
                 <input
@@ -120,6 +155,7 @@ export default function Page() {
         </div>
         {lockError && <div className="lock-error">{lockError}</div>}
         {saving && <span className="saving">saving…</span>}
+        {syncNote && <div className="sync-note">{syncNote}</div>}
       </header>
 
       <main>
@@ -140,6 +176,7 @@ export default function Page() {
                   {items.map((b) => {
                     const parsed = parseBetType(b.bet);
                     const cls = trend(parsed, b.stat, b.thru);
+                    const isAuto = b.autoEnabled !== false;
                     return (
                       <div className={`card ${b.status}`} key={b.id}>
                         <div className="card-top">
@@ -191,7 +228,7 @@ export default function Page() {
                               placeholder="—"
                               value={b.stat === null || b.stat === undefined ? "" : b.stat}
                               onChange={(e) =>
-                                updateBet(b.id, {
+                                updateBetManually(b.id, {
                                   stat: e.target.value === "" ? null : parseFloat(e.target.value),
                                 })
                               }
@@ -209,12 +246,33 @@ export default function Page() {
                               placeholder="—"
                               value={b.thru === null || b.thru === undefined ? "" : b.thru}
                               onChange={(e) =>
-                                updateBet(b.id, {
+                                updateBetManually(b.id, {
                                   thru: e.target.value === "" ? null : parseInt(e.target.value, 10),
                                 })
                               }
                             />
                           </div>
+                        </div>
+
+                        <div className="auto-row">
+                          <span className={`auto-badge ${isAuto ? "on" : "off"}`}>
+                            {isAuto ? "● AUTO" : "○ MANUAL"}
+                          </span>
+                          {unlocked && !isAuto && (
+                            <button className="resume-btn" onClick={() => resumeAuto(b.id)}>
+                              Resume auto
+                            </button>
+                          )}
+                          {b.auto && (
+                            <span className="detail-strip">
+                              Rd {b.auto.scoreToPar !== null ? (b.auto.scoreToPar > 0 ? `+${b.auto.scoreToPar}` : b.auto.scoreToPar) : "—"}
+                              {" · "}GIR {b.auto.gir ?? "—"}
+                              {" · "}FW {b.auto.fairways ?? "—"}
+                              {" · "}B{b.auto.birdies ?? "—"}
+                              {" Bo"}{b.auto.bogeys ?? "—"}
+                              {" P"}{b.auto.pars ?? "—"}
+                            </span>
+                          )}
                         </div>
                       </div>
                     );

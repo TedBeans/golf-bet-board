@@ -56,3 +56,20 @@ export function timeToMinutes(tstr: string): number {
   if (ap === "AM") { if (h === 12) h = 0; } else { if (h !== 12) h += 12; }
   return h * 60 + min;
 }
+
+// Given a parsed bet type and a computed AutoStats snapshot, return the
+// value that belongs in this bet's "Stat" cell.
+export function autoStatValue(
+  parsed: ParsedBet,
+  auto: { scoreToPar: number | null; gir: string | null; fairways: string | null; birdies: number | null; bogeys: number | null } | null | undefined
+): number | null {
+  if (!auto) return null;
+  if (parsed.label === "SCORE") return auto.scoreToPar;
+  if (parsed.label === "GIR") {
+    const m = auto.gir?.match(/(\d+)/);
+    return m ? parseInt(m[1], 10) : null;
+  }
+  if (parsed.label === "BIRDIES") return auto.birdies;
+  if (parsed.label === "BOGEYS") return auto.bogeys;
+  return null;
+}
