@@ -269,21 +269,30 @@ export default function AdminPage() {
               padding: "8px 10px", borderRadius: 3,
             }}
           />
-          <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 12, cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={!!mapping.tournaments[tourn]?.suspended}
+          <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
+            Play suspended?
+            <select
+              value={mapping.tournaments[tourn]?.suspendedType || "none"}
               onChange={(e) =>
                 setMapping((m) => ({
                   ...m,
                   tournaments: {
                     ...m.tournaments,
-                    [tourn]: { pgaId: m.tournaments[tourn]?.pgaId || "", suspended: e.target.checked },
+                    [tourn]: { pgaId: m.tournaments[tourn]?.pgaId || "", suspendedType: e.target.value as any },
                   },
                 }))
               }
-            />
-            Play suspended (weather delay)
+              style={{
+                width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                padding: "8px 10px", borderRadius: 3,
+              }}
+            >
+              <option value="none">Not suspended</option>
+              <option value="fog">Fog</option>
+              <option value="storm">Storms</option>
+              <option value="dark">Darkness</option>
+            </select>
           </label>
         </div>
       ))}

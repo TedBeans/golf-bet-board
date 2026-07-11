@@ -175,11 +175,15 @@ export default function Page() {
           const tournBets = Object.values(groups[tourn]).flat();
           const tc = { hit: 0, miss: 0, live: 0, pending: 0 } as Record<string, number>;
           tournBets.forEach((b) => (tc[b.status] = (tc[b.status] || 0) + 1));
-          const isSuspended = !!mapping.tournaments[tourn]?.suspended;
+          const suspendType = mapping.tournaments[tourn]?.suspendedType || "none";
+          const isSuspended = suspendType !== "none";
           return (
           <div className="tourn" key={tourn}>
             <div className="tourn-head">
-              <h2>{tourn}</h2>
+              <div className="tourn-title-row">
+                <h2>{tourn}</h2>
+                {isSuspended && <span className="susp-badge">SUSP</span>}
+              </div>
               <div className="tourn-summary">
                 <span className="tsum win">WIN {tc.hit || 0}</span>
                 <span className="tsum loss">LOSS {tc.miss || 0}</span>
@@ -188,13 +192,41 @@ export default function Page() {
               </div>
             </div>
             {isSuspended && (
-              <div className="fog-overlay">
-                <div className="fog-layer fog1" />
-                <div className="fog-layer fog2" />
-                <div className="fog-layer fog3" />
+              <div className={`suspend-overlay variant-${suspendType}`}>
+                {suspendType === "fog" && (
+                  <>
+                    <div className="fog-layer fog1" />
+                    <div className="fog-layer fog2" />
+                    <div className="fog-layer fog3" />
+                    <div className="rain-layer rain-light" />
+                  </>
+                )}
+                {suspendType === "storm" && (
+                  <>
+                    <div className="storm-tint" />
+                    <div className="rain-layer rain-heavy" />
+                    <div className="lightning" />
+                    <div className="lightning lightning2" />
+                  </>
+                )}
+                {suspendType === "dark" && (
+                  <>
+                    <div className="dark-tint" />
+                    <div className="moon" />
+                    <div className="star" style={{ top: "18%", left: "14%" }} />
+                    <div className="star" style={{ top: "32%", left: "72%" }} />
+                    <div className="star" style={{ top: "55%", left: "38%" }} />
+                    <div className="star" style={{ top: "14%", left: "52%" }} />
+                    <div className="star" style={{ top: "68%", left: "80%" }} />
+                  </>
+                )}
                 <div className="fog-banner">
                   <div className="fog-banner-title">Play suspended</div>
-                  <div className="fog-banner-sub">Fog delay</div>
+                  <div className="fog-banner-sub">
+                    {suspendType === "fog" && "Fog delay"}
+                    {suspendType === "storm" && "Storm delay"}
+                    {suspendType === "dark" && "Darkness"}
+                  </div>
                 </div>
               </div>
             )}
