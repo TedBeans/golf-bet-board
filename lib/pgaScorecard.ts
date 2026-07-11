@@ -22,6 +22,13 @@ function numeratorOf(display: string | null): number | null {
   return isNaN(n) ? null : n;
 }
 
+// Strips the leading percentage off "72.22% (13/18)", leaving just "13/18".
+function fractionOnly(display: string | null): string | null {
+  if (!display) return null;
+  const m = display.match(/\((\d+\s*\/\s*\d+)\)/) || display.match(/(\d+\s*\/\s*\d+)/);
+  return m ? m[1].replace(/\s+/g, "") : display;
+}
+
 export function extractScorecardStats(json: any, roundNumber: number): ScorecardRoundStats | null {
   const rounds: any[] = json?.rounds || [];
   const round = rounds.find((r: any) => r.round === String(roundNumber));
@@ -40,9 +47,9 @@ export function extractScorecardStats(json: any, roundNumber: number): Scorecard
     birdies: birdiesStr !== null ? parseInt(birdiesStr, 10) : null,
     bogeys: bogeysStr !== null ? parseInt(bogeysStr, 10) : null,
     pars: parsStr !== null ? parseInt(parsStr, 10) : null,
-    gir: girDisplay,
+    gir: fractionOnly(girDisplay),
     girCount: numeratorOf(girDisplay),
-    fairways: fairwaysDisplay,
+    fairways: fractionOnly(fairwaysDisplay),
     fairwaysCount: numeratorOf(fairwaysDisplay),
   };
 }

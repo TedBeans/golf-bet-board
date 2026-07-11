@@ -47,6 +47,18 @@ export function trend(parsed: ParsedBet, stat: number | null, thru: number | nul
   return "neutral";
 }
 
+// Turns the internal category name into the word used in the UI - shared by
+// the target column, the stat column, and the detail strip so they all agree.
+export function friendlyLabel(label: string): string {
+  switch (label) {
+    case "SCORE": return "Score";
+    case "GIR": return "Greens";
+    case "BIRDIES": return "Birdies";
+    case "BOGEYS": return "Bogeys";
+    default: return "Stat";
+  }
+}
+
 export function timeToMinutes(tstr: string): number {
   const m = tstr.match(/(\d+):(\d+)\s*(AM|PM)/i);
   if (!m) return 9999;

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../lib/seed";
-import { parseBetType, trend, timeToMinutes } from "../lib/betLogic";
+import { parseBetType, trend, timeToMinutes, friendlyLabel } from "../lib/betLogic";
 
 const SYNC_INTERVAL_MS = 60000;
 
@@ -215,11 +215,11 @@ export default function Page() {
 
                         <div className="scorecard">
                           <div className="sc-cell">
-                            <div className="sc-label">{parsed.label}</div>
+                            <div className="sc-label">{friendlyLabel(parsed.label)}</div>
                             <div className="sc-target">{parsed.targetDisplay}</div>
                           </div>
                           <div className="sc-cell">
-                            <div className="sc-label">Stat</div>
+                            <div className="sc-label">{friendlyLabel(parsed.label)}</div>
                             <input
                               disabled={!unlocked}
                               className={`sc-input trend-${cls}`}
@@ -265,12 +265,25 @@ export default function Page() {
                           )}
                           {b.auto && (
                             <span className="detail-strip">
-                              Rd {b.auto.scoreToPar !== null ? (b.auto.scoreToPar > 0 ? `+${b.auto.scoreToPar}` : b.auto.scoreToPar) : "—"}
-                              {" · "}GIR {b.auto.gir ?? "—"}
-                              {" · "}FW {b.auto.fairways ?? "—"}
-                              {" · "}B{b.auto.birdies ?? "—"}
-                              {" Bo"}{b.auto.bogeys ?? "—"}
-                              {" P"}{b.auto.pars ?? "—"}
+                              <span className={parsed.label === "SCORE" ? "detail-hi" : ""}>
+                                Score {b.auto.scoreToPar !== null ? (b.auto.scoreToPar > 0 ? `+${b.auto.scoreToPar}` : b.auto.scoreToPar) : "—"}
+                              </span>
+                              {" · "}
+                              <span className={parsed.label === "GIR" ? "detail-hi" : ""}>
+                                Greens {b.auto.gir ?? "—"}
+                              </span>
+                              {" · "}
+                              <span>Fairways {b.auto.fairways ?? "—"}</span>
+                              {" · "}
+                              <span className={parsed.label === "BIRDIES" ? "detail-hi" : ""}>
+                                Birdies {b.auto.birdies ?? "—"}
+                              </span>
+                              {" · "}
+                              <span className={parsed.label === "BOGEYS" ? "detail-hi" : ""}>
+                                Bogeys {b.auto.bogeys ?? "—"}
+                              </span>
+                              {" · "}
+                              <span>Pars {b.auto.pars ?? "—"}</span>
                             </span>
                           )}
                         </div>

@@ -147,6 +147,9 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
 .detail-strip{
   font-size:10px; color:var(--cream-dim); letter-spacing:0.02em;
 }
+.detail-strip .detail-hi{
+  color: var(--cream); font-weight:700;
+}
 .sync-note{
   font-size:10px; color: var(--clay); margin-top:4px; letter-spacing:0.04em;
 }
