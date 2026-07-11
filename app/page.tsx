@@ -202,10 +202,16 @@ export default function Page() {
               <div className={`suspend-overlay variant-${suspendType}`}>
                 {suspendType === "fog" && (
                   <>
-                    <div className="fog-blob fb1" />
-                    <div className="fog-blob fb2" />
-                    <div className="fog-blob fb3" />
-                    <div className="fog-blob fb4" />
+                    <div className="fog-sheet fs1" />
+                    <div className="fog-sheet fs2" />
+                    <div className="fog-sheet fs3" />
+                    {RAINDROPS.map((d, i) => (
+                      <div
+                        key={i}
+                        className="raindrop"
+                        style={{ left: `${d.left}%`, animationDelay: `${d.delay}s`, animationDuration: `${d.duration}s` }}
+                      />
+                    ))}
                   </>
                 )}
                 {suspendType === "storm" && (
