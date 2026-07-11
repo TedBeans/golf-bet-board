@@ -42,6 +42,7 @@ export async function GET() {
 
   for (const bet of bets) {
     if (bet.autoEnabled === false) continue;
+    if (bet.status === "hit" || bet.status === "miss") continue; // already decided - stop pulling for it
 
     const tournamentMap = mapping.tournaments[bet.t];
     if (!tournamentMap?.pgaId) continue;
