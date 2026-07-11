@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { redis, BETS_KEY, MAPPING_KEY } from "../../../lib/redis";
 import { Bet } from "../../../lib/seed";
 import { Mapping } from "../../../lib/mapping";
-import { fetchPgaLeaderboard } from "../../../lib/pgatour";
+import { fetchPgaLeaderboard, fetchPlayerScorecardStats } from "../../../lib/pgatour";
 import { extractPlayers, findPlayerMatch, PgaPlayerRow } from "../../../lib/pgaMatch";
+import { extractScorecardStats, roundNumberFromLabel } from "../../../lib/pgaScorecard";
 import { parseBetType } from "../../../lib/betLogic";
 
 // Triggered by the browser (not a server cron - see README) roughly once a
@@ -22,6 +23,7 @@ export async function GET() {
 
   const errors: string[] = [];
   const leaderboardCache = new Map<string, PgaPlayerRow[]>();
+  const scorecardCache = new Map<string, any>();
   let updatedCount = 0;
 
   for (const bet of bets) {
@@ -29,13 +31,14 @@ export async function GET() {
 
     const tournamentMap = mapping.tournaments[bet.t];
     if (!tournamentMap?.pgaId) continue;
+    const tournamentId = tournamentMap.pgaId;
 
     try {
-      let players = leaderboardCache.get(tournamentMap.pgaId);
+      let players = leaderboardCache.get(tournamentId);
       if (!players) {
-        const raw = await fetchPgaLeaderboard(tournamentMap.pgaId);
+        const raw = await fetchPgaLeaderboard(tournamentId);
         players = extractPlayers(raw);
-        leaderboardCache.set(tournamentMap.pgaId, players);
+        leaderboardCache.set(tournamentId, players);
       }
 
       const row = findPlayerMatch(bet.player, players);
@@ -44,27 +47,43 @@ export async function GET() {
         continue;
       }
 
+      const roundNum = roundNumberFromLabel(bet.r);
+      const scorecardKey = `${tournamentId}:${row.id}`;
+      let scorecardJson = scorecardCache.get(scorecardKey);
+      if (scorecardJson === undefined) {
+        try {
+          scorecardJson = await fetchPlayerScorecardStats(tournamentId, row.id);
+        } catch {
+          scorecardJson = null; // don't let a scorecard failure block the score-only bets
+        }
+        scorecardCache.set(scorecardKey, scorecardJson);
+      }
+      const scorecard = scorecardJson ? extractScorecardStats(scorecardJson, roundNum) : null;
+
       const parsed = parseBetType(bet.bet);
 
       bet.thru = row.thru;
       bet.auto = {
         thru: row.thru,
         scoreToPar: row.score,
-        birdies: null,
-        bogeys: null,
-        pars: null,
+        birdies: scorecard?.birdies ?? null,
+        bogeys: scorecard?.bogeys ?? null,
+        pars: scorecard?.pars ?? null,
         eagles: null,
         doubleBogeys: null,
-        gir: null,
-        fairways: null,
+        gir: scorecard?.gir ?? null,
+        fairways: scorecard?.fairways ?? null,
         updatedAt: new Date().toISOString(),
       };
 
-      // Only SCORE-type bets are computed automatically for now - GIR,
-      // birdies, and bogeys need a second PGA Tour query we haven't wired
-      // up yet.
       if (parsed.label === "SCORE" && row.score !== null) {
         bet.stat = row.score;
+      } else if (parsed.label === "GIR" && scorecard?.girCount !== null && scorecard?.girCount !== undefined) {
+        bet.stat = scorecard.girCount;
+      } else if (parsed.label === "BIRDIES" && scorecard?.birdies !== null && scorecard?.birdies !== undefined) {
+        bet.stat = scorecard.birdies;
+      } else if (parsed.label === "BOGEYS" && scorecard?.bogeys !== null && scorecard?.bogeys !== undefined) {
+        bet.stat = scorecard.bogeys;
       }
 
       updatedCount += 1;

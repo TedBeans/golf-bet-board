@@ -192,8 +192,9 @@ export default function AdminPage() {
       {saveMsg && <div className="subline" style={{ marginTop: 8 }}>{saveMsg}</div>}
 
       <div className="subline" style={{ marginTop: 24, marginBottom: 40 }}>
-        Currently auto-fills: round score, for bets like "-2 or better" or "E or worse."
-        Greens/birdies/bogeys bets still need manual entry - that's next.
+        Auto-fills round score, GIR, birdies, and bogeys for every bet on the
+        board, matched to players by name. Edit any stat by hand and it locks
+        that bet out of auto-sync until you hit "Resume auto" on it.
       </div>
     </main>
   );
