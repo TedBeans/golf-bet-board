@@ -193,7 +193,7 @@ export default function Page() {
                             <div className="bet-text">{b.bet}</div>
                             {b.oddsLine && (
                               <div className="odds-line">
-                                {b.oddsLine} · DK {b.oddsPrice ?? "—"} · {b.oddsUnits ?? "—"}u
+                                {b.oddsLine} · DK {b.oddsPrice ?? "—"}
                               </div>
                             )}
                           </div>
