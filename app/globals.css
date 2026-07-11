@@ -63,7 +63,7 @@ h1 span{ color: var(--gold-bright); }
 .lock-error{ color: var(--clay); font-size:10px; }
 
 main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
-.tourn{ margin-bottom: 26px; }
+.tourn{ margin-bottom: 26px; position: relative; }
 .tourn-head{
   display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:6px 14px;
   margin-bottom: 10px; padding-bottom:6px; border-bottom: 1px solid var(--line);
@@ -76,6 +76,45 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
 .tsum.loss{ color: var(--clay); }
 .tsum.live{ color: var(--gold-bright); }
 .tsum.tbd{ color: var(--cream-dim); }
+
+.fog-overlay{
+  position:absolute; inset:0; z-index:5; overflow:hidden;
+  border-radius:4px; pointer-events:none;
+}
+.fog-layer{
+  position:absolute; top:0; height:140%; width:220%;
+  background: linear-gradient(90deg, transparent, rgba(225,224,215,0.32) 22%, rgba(225,224,215,0.48) 50%, rgba(225,224,215,0.32) 78%, transparent);
+  filter: blur(16px);
+}
+.fog1{ top:-10%; opacity:0.55; animation: fogdrift-a 24s linear infinite; }
+.fog2{ top:30%; opacity:0.4; animation: fogdrift-b 32s linear infinite; }
+.fog3{ top:65%; opacity:0.5; animation: fogdrift-a 28s linear infinite reverse; }
+
+@keyframes fogdrift-a{
+  0%{ transform: translateX(-55%); }
+  100%{ transform: translateX(5%); }
+}
+@keyframes fogdrift-b{
+  0%{ transform: translateX(0%); }
+  100%{ transform: translateX(-60%); }
+}
+
+.fog-banner{
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  background: rgba(20,23,27,0.78); border:1px solid rgba(225,224,215,0.4);
+  border-radius:6px; padding:16px 28px; text-align:center;
+}
+.fog-banner-title{
+  font-family:'Oswald',sans-serif; font-weight:700; font-size:20px;
+  letter-spacing:0.08em; text-transform:uppercase; color:var(--cream);
+}
+.fog-banner-sub{
+  font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:0.15em;
+  text-transform:uppercase; color:var(--cream-dim); margin-top:4px;
+}
+@media (prefers-reduced-motion: reduce){
+  .fog-layer{ animation: none !important; }
+}
 .tourn-head h2{
   font-family:'Oswald',sans-serif; font-size:15px; font-weight:600;
   letter-spacing:0.05em; text-transform:uppercase; margin:0; color: var(--gold-bright);

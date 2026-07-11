@@ -54,7 +54,7 @@ export default function AdminPage() {
   function setTournamentId(tourn: string, pgaId: string) {
     setMapping((m) => ({
       ...m,
-      tournaments: { ...m.tournaments, [tourn]: { pgaId } },
+      tournaments: { ...m.tournaments, [tourn]: { ...m.tournaments[tourn], pgaId } },
     }));
   }
 
@@ -269,6 +269,22 @@ export default function AdminPage() {
               padding: "8px 10px", borderRadius: 3,
             }}
           />
+          <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 12, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={!!mapping.tournaments[tourn]?.suspended}
+              onChange={(e) =>
+                setMapping((m) => ({
+                  ...m,
+                  tournaments: {
+                    ...m.tournaments,
+                    [tourn]: { pgaId: m.tournaments[tourn]?.pgaId || "", suspended: e.target.checked },
+                  },
+                }))
+              }
+            />
+            Play suspended (weather delay)
+          </label>
         </div>
       ))}
 

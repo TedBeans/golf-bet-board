@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../lib/seed";
+import { Mapping, EMPTY_MAPPING } from "../lib/mapping";
 import { parseBetType, trend, timeToMinutes, friendlyLabel, formatScore, parseScoreInput } from "../lib/betLogic";
 
 const SYNC_INTERVAL_MS = 60000;
@@ -15,6 +16,7 @@ export default function Page() {
   const [saving, setSaving] = useState(false);
   const [syncNote, setSyncNote] = useState("");
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const [mapping, setMapping] = useState<Mapping>(EMPTY_MAPPING);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function loadBets() {
@@ -41,6 +43,7 @@ export default function Page() {
 
   useEffect(() => {
     loadBets().then(() => runSync());
+    fetch("/api/mapping").then((r) => r.json()).then((d) => setMapping(d.mapping || EMPTY_MAPPING));
     const interval = setInterval(runSync, SYNC_INTERVAL_MS);
 
     const stored = typeof window !== "undefined" ? sessionStorage.getItem("bb_passcode") : null;
@@ -172,6 +175,7 @@ export default function Page() {
           const tournBets = Object.values(groups[tourn]).flat();
           const tc = { hit: 0, miss: 0, live: 0, pending: 0 } as Record<string, number>;
           tournBets.forEach((b) => (tc[b.status] = (tc[b.status] || 0) + 1));
+          const isSuspended = !!mapping.tournaments[tourn]?.suspended;
           return (
           <div className="tourn" key={tourn}>
             <div className="tourn-head">
@@ -183,6 +187,17 @@ export default function Page() {
                 <span className="tsum tbd">TBD {tc.pending || 0}</span>
               </div>
             </div>
+            {isSuspended && (
+              <div className="fog-overlay">
+                <div className="fog-layer fog1" />
+                <div className="fog-layer fog2" />
+                <div className="fog-layer fog3" />
+                <div className="fog-banner">
+                  <div className="fog-banner-title">Play suspended</div>
+                  <div className="fog-banner-sub">Fog delay</div>
+                </div>
+              </div>
+            )}
             {Object.keys(groups[tourn]).map((round) => {
               const items = groups[tourn][round]
                 .slice()
