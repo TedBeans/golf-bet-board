@@ -25,6 +25,9 @@ export type Bet = {
   status: "pending" | "live" | "hit" | "miss";
   autoEnabled?: boolean; // if true, sync will overwrite stat/thru/auto
   auto?: AutoStats | null; // full detail line from last successful sync
+  oddsLine?: string | null; // e.g. "Under 69.5"
+  oddsPrice?: string | null; // DK price only, e.g. "-112"
+  oddsUnits?: string | null; // e.g. "1.12"
 };
 
 export const SEED: Bet[] = [

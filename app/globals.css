@@ -92,15 +92,24 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
 .time{ font-size:10px; color:var(--cream-dim); letter-spacing:0.04em; }
 .player{ font-family:'Oswald',sans-serif; font-size:15px; font-weight:600; }
 .bet-text{ font-size:11px; color:var(--cream-dim); margin-top:2px; }
-.status-btns{ display:flex; gap:4px; flex-shrink:0; }
-.sbtn{
-  width:26px; height:26px; border-radius:3px; border:1px solid var(--line);
-  background:transparent; color:var(--cream-dim); font-size:13px; cursor:pointer;
-  display:flex; align-items:center; justify-content:center;
+.odds-line{ font-size:10px; color: var(--gold-bright); margin-top:2px; letter-spacing:0.02em; }
+
+.status-btns{ display:flex; gap:4px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; max-width:180px; }
+.tbd-badge{
+  font-family:'Oswald',sans-serif; font-weight:700; font-size:10px; letter-spacing:0.08em;
+  color: var(--cream-dim); border:1px solid var(--line); border-radius:3px;
+  padding:6px 8px; display:flex; align-items:center;
 }
-.sbtn:disabled{ opacity:0.4; cursor:default; }
-.sbtn.active.hit{ background:var(--live); color:#0c1a13; border-color:var(--live); }
-.sbtn.active.miss{ background:var(--clay); color:#1a0e0a; border-color:var(--clay); }
+.sbtn{
+  border-radius:3px; border:1px solid var(--line);
+  background:transparent; color:var(--cream-dim); cursor:pointer;
+  font-family:'Oswald',sans-serif; font-weight:700; font-size:10px; letter-spacing:0.05em;
+  padding:6px 8px; line-height:1.15; text-align:center;
+}
+.sbtn:disabled{ opacity:0.45; cursor:default; }
+.sbtn.active{ font-size:12px; }
+.sbtn.active.win{ background:var(--live); color:#0c1a13; border-color:var(--live); }
+.sbtn.active.loss{ background:var(--clay); color:#1a0e0a; border-color:var(--clay); }
 .sbtn.active.live{ background:var(--gold-bright); color:#1a1204; border-color:var(--gold-bright); }
 
 .scorecard{

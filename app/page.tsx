@@ -135,10 +135,10 @@ export default function Page() {
           )}
         </div>
         <div className="summary">
-          <div className="pill hit">✅ <b>{counts.hit || 0}</b></div>
-          <div className="pill miss">❌ <b>{counts.miss || 0}</b></div>
-          <div className="pill live">⛳ <b>{counts.live || 0}</b></div>
-          <div className="pill pending">⏳ <b>{counts.pending || 0}</b></div>
+          <div className="pill hit">WIN <b>{counts.hit || 0}</b></div>
+          <div className="pill miss">LOSS <b>{counts.miss || 0}</b></div>
+          <div className="pill live">LIVE <b>{counts.live || 0}</b></div>
+          <div className="pill pending">TBD <b>{counts.pending || 0}</b></div>
 
           <div className="lock">
             {unlocked ? (
@@ -191,31 +191,34 @@ export default function Page() {
                             <div className="time">{b.time}</div>
                             <div className="player">{b.player}</div>
                             <div className="bet-text">{b.bet}</div>
+                            {b.oddsLine && (
+                              <div className="odds-line">
+                                {b.oddsLine} · DK {b.oddsPrice ?? "—"} · {b.oddsUnits ?? "—"}u
+                              </div>
+                            )}
                           </div>
                           <div className="status-btns">
+                            {b.status === "pending" && <span className="tbd-badge">TBD</span>}
                             <button
                               disabled={!unlocked}
-                              className={`sbtn ${b.status === "hit" ? "active hit" : ""}`}
+                              className={`sbtn win ${b.status === "hit" ? "active" : ""}`}
                               onClick={() => cycleStatus(b.id, "hit")}
-                              title="Hit"
                             >
-                              ✅
+                              WIN
                             </button>
                             <button
                               disabled={!unlocked}
-                              className={`sbtn ${b.status === "live" ? "active live" : ""}`}
+                              className={`sbtn live ${b.status === "live" ? "active" : ""}`}
                               onClick={() => cycleStatus(b.id, "live")}
-                              title="Live"
                             >
-                              ⛳
+                              IN PROGRESS
                             </button>
                             <button
                               disabled={!unlocked}
-                              className={`sbtn ${b.status === "miss" ? "active miss" : ""}`}
+                              className={`sbtn loss ${b.status === "miss" ? "active" : ""}`}
                               onClick={() => cycleStatus(b.id, "miss")}
-                              title="Miss"
                             >
-                              ❌
+                              LOSS
                             </button>
                           </div>
                         </div>

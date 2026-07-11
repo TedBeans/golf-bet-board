@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Bet } from "../../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
 import { parseBetsText, ParseResult } from "../../lib/parseBets";
+import { parseOddsText, attachOddsToBets, OddsParseResult } from "../../lib/parseOdds";
 
 export default function AdminPage() {
   const [passcode, setPasscode] = useState("");
@@ -17,6 +18,10 @@ export default function AdminPage() {
   const [importText, setImportText] = useState("");
   const [preview, setPreview] = useState<ParseResult | null>(null);
   const [importMsg, setImportMsg] = useState("");
+
+  const [oddsText, setOddsText] = useState("");
+  const [oddsPreview, setOddsPreview] = useState<OddsParseResult | null>(null);
+  const [oddsMsg, setOddsMsg] = useState("");
 
   useEffect(() => {
     const stored = sessionStorage.getItem("bb_passcode");
@@ -83,6 +88,30 @@ export default function AdminPage() {
         setImportText("");
       } else {
         setImportMsg("Failed to save - check passcode.");
+      }
+    });
+  }
+
+  function previewOdds() {
+    setOddsMsg("");
+    setOddsPreview(parseOddsText(oddsText));
+  }
+
+  function confirmOdds() {
+    if (!oddsPreview || oddsPreview.entries.length === 0) return;
+    const { bets: updatedBets, matched, warnings } = attachOddsToBets(oddsPreview.entries, bets);
+    fetch("/api/bets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, bets: updatedBets }),
+    }).then((r) => {
+      if (r.ok) {
+        setOddsMsg(`Matched ${matched} of ${oddsPreview.entries.length} lines.${warnings.length ? " " + warnings.length + " warning(s) below." : ""}`);
+        setBets(updatedBets);
+        setOddsPreview({ entries: [], warnings });
+        setOddsText("");
+      } else {
+        setOddsMsg("Failed to save - check passcode.");
       }
     });
   }
@@ -162,6 +191,63 @@ export default function AdminPage() {
         </div>
       )}
       {importMsg && <div className="subline" style={{ marginTop: 8 }}>{importMsg}</div>}
+
+      <h1 style={{ marginTop: 36, marginBottom: 4 }}>Load odds & lines</h1>
+      <div className="subline" style={{ marginBottom: 12 }}>
+        Paste the DraftKings-style odds block - a "Tournament Round N" header
+        line, then one "Player **Over/Under** Line ... (DK) for X units" line
+        per bet. Only the DK price is kept even if other books are listed.
+        Matches onto existing bets by player + category + round.
+      </div>
+      <textarea
+        value={oddsText}
+        onChange={(e) => setOddsText(e.target.value)}
+        placeholder={"ISCO Championship Round 3\nLucas Glover **Under** 69.5 -112 (DK) for 1.12 units\n..."}
+        rows={8}
+        style={{
+          width: "100%", background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+          color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 12,
+          padding: "10px", borderRadius: 4, marginBottom: 8, resize: "vertical",
+        }}
+      />
+      <button className="add-btn-inline" onClick={previewOdds} style={{ marginRight: 8 }}>
+        Preview
+      </button>
+
+      {oddsPreview && oddsPreview.entries.length > 0 && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <div className="player" style={{ marginBottom: 8 }}>
+            {oddsPreview.entries.length} line{oddsPreview.entries.length === 1 ? "" : "s"} parsed
+          </div>
+          {oddsPreview.entries.map((e, i) => (
+            <div key={i} className="bet-text" style={{ marginBottom: 4 }}>
+              {e.tournament} · {e.round} · <b style={{ color: "var(--cream)" }}>{e.player}</b> · {e.side} {e.lineValue} ({e.category}) · DK {e.oddsDK ?? "—"} · {e.units ?? "—"}u
+            </div>
+          ))}
+          {oddsPreview.warnings.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              {oddsPreview.warnings.map((w, i) => (
+                <div key={i} className="lock-error" style={{ marginBottom: 4 }}>{w}</div>
+              ))}
+            </div>
+          )}
+          <button
+            className="add-btn-inline"
+            onClick={confirmOdds}
+            style={{ marginTop: 12, width: "100%", padding: 10 }}
+          >
+            Attach these {oddsPreview.entries.length} lines to matching bets
+          </button>
+        </div>
+      )}
+      {oddsPreview && oddsPreview.entries.length === 0 && oddsPreview.warnings.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          {oddsPreview.warnings.map((w, i) => (
+            <div key={i} className="lock-error" style={{ marginBottom: 4 }}>{w}</div>
+          ))}
+        </div>
+      )}
+      {oddsMsg && <div className="subline" style={{ marginTop: 8 }}>{oddsMsg}</div>}
 
       <h1 style={{ marginTop: 36, marginBottom: 4 }}>Auto-sync setup</h1>
       <div className="subline" style={{ marginBottom: 20 }}>
