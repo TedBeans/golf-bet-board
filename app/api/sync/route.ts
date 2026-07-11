@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { redis, BETS_KEY, MAPPING_KEY, SYNC_LOCK_KEY } from "../../../lib/redis";
+import { redis, BETS_KEY, MAPPING_KEY, SYNC_LOCK_KEY, ARCHIVE_KEY } from "../../../lib/redis";
 import { Bet } from "../../../lib/seed";
 import { Mapping } from "../../../lib/mapping";
 import { fetchPgaLeaderboard, fetchPlayerScorecardStats } from "../../../lib/pgatour";
@@ -114,9 +114,39 @@ export async function GET() {
     }
   }
 
-  if (updatedCount > 0) {
-    await redis.set(BETS_KEY, bets);
+  // Once every bet in a tournament+round is decided (win or loss), file the
+  // whole round away to the recap automatically - a bet stays on the live
+  // board as long as anything in its round is still pending/live, even if
+  // that means it sits alongside a newer round's bets for a day or two.
+  const groupMap: Record<string, Bet[]> = {};
+  for (const b of bets) {
+    const key = `${b.t}|||${b.r}`;
+    (groupMap[key] = groupMap[key] || []).push(b);
+  }
+  const remaining: Bet[] = [];
+  const toArchive: Bet[] = [];
+  for (const key of Object.keys(groupMap)) {
+    const groupBets = groupMap[key];
+    const allDecided = groupBets.every((b) => b.status === "hit" || b.status === "miss");
+    if (allDecided) {
+      groupBets.forEach((b) => toArchive.push({ ...b, archivedAt: new Date().toISOString() }));
+    } else {
+      remaining.push(...groupBets);
+    }
   }
 
-  return NextResponse.json({ ok: true, updated: updatedCount, errors });
+  let finalBets = bets;
+  let archivedCount = 0;
+  if (toArchive.length > 0) {
+    const existingArchive = (await redis.get<Bet[]>(ARCHIVE_KEY)) || [];
+    await redis.set(ARCHIVE_KEY, [...existingArchive, ...toArchive]);
+    finalBets = remaining;
+    archivedCount = toArchive.length;
+  }
+
+  if (updatedCount > 0 || archivedCount > 0) {
+    await redis.set(BETS_KEY, finalBets);
+  }
+
+  return NextResponse.json({ ok: true, updated: updatedCount, archived: archivedCount, errors });
 }

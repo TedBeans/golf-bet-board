@@ -15,3 +15,4 @@ export const redis = new Redis({ url, token });
 export const BETS_KEY = "golf-bet-board:bets";
 export const MAPPING_KEY = "golf-bet-board:mapping";
 export const SYNC_LOCK_KEY = "golf-bet-board:last-sync-at";
+export const ARCHIVE_KEY = "golf-bet-board:archive";

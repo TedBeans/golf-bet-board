@@ -28,6 +28,8 @@ export type Bet = {
   oddsLine?: string | null; // e.g. "Under 69.5"
   oddsPrice?: string | null; // DK price only, e.g. "-112"
   oddsUnits?: string | null; // e.g. "1.12"
+  loadedDate?: string; // "YYYY-MM-DD" - the day these bets were loaded onto the board
+  archivedAt?: string; // ISO timestamp - when this bet moved to the recap
 };
 
 export const SEED: Bet[] = [

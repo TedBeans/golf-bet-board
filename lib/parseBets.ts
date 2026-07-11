@@ -14,6 +14,9 @@ export function parseBetsText(text: string): ParseResult {
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
+  const today = new Date();
+  const loadedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
   let currentTournament = "";
   let currentRound = "";
   const bets: Bet[] = [];
@@ -55,6 +58,7 @@ export function parseBetsText(text: string): ParseResult {
         status: "pending",
         autoEnabled: true,
         auto: null,
+        loadedDate,
       });
       continue;
     }

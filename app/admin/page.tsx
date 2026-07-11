@@ -23,6 +23,8 @@ export default function AdminPage() {
   const [oddsPreview, setOddsPreview] = useState<OddsParseResult | null>(null);
   const [oddsMsg, setOddsMsg] = useState("");
 
+  const [forceMsg, setForceMsg] = useState("");
+
   useEffect(() => {
     const stored = sessionStorage.getItem("bb_passcode");
     if (stored) {
@@ -51,6 +53,31 @@ export default function AdminPage() {
 
   const tournaments = Array.from(new Set(bets.map((b) => b.t)));
 
+  const roundGroups = Array.from(new Set(bets.map((b) => `${b.t}|||${b.r}`))).map((key) => {
+    const [t, r] = key.split("|||");
+    const groupBets = bets.filter((b) => b.t === t && b.r === r);
+    const pending = groupBets.filter((b) => b.status === "pending" || b.status === "live").length;
+    return { t, r, total: groupBets.length, pending, decided: groupBets.length - pending };
+  });
+
+  function forceArchive(tourn: string, round: string) {
+    fetch("/api/archive", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, tournament: tourn, round }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) {
+          setBets((prev) => prev.filter((b) => !(b.t === tourn && b.r === round)));
+          setForceMsg(`Archived ${d.archived} bet(s) from ${tourn} ${round}.`);
+        } else {
+          setForceMsg("Failed - check passcode.");
+        }
+        setTimeout(() => setForceMsg(""), 4000);
+      });
+  }
+
   function setTournamentId(tourn: string, pgaId: string) {
     setMapping((m) => ({
       ...m,
@@ -76,20 +103,27 @@ export default function AdminPage() {
 
   function confirmImport() {
     if (!preview || preview.bets.length === 0) return;
-    fetch("/api/bets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ passcode, bets: preview.bets }),
-    }).then((r) => {
-      if (r.ok) {
-        setImportMsg(`Board replaced with ${preview.bets.length} bets.`);
-        setBets(preview.bets);
-        setPreview(null);
-        setImportText("");
-      } else {
-        setImportMsg("Failed to save - check passcode.");
-      }
-    });
+    fetch("/api/bets")
+      .then((r) => r.json())
+      .then((d) => {
+        const current: Bet[] = d.bets || [];
+        const merged = [...current, ...preview.bets];
+        return fetch("/api/bets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ passcode, bets: merged }),
+        }).then((r) => ({ r, merged }));
+      })
+      .then(({ r, merged }) => {
+        if (r.ok) {
+          setImportMsg(`Added ${preview.bets.length} bets. Anything still unresolved from before stays on the board too.`);
+          setBets(merged);
+          setPreview(null);
+          setImportText("");
+        } else {
+          setImportMsg("Failed to save - check passcode.");
+        }
+      });
   }
 
   function previewOdds() {
@@ -146,7 +180,8 @@ export default function AdminPage() {
       <div className="subline" style={{ marginBottom: 12 }}>
         Paste the nightly list in the usual format - a tournament header line,
         a "Round N:" line, then one "TIME Player Name bet type:" line per bet.
-        This replaces the entire board.
+        This adds to the board - anything still unresolved from a prior round
+        (like a suspended round) stays visible until it's decided.
       </div>
       <textarea
         value={importText}
@@ -186,7 +221,7 @@ export default function AdminPage() {
             disabled={preview.bets.length === 0}
             style={{ marginTop: 12, width: "100%", padding: 10 }}
           >
-            Replace board with these {preview.bets.length} bets
+            Add these {preview.bets.length} bets to the board
           </button>
         </div>
       )}
@@ -248,6 +283,25 @@ export default function AdminPage() {
         </div>
       )}
       {oddsMsg && <div className="subline" style={{ marginTop: 8 }}>{oddsMsg}</div>}
+
+      <h1 style={{ marginTop: 36, marginBottom: 4 }}>Live board rounds</h1>
+      <div className="subline" style={{ marginBottom: 12 }}>
+        Rounds archive to the recap automatically once every bet in them is
+        decided. Use this only if one will never fully resolve (withdrawal,
+        etc.) and you want to file it away manually.
+      </div>
+      {roundGroups.map((g) => (
+        <div key={`${g.t}|||${g.r}`} className="card" style={{ marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div className="player" style={{ fontSize: 14 }}>{g.t} · {g.r}</div>
+            <div className="subline" style={{ marginTop: 2 }}>{g.decided} decided · {g.pending} still pending/live</div>
+          </div>
+          <button className="add-btn-inline" onClick={() => forceArchive(g.t, g.r)}>
+            Force archive
+          </button>
+        </div>
+      ))}
+      {forceMsg && <div className="subline" style={{ marginBottom: 8 }}>{forceMsg}</div>}
 
       <h1 style={{ marginTop: 36, marginBottom: 4 }}>Auto-sync setup</h1>
       <div className="subline" style={{ marginBottom: 20 }}>

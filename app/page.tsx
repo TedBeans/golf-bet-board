@@ -168,6 +168,7 @@ export default function Page() {
                 <button onClick={tryUnlock}>Unlock</button>
               </>
             )}
+            <Link href="/recap" className="admin-link">recap</Link>
           </div>
         </div>
         {lockError && <div className="lock-error">{lockError}</div>}
