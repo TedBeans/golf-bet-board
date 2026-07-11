@@ -87,80 +87,77 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
   border-radius:4px; pointer-events:none;
 }
 
-.fog-layer{
-  position:absolute; top:0; height:140%; width:220%;
-  background: linear-gradient(90deg, transparent, rgba(225,224,215,0.32) 22%, rgba(225,224,215,0.48) 50%, rgba(225,224,215,0.32) 78%, transparent);
-  filter: blur(16px);
+/* Fog: soft blurred blobs drifting slowly, no hard edges or banding */
+.fog-blob{
+  position:absolute; border-radius:50%; filter: blur(28px);
+  background: radial-gradient(circle, rgba(225,224,215,0.22), transparent 72%);
 }
-.fog1{ top:-10%; opacity:0.55; animation: fogdrift-a 24s linear infinite; }
-.fog2{ top:30%; opacity:0.4; animation: fogdrift-b 32s linear infinite; }
-.fog3{ top:65%; opacity:0.5; animation: fogdrift-a 28s linear infinite reverse; }
-
-@keyframes fogdrift-a{
-  0%{ transform: translateX(-55%); }
-  100%{ transform: translateX(5%); }
+.fb1{ width:260px; height:140px; top:-10%; left:-15%; animation: driftA 34s linear infinite; }
+.fb2{ width:220px; height:120px; top:35%; left:40%; animation: driftB 42s linear infinite; }
+.fb3{ width:300px; height:150px; top:60%; left:-10%; animation: driftA 38s linear infinite reverse; }
+.fb4{ width:200px; height:110px; top:10%; left:60%; animation: driftB 46s linear infinite reverse; }
+@keyframes driftA{
+  0%{ transform: translateX(-10%); }
+  100%{ transform: translateX(120%); }
 }
-@keyframes fogdrift-b{
-  0%{ transform: translateX(0%); }
-  100%{ transform: translateX(-60%); }
-}
-
-.rain-layer{ position:absolute; inset:0; }
-.rain-light{
-  opacity:0.32;
-  background-image: repeating-linear-gradient(115deg, rgba(210,220,230,0.28) 0px, rgba(210,220,230,0.28) 1px, transparent 1px, transparent 14px);
-  animation: rainfall 0.6s linear infinite;
-}
-.rain-heavy{
-  opacity:0.5;
-  background-image: repeating-linear-gradient(112deg, rgba(210,220,230,0.4) 0px, rgba(210,220,230,0.4) 2px, transparent 2px, transparent 9px);
-  animation: rainfall 0.28s linear infinite;
-}
-@keyframes rainfall{
-  0%{ background-position:0 0; }
-  100%{ background-position:-14px 34px; }
+@keyframes driftB{
+  0%{ transform: translateX(10%); }
+  100%{ transform: translateX(-130%); }
 }
 
-.storm-tint{ position:absolute; inset:0; background: rgba(8,10,14,0.52); }
-.lightning{
-  position:absolute; inset:0; background:#eef2ff; opacity:0;
-  animation: lightning-flash 7s infinite;
+/* Storm: light tint, small falling streaks, rare subtle bolt */
+.storm-tint{ position:absolute; inset:0; background: rgba(8,10,14,0.16); }
+.raindrop{
+  position:absolute; top:-6%; width:2px; height:14px; border-radius:2px;
+  background: linear-gradient(180deg, transparent, rgba(200,215,230,0.5));
+  animation-name: raindrop-fall; animation-timing-function: linear; animation-iteration-count: infinite;
 }
-.lightning2{ animation-delay: 3.4s; animation-duration: 9.5s; }
-@keyframes lightning-flash{
-  0%, 91%, 100% { opacity:0; }
-  92% { opacity:0.55; }
-  92.5% { opacity:0.05; }
-  93% { opacity:0.4; }
-  93.5%{ opacity:0; }
+@keyframes raindrop-fall{
+  0%{ transform: translateY(-20px); opacity:0; }
+  12%{ opacity:0.7; }
+  85%{ opacity:0.7; }
+  100%{ transform: translateY(480px); opacity:0; }
+}
+.bolt-svg{ position:absolute; opacity:0; }
+.bolt-svg.b1{ top:8%; left:20%; animation: bolt-flicker 13s infinite; }
+.bolt-svg.b2{ top:14%; left:68%; animation: bolt-flicker 17s infinite; animation-delay: 6s; }
+.bolt-flash{ position:absolute; inset:0; background:#dfe6f2; opacity:0; }
+.bolt-flash.b1{ animation: bolt-tint 13s infinite; }
+.bolt-flash.b2{ animation: bolt-tint 17s infinite; animation-delay: 6s; }
+@keyframes bolt-flicker{
+  0%, 96%, 100% { opacity:0; }
+  96.4% { opacity:0.9; }
+  96.7% { opacity:0.15; }
+  97% { opacity:0.7; }
+  97.4%{ opacity:0; }
+}
+@keyframes bolt-tint{
+  0%, 96%, 100% { opacity:0; }
+  96.4% { opacity:0.12; }
+  96.7% { opacity:0.02; }
+  97% { opacity:0.08; }
+  97.4%{ opacity:0; }
 }
 
-.dark-tint{ position:absolute; inset:0; background: linear-gradient(180deg, rgba(6,8,14,0.8), rgba(6,8,14,0.88)); }
-.moon{
-  position:absolute; top:14%; right:14%; width:44px; height:44px; border-radius:50%;
-  background: radial-gradient(circle at 35% 35%, #FDF6E3, #E8DDB5 60%, #CBBE8E 100%);
-  box-shadow: 0 0 22px 6px rgba(253,246,227,0.3);
+/* Darkness: warm dusk wash (not a blackout) with a crescent moon */
+.dusk-tint{
+  position:absolute; inset:0;
+  background: linear-gradient(160deg, rgba(64,32,44,0.3), rgba(28,22,42,0.28));
+}
+.moon-crescent{
+  position:absolute; top:14%; right:14%; width:40px; height:40px; border-radius:50%;
+  background: #F3D9A8;
+  -webkit-mask-image: radial-gradient(circle at 66% 38%, transparent 58%, black 60%);
+  mask-image: radial-gradient(circle at 66% 38%, transparent 58%, black 60%);
+  box-shadow: 0 0 16px 3px rgba(243,217,168,0.22);
 }
 .star{
   position:absolute; width:2px; height:2px; background:var(--cream);
-  border-radius:50%; opacity:0.75;
+  border-radius:50%; opacity:0.55;
 }
 
-.fog-banner{
-  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-  background: rgba(20,23,27,0.78); border:1px solid rgba(225,224,215,0.4);
-  border-radius:6px; padding:16px 28px; text-align:center;
-}
-.fog-banner-title{
-  font-family:'Oswald',sans-serif; font-weight:700; font-size:20px;
-  letter-spacing:0.08em; text-transform:uppercase; color:var(--cream);
-}
-.fog-banner-sub{
-  font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:0.15em;
-  text-transform:uppercase; color:var(--cream-dim); margin-top:4px;
-}
 @media (prefers-reduced-motion: reduce){
-  .fog-layer, .rain-layer, .lightning{ animation: none !important; }
+  .fog-blob, .raindrop, .bolt-svg, .bolt-flash{ animation: none !important; }
 }
 .tourn-head h2{
   font-family:'Oswald',sans-serif; font-size:15px; font-weight:600;

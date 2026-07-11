@@ -8,6 +8,13 @@ import { parseBetType, trend, timeToMinutes, friendlyLabel, formatScore, parseSc
 
 const SYNC_INTERVAL_MS = 60000;
 
+// Fixed (not random) so it doesn't reshuffle on every re-render/sync tick.
+const RAINDROPS = Array.from({ length: 18 }).map((_, i) => ({
+  left: (i * 37) % 100,
+  delay: (i * 0.41) % 2.2,
+  duration: 0.7 + (i % 5) * 0.09,
+}));
+
 export default function Page() {
   const [bets, setBets] = useState<Bet[] | null>(null);
   const [passcode, setPasscode] = useState("");
@@ -195,39 +202,42 @@ export default function Page() {
               <div className={`suspend-overlay variant-${suspendType}`}>
                 {suspendType === "fog" && (
                   <>
-                    <div className="fog-layer fog1" />
-                    <div className="fog-layer fog2" />
-                    <div className="fog-layer fog3" />
-                    <div className="rain-layer rain-light" />
+                    <div className="fog-blob fb1" />
+                    <div className="fog-blob fb2" />
+                    <div className="fog-blob fb3" />
+                    <div className="fog-blob fb4" />
                   </>
                 )}
                 {suspendType === "storm" && (
                   <>
                     <div className="storm-tint" />
-                    <div className="rain-layer rain-heavy" />
-                    <div className="lightning" />
-                    <div className="lightning lightning2" />
+                    {RAINDROPS.map((d, i) => (
+                      <div
+                        key={i}
+                        className="raindrop"
+                        style={{ left: `${d.left}%`, animationDelay: `${d.delay}s`, animationDuration: `${d.duration}s` }}
+                      />
+                    ))}
+                    <div className="bolt-flash b1" />
+                    <svg className="bolt-svg b1" viewBox="0 0 24 24" width="26" height="26">
+                      <polygon points="13,1 5,13 11,13 9,23 19,10 12,10" fill="#EFEBE0" />
+                    </svg>
+                    <div className="bolt-flash b2" />
+                    <svg className="bolt-svg b2" viewBox="0 0 24 24" width="20" height="20">
+                      <polygon points="13,1 5,13 11,13 9,23 19,10 12,10" fill="#EFEBE0" />
+                    </svg>
                   </>
                 )}
                 {suspendType === "dark" && (
                   <>
-                    <div className="dark-tint" />
-                    <div className="moon" />
-                    <div className="star" style={{ top: "18%", left: "14%" }} />
-                    <div className="star" style={{ top: "32%", left: "72%" }} />
-                    <div className="star" style={{ top: "55%", left: "38%" }} />
-                    <div className="star" style={{ top: "14%", left: "52%" }} />
-                    <div className="star" style={{ top: "68%", left: "80%" }} />
+                    <div className="dusk-tint" />
+                    <div className="moon-crescent" />
+                    <div className="star" style={{ top: "20%", left: "18%" }} />
+                    <div className="star" style={{ top: "38%", left: "78%" }} />
+                    <div className="star" style={{ top: "58%", left: "42%" }} />
+                    <div className="star" style={{ top: "16%", left: "58%" }} />
                   </>
                 )}
-                <div className="fog-banner">
-                  <div className="fog-banner-title">Play suspended</div>
-                  <div className="fog-banner-sub">
-                    {suspendType === "fog" && "Fog delay"}
-                    {suspendType === "storm" && "Storm delay"}
-                    {suspendType === "dark" && "Darkness"}
-                  </div>
-                </div>
               </div>
             )}
             {Object.keys(groups[tourn]).map((round) => {
