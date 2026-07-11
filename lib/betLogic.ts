@@ -59,6 +59,41 @@ export function friendlyLabel(label: string): string {
   }
 }
 
+// Count-based bets (GIR, birdies, bogeys) only ever move in one direction as
+// holes are played - the count can't go down. That means once the best or
+// worst possible final number is already decided relative to the target,
+// the bet is mathematically locked regardless of what happens on the
+// remaining holes. Round score is deliberately excluded: a score can go up
+// or down on any hole, so it's never locked in until the round finishes.
+export function autoGradeStatus(
+  parsed: ParsedBet,
+  stat: number | null,
+  thru: number | null,
+  holesTotal = 18
+): "hit" | "miss" | null {
+  if (parsed.type === "generic" || parsed.label === "SCORE") return null;
+  if (stat === null || stat === undefined || thru === null || thru === undefined) return null;
+  if (parsed.target === null || parsed.target === undefined) return null;
+
+  const remaining = holesTotal - thru;
+  if (remaining < 0) return null;
+  const worstCase = stat + remaining; // max the count could still reach
+
+  if (parsed.type === "max") {
+    // Bet wins if the final count ends at or under the target.
+    if (stat > parsed.target) return "miss"; // already over, can't undo
+    if (worstCase <= parsed.target) return "hit"; // can't exceed it even in the worst case
+    return null;
+  }
+  if (parsed.type === "min") {
+    // Bet wins if the final count reaches at least the target.
+    if (stat >= parsed.target) return "hit"; // already there, can't lose it
+    if (worstCase < parsed.target) return "miss"; // can't reach it even in the best case
+    return null;
+  }
+  return null;
+}
+
 export function timeToMinutes(tstr: string): number {
   const m = tstr.match(/(\d+):(\d+)\s*(AM|PM)/i);
   if (!m) return 9999;

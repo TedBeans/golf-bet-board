@@ -5,7 +5,7 @@ import { Mapping } from "../../../lib/mapping";
 import { fetchPgaLeaderboard, fetchPlayerScorecardStats } from "../../../lib/pgatour";
 import { extractPlayers, findPlayerMatch, PgaPlayerRow } from "../../../lib/pgaMatch";
 import { extractScorecardStats, roundNumberFromLabel } from "../../../lib/pgaScorecard";
-import { parseBetType } from "../../../lib/betLogic";
+import { parseBetType, autoGradeStatus } from "../../../lib/betLogic";
 
 const SYNC_LOCK_MS = 45000;
 
@@ -98,6 +98,13 @@ export async function GET() {
         bet.stat = scorecard.birdies;
       } else if (parsed.label === "BOGEYS" && scorecard?.bogeys !== null && scorecard?.bogeys !== undefined) {
         bet.stat = scorecard.bogeys;
+      }
+
+      // Only progress a bet forward automatically while it's still
+      // pending/live - never overwrite a status you set by hand.
+      if (bet.status === "pending" || bet.status === "live") {
+        const graded = autoGradeStatus(parsed, bet.stat, bet.thru);
+        if (graded) bet.status = graded;
       }
 
       updatedCount += 1;
