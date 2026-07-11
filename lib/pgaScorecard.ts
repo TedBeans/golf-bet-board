@@ -13,12 +13,25 @@ function findLabel(list: any[], label: string): string | null {
   return item ? item.total : null;
 }
 
+// PGA Tour represents "zero occurrences so far" as a dash, an empty string,
+// or by omitting the stat row entirely - all of those should read as 0, not
+// as "we don't have this yet", so counting bets grade correctly.
+function parseCountValue(str: string | null): number {
+  if (str === null || str === undefined) return 0;
+  const t = str.trim();
+  if (t === "" || t === "-" || t === "\u2014") return 0;
+  const n = parseInt(t, 10);
+  return isNaN(n) ? 0 : n;
+}
+
 // Pulls the numerator out of PGA Tour's "72.22% (13/18)" style display strings.
 function numeratorOf(display: string | null): number | null {
   if (!display) return null;
-  const m = display.match(/\((\d+)\s*\/\s*\d+\)/) || display.match(/(\d+)\s*\/\s*\d+/);
+  const trimmed = display.trim();
+  if (trimmed === "-" || trimmed === "\u2014") return 0;
+  const m = trimmed.match(/\((\d+)\s*\/\s*\d+\)/) || trimmed.match(/(\d+)\s*\/\s*\d+/);
   if (m) return parseInt(m[1], 10);
-  const n = parseInt(display, 10);
+  const n = parseInt(trimmed, 10);
   return isNaN(n) ? null : n;
 }
 
@@ -44,9 +57,9 @@ export function extractScorecardStats(json: any, roundNumber: number): Scorecard
   const fairwaysDisplay = findLabel(performance, "Driving Accuracy");
 
   return {
-    birdies: birdiesStr !== null ? parseInt(birdiesStr, 10) : null,
-    bogeys: bogeysStr !== null ? parseInt(bogeysStr, 10) : null,
-    pars: parsStr !== null ? parseInt(parsStr, 10) : null,
+    birdies: parseCountValue(birdiesStr),
+    bogeys: parseCountValue(bogeysStr),
+    pars: parseCountValue(parsStr),
     gir: fractionOnly(girDisplay),
     girCount: numeratorOf(girDisplay),
     fairways: fractionOnly(fairwaysDisplay),

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../lib/seed";
-import { parseBetType, trend, timeToMinutes, friendlyLabel } from "../lib/betLogic";
+import { parseBetType, trend, timeToMinutes, friendlyLabel, formatScore, parseScoreInput } from "../lib/betLogic";
 
 const SYNC_INTERVAL_MS = 60000;
 
@@ -230,19 +230,31 @@ export default function Page() {
                           </div>
                           <div className="sc-cell">
                             <div className="sc-label">{friendlyLabel(parsed.label)}</div>
-                            <input
-                              disabled={!unlocked}
-                              className={`sc-input trend-${cls}`}
-                              type="number"
-                              step="1"
-                              placeholder="—"
-                              value={b.stat === null || b.stat === undefined ? "" : b.stat}
-                              onChange={(e) =>
-                                updateBetManually(b.id, {
-                                  stat: e.target.value === "" ? null : parseFloat(e.target.value),
-                                })
-                              }
-                            />
+                            {parsed.label === "SCORE" ? (
+                              <input
+                                disabled={!unlocked}
+                                className={`sc-input trend-${cls}`}
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="—"
+                                value={formatScore(b.stat, "")}
+                                onChange={(e) => updateBetManually(b.id, { stat: parseScoreInput(e.target.value) })}
+                              />
+                            ) : (
+                              <input
+                                disabled={!unlocked}
+                                className={`sc-input trend-${cls}`}
+                                type="number"
+                                step="1"
+                                placeholder="—"
+                                value={b.stat === null || b.stat === undefined ? "" : b.stat}
+                                onChange={(e) =>
+                                  updateBetManually(b.id, {
+                                    stat: e.target.value === "" ? null : parseFloat(e.target.value),
+                                  })
+                                }
+                              />
+                            )}
                           </div>
                           <div className="sc-cell">
                             <div className="sc-label">Thru</div>
@@ -276,7 +288,7 @@ export default function Page() {
                           {b.auto && (
                             <span className="detail-strip">
                               <span className={parsed.label === "SCORE" ? "detail-hi" : ""}>
-                                Score {b.auto.scoreToPar !== null ? (b.auto.scoreToPar > 0 ? `+${b.auto.scoreToPar}` : b.auto.scoreToPar) : "—"}
+                                Score {formatScore(b.auto.scoreToPar)}
                               </span>
                               {" · "}
                               <span className={parsed.label === "GIR" ? "detail-hi" : ""}>

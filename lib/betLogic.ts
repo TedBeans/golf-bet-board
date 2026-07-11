@@ -94,6 +94,24 @@ export function autoGradeStatus(
   return null;
 }
 
+// Displays a to-par number the way golf actually reads it - "E" for even,
+// "+3" for over, "-2" for under - while the underlying value stays a plain
+// number (0, 3, -2) for all math and grading.
+export function formatScore(n: number | null | undefined, emptyText = "\u2014"): string {
+  if (n === null || n === undefined || isNaN(n)) return emptyText;
+  if (n === 0) return "E";
+  return n > 0 ? `+${n}` : `${n}`;
+}
+
+// Parses user-typed score input ("E", "+3", "-2", "3") back into a number.
+export function parseScoreInput(v: string): number | null {
+  const t = v.trim();
+  if (t === "") return null;
+  if (/^e$/i.test(t)) return 0;
+  const n = parseInt(t.replace(/^\+/, ""), 10);
+  return isNaN(n) ? null : n;
+}
+
 export function timeToMinutes(tstr: string): number {
   const m = tstr.match(/(\d+):(\d+)\s*(AM|PM)/i);
   if (!m) return 9999;
