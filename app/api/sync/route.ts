@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { redis, BETS_KEY, MAPPING_KEY } from "../../../lib/redis";
+import { redis, BETS_KEY, MAPPING_KEY, SYNC_LOCK_KEY } from "../../../lib/redis";
 import { Bet } from "../../../lib/seed";
 import { Mapping } from "../../../lib/mapping";
 import { fetchPgaLeaderboard, fetchPlayerScorecardStats } from "../../../lib/pgatour";
@@ -7,11 +7,25 @@ import { extractPlayers, findPlayerMatch, PgaPlayerRow } from "../../../lib/pgaM
 import { extractScorecardStats, roundNumberFromLabel } from "../../../lib/pgaScorecard";
 import { parseBetType } from "../../../lib/betLogic";
 
+const SYNC_LOCK_MS = 45000;
+
 // Triggered by the browser (not a server cron - see README) roughly once a
 // minute while the board is open. No passcode required: this route only
 // recomputes values from the tournament mapping already saved server-side,
 // it can't accept arbitrary bet data from the caller.
+//
+// Because every open tab triggers its own sync call, a friend group with
+// many tabs open at once could otherwise multiply real PGA Tour requests.
+// This lock collapses all of that into one shared fetch per ~45s window,
+// regardless of how many people are watching.
 export async function GET() {
+  const now = Date.now();
+  const lastSync = await redis.get<number>(SYNC_LOCK_KEY);
+  if (lastSync && now - lastSync < SYNC_LOCK_MS) {
+    return NextResponse.json({ ok: true, updated: 0, errors: [], skipped: true });
+  }
+  await redis.set(SYNC_LOCK_KEY, now);
+
   const [bets, mapping] = await Promise.all([
     redis.get<Bet[]>(BETS_KEY),
     redis.get<Mapping>(MAPPING_KEY),

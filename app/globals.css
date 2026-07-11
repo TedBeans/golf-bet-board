@@ -33,6 +33,7 @@ h1{
 }
 h1 span{ color: var(--gold-bright); }
 .subline{ font-size: 11px; color: var(--cream-dim); letter-spacing: 0.08em; text-transform: uppercase; }
+.last-synced{ color: var(--live); }
 .summary{ display:flex; gap:14px; margin-top:12px; flex-wrap:wrap; align-items:center; }
 .pill{
   font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:0.06em; text-transform:uppercase;

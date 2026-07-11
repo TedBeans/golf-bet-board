@@ -14,6 +14,7 @@ export default function Page() {
   const [lockError, setLockError] = useState("");
   const [saving, setSaving] = useState(false);
   const [syncNote, setSyncNote] = useState("");
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function loadBets() {
@@ -27,10 +28,11 @@ export default function Page() {
     fetch("/api/sync")
       .then((r) => r.json())
       .then((d) => {
-        if (d.updated > 0) loadBets();
+        setLastSynced(new Date());
+        loadBets();
         if (d.errors && d.errors.length > 0) {
           setSyncNote(`Auto-sync: ${d.errors[0]}`);
-        } else if (d.updated > 0) {
+        } else {
           setSyncNote("");
         }
       })
@@ -126,7 +128,12 @@ export default function Page() {
         <h1>
           Bet <span>Board</span>
         </h1>
-        <div className="subline">Live tournament wager tracker</div>
+        <div className="subline">
+          Live tournament wager tracker
+          {lastSynced && (
+            <span className="last-synced"> · updated {lastSynced.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })}</span>
+          )}
+        </div>
         <div className="summary">
           <div className="pill hit">✅ <b>{counts.hit || 0}</b></div>
           <div className="pill miss">❌ <b>{counts.miss || 0}</b></div>
