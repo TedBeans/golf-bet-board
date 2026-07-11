@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
+import { parseBetsText, ParseResult } from "../../lib/parseBets";
 
 export default function AdminPage() {
   const [passcode, setPasscode] = useState("");
@@ -12,6 +13,10 @@ export default function AdminPage() {
   const [bets, setBets] = useState<Bet[]>([]);
   const [mapping, setMapping] = useState<Mapping>(EMPTY_MAPPING);
   const [saveMsg, setSaveMsg] = useState("");
+
+  const [importText, setImportText] = useState("");
+  const [preview, setPreview] = useState<ParseResult | null>(null);
+  const [importMsg, setImportMsg] = useState("");
 
   useEffect(() => {
     const stored = sessionStorage.getItem("bb_passcode");
@@ -59,6 +64,29 @@ export default function AdminPage() {
     });
   }
 
+  function previewImport() {
+    setImportMsg("");
+    setPreview(parseBetsText(importText));
+  }
+
+  function confirmImport() {
+    if (!preview || preview.bets.length === 0) return;
+    fetch("/api/bets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, bets: preview.bets }),
+    }).then((r) => {
+      if (r.ok) {
+        setImportMsg(`Board replaced with ${preview.bets.length} bets.`);
+        setBets(preview.bets);
+        setPreview(null);
+        setImportText("");
+      } else {
+        setImportMsg("Failed to save - check passcode.");
+      }
+    });
+  }
+
   if (!unlocked) {
     return (
       <main style={{ maxWidth: 420, margin: "80px auto", textAlign: "center" }}>
@@ -84,7 +112,58 @@ export default function AdminPage() {
       <div style={{ marginBottom: 16 }}>
         <Link href="/" className="admin-link">← back to board</Link>
       </div>
-      <h1 style={{ marginBottom: 4 }}>Auto-sync setup</h1>
+
+      <h1 style={{ marginBottom: 4 }}>Load tonight's bets</h1>
+      <div className="subline" style={{ marginBottom: 12 }}>
+        Paste the nightly list in the usual format - a tournament header line,
+        a "Round N:" line, then one "TIME Player Name bet type:" line per bet.
+        This replaces the entire board.
+      </div>
+      <textarea
+        value={importText}
+        onChange={(e) => setImportText(e.target.value)}
+        placeholder={"ISCO Championship:\nRound 3:\n11:00 AM Jackson Koivun -2 or better:\n..."}
+        rows={10}
+        style={{
+          width: "100%", background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+          color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 12,
+          padding: "10px", borderRadius: 4, marginBottom: 8, resize: "vertical",
+        }}
+      />
+      <button className="add-btn-inline" onClick={previewImport} style={{ marginRight: 8 }}>
+        Preview
+      </button>
+
+      {preview && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <div className="player" style={{ marginBottom: 8 }}>
+            {preview.bets.length} bet{preview.bets.length === 1 ? "" : "s"} parsed
+          </div>
+          {preview.bets.map((b) => (
+            <div key={b.id} className="bet-text" style={{ marginBottom: 4 }}>
+              {b.t} · {b.r} · {b.time} · <b style={{ color: "var(--cream)" }}>{b.player}</b> · {b.bet}
+            </div>
+          ))}
+          {preview.warnings.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              {preview.warnings.map((w, i) => (
+                <div key={i} className="lock-error" style={{ marginBottom: 4 }}>{w}</div>
+              ))}
+            </div>
+          )}
+          <button
+            className="add-btn-inline"
+            onClick={confirmImport}
+            disabled={preview.bets.length === 0}
+            style={{ marginTop: 12, width: "100%", padding: 10 }}
+          >
+            Replace board with these {preview.bets.length} bets
+          </button>
+        </div>
+      )}
+      {importMsg && <div className="subline" style={{ marginTop: 8 }}>{importMsg}</div>}
+
+      <h1 style={{ marginTop: 36, marginBottom: 4 }}>Auto-sync setup</h1>
       <div className="subline" style={{ marginBottom: 20 }}>
         One number per tournament. Open the tournament's leaderboard on pgatour.com
         and copy the "Rxxxxxxx" segment from the URL - for example
@@ -112,10 +191,11 @@ export default function AdminPage() {
       </button>
       {saveMsg && <div className="subline" style={{ marginTop: 8 }}>{saveMsg}</div>}
 
-      <div className="subline" style={{ marginTop: 24 }}>
+      <div className="subline" style={{ marginTop: 24, marginBottom: 40 }}>
         Currently auto-fills: round score, for bets like "-2 or better" or "E or worse."
         Greens/birdies/bogeys bets still need manual entry - that's next.
       </div>
     </main>
   );
 }
+
