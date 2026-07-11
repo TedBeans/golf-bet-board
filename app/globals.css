@@ -1,11 +1,11 @@
 :root{
-  --fairway-dark: #0E211D;
+  --fairway-dark: #14171B;
   --cream: #F1ECDD;
   --cream-dim: #A7A08D;
   --gold: #C9A02B;
   --gold-bright: #E4BE4A;
   --clay: #C06A4C;
-  --live: #4F9576;
+  --live: #4CAF6E;
   --line: rgba(241,236,221,0.12);
   --line-soft: rgba(241,236,221,0.07);
 }
@@ -13,7 +13,7 @@
 html, body { margin:0; padding:0; }
 body{
   background: var(--fairway-dark);
-  background-image: radial-gradient(circle at 50% 0%, rgba(79,149,118,0.20), transparent 60%);
+  background-image: radial-gradient(circle at 50% 0%, rgba(76,175,110,0.20), transparent 60%);
   color: var(--cream);
   font-family: 'JetBrains Mono', monospace;
   min-height:100vh;
@@ -41,7 +41,7 @@ h1 span{ color: var(--gold-bright); }
   display:flex; gap:6px; align-items:center;
 }
 .pill b{ font-family:'JetBrains Mono',monospace; font-size:12px; }
-.pill.hit{ color: var(--live); border-color: rgba(79,149,118,0.6); }
+.pill.hit{ color: var(--live); border-color: rgba(76,175,110,0.6); }
 .pill.miss{ color: var(--clay); border-color: rgba(192,106,76,0.4); }
 .pill.live{ color: var(--gold-bright); border-color: rgba(228,190,74,0.4); }
 .pill.pending{ color: var(--cream-dim); }
@@ -84,7 +84,7 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
   padding: 10px 12px 12px;
   margin-bottom: 10px;
 }
-.card.hit{ border-left-color: var(--live); background: rgba(79,149,118,0.07); }
+.card.hit{ border-left-color: var(--live); background: rgba(76,175,110,0.07); }
 .card.miss{ border-left-color: var(--clay); background: rgba(192,106,76,0.06); opacity:0.75; }
 .card.live{ border-left-color: var(--gold-bright); background: rgba(228,190,74,0.06); }
 .card-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
@@ -146,7 +146,7 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
   font-family:'Oswald',sans-serif; font-size:9px; letter-spacing:0.08em;
   padding:2px 6px; border-radius:3px; border:1px solid var(--line);
 }
-.auto-badge.on{ color: var(--live); border-color: rgba(79,149,118,0.5); }
+.auto-badge.on{ color: var(--live); border-color: rgba(76,175,110,0.5); }
 .auto-badge.off{ color: var(--cream-dim); }
 .resume-btn{
   background:none; border:1px solid var(--line); color:var(--cream-dim);
