@@ -4,7 +4,7 @@ import { Bet } from "../../../lib/seed";
 import { Mapping } from "../../../lib/mapping";
 import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../../../lib/parlay";
 import { fetchPgaLeaderboard, fetchPlayerScorecardStats } from "../../../lib/pgatour";
-import { extractPlayers, findPlayerMatch, PgaPlayerRow } from "../../../lib/pgaMatch";
+import { extractPlayers, findPlayerMatch, findLeader, PgaPlayerRow } from "../../../lib/pgaMatch";
 import { extractScorecardStats, roundNumberFromLabel } from "../../../lib/pgaScorecard";
 import { parseBetType, autoGradeStatus, timeToMinutes } from "../../../lib/betLogic";
 import { nowInCentral } from "../../../lib/centralTime";
@@ -100,6 +100,37 @@ export async function GET() {
         leaderboardCache.set(tournamentId, players);
       }
 
+      const parsed = parseBetType(bet.bet);
+
+      // Tournament-long "winning score" bets track whoever is currently in
+      // 1st place, not a specific named player - no scorecard fetch needed,
+      // and never auto-graded (see autoGradeStatus), so this just updates
+      // the live number for you to eyeball and settle by hand.
+      if (parsed.label === "WINNER_SCORE") {
+        const leader = findLeader(players);
+        if (!leader) {
+          errors.push(`${bet.t}: couldn't find a tournament leader`);
+          continue;
+        }
+        bet.thru = leader.thru;
+        bet.stat = leader.total;
+        bet.auto = {
+          thru: leader.thru,
+          scoreToPar: leader.total,
+          birdies: null,
+          bogeys: null,
+          pars: null,
+          eagles: null,
+          doubleBogeys: null,
+          gir: null,
+          fairways: null,
+          updatedAt: new Date().toISOString(),
+          leaderName: leader.displayName,
+        };
+        updatedCount += 1;
+        continue;
+      }
+
       const row = findPlayerMatch(bet.player, players);
       if (!row) {
         errors.push(`${bet.player}: no match on leaderboard`);
@@ -118,8 +149,6 @@ export async function GET() {
         scorecardCache.set(scorecardKey, scorecardJson);
       }
       const scorecard = scorecardJson ? extractScorecardStats(scorecardJson, roundNum) : null;
-
-      const parsed = parseBetType(bet.bet);
 
       bet.thru = row.thru;
       bet.auto = {

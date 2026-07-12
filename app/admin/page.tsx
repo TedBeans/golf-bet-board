@@ -28,6 +28,15 @@ export default function AdminPage() {
   const [oddsPreview, setOddsPreview] = useState<OddsParseResult | null>(null);
   const [oddsMsg, setOddsMsg] = useState("");
 
+  const [winnerTournament, setWinnerTournament] = useState("");
+  const [winnerSide, setWinnerSide] = useState<"Under" | "Over">("Under");
+  const [winnerStrokes, setWinnerStrokes] = useState("");
+  const [winnerCoursePar, setWinnerCoursePar] = useState("288");
+  const [winnerOdds, setWinnerOdds] = useState("");
+  const [winnerWagerDollars, setWinnerWagerDollars] = useState("");
+  const [winnerDate, setWinnerDate] = useState(() => nowInCentral().dateStr);
+  const [winnerMsg, setWinnerMsg] = useState("");
+
   const [forceMsg, setForceMsg] = useState("");
   const [tab, setTab] = useState<"bets" | "tournaments" | "parlays">("bets");
   const [newTournName, setNewTournName] = useState("");
@@ -249,6 +258,62 @@ export default function AdminPage() {
     });
   }
 
+  function submitWinnerBet() {
+    const strokes = parseFloat(winnerStrokes);
+    const coursePar = parseFloat(winnerCoursePar);
+    const dollars = parseFloat(winnerWagerDollars);
+    if (!winnerTournament || isNaN(strokes) || isNaN(coursePar) || !winnerOdds.trim() || isNaN(dollars)) {
+      setWinnerMsg("Fill in the tournament, strokes, course par, odds, and wager first.");
+      return;
+    }
+    const targetToPar = Math.round((strokes - coursePar) * 2) / 2; // keep .5 lines exact
+    const targetDisplay = targetToPar === 0 ? "E" : targetToPar > 0 ? `+${targetToPar}` : `${targetToPar}`;
+    const phrase = winnerSide === "Under" ? `Winning score ${targetDisplay} or better` : `Winning score ${targetDisplay} or worse`;
+
+    const newBet: Bet = {
+      id: "b_winner_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+      t: winnerTournament,
+      r: "Tournament Winner",
+      time: "",
+      player: "Field",
+      bet: phrase,
+      stat: null,
+      thru: null,
+      status: "pending",
+      autoEnabled: true,
+      auto: null,
+      oddsLine: `${winnerSide} ${winnerStrokes}`,
+      oddsPrice: winnerOdds.trim(),
+      oddsUnits: String(Math.round((dollars / (settings.unitSizeDollars || 50)) * 100) / 100),
+      loadedDate: winnerDate,
+    };
+
+    fetch("/api/bets")
+      .then((r) => r.json())
+      .then((d) => {
+        const current: Bet[] = d.bets || [];
+        const merged = [...current, newBet];
+        return fetch("/api/bets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ passcode, bets: merged }),
+        }).then((r) => ({ r, merged }));
+      })
+      .then(({ r, merged }) => {
+        if (r.ok) {
+          setBets(merged);
+          setWinnerMsg(`Added. Tracks the current tournament leader until you settle it by hand.`);
+          setWinnerStrokes("");
+          setWinnerOdds("");
+          setWinnerWagerDollars("");
+          setWinnerDate(nowInCentral().dateStr);
+        } else {
+          setWinnerMsg("Failed to save - check passcode.");
+        }
+        setTimeout(() => setWinnerMsg(""), 5000);
+      });
+  }
+
   function previewImport() {
     setImportMsg("");
     setPreview(parseBetsText(importText, betsDate));
@@ -418,6 +483,129 @@ export default function AdminPage() {
         </div>
       )}
       {importMsg && <div className="subline" style={{ marginTop: 8 }}>{importMsg}</div>}
+
+      <h1 style={{ marginTop: 36, marginBottom: 4 }}>Add a tournament-long bet</h1>
+      <div className="subline" style={{ marginBottom: 12 }}>
+        For bets on the eventual winning score (not tied to one player or
+        round). Tracks the current tournament leader's live score-to-par
+        automatically, but never grades itself - settle it by hand once the
+        tournament actually finishes.
+      </div>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <label style={{ display: "block", marginBottom: 10, fontSize: 12 }}>
+          Tournament
+          <select
+            value={winnerTournament}
+            onChange={(e) => setWinnerTournament(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+              padding: "8px 10px", borderRadius: 3,
+            }}
+          >
+            <option value="">— choose —</option>
+            {tournaments.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </label>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <label style={{ flex: 1, fontSize: 12 }}>
+            Side
+            <select
+              value={winnerSide}
+              onChange={(e) => setWinnerSide(e.target.value as "Under" | "Over")}
+              style={{
+                width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                padding: "8px 10px", borderRadius: 3,
+              }}
+            >
+              <option value="Under">Under</option>
+              <option value="Over">Over</option>
+            </select>
+          </label>
+          <label style={{ flex: 1, fontSize: 12 }}>
+            Line (total strokes, e.g. 268.5)
+            <input
+              placeholder="268.5"
+              value={winnerStrokes}
+              onChange={(e) => setWinnerStrokes(e.target.value)}
+              style={{
+                width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                padding: "8px 10px", borderRadius: 3,
+              }}
+            />
+          </label>
+        </div>
+
+        <label style={{ display: "block", marginBottom: 10, fontSize: 12 }}>
+          Course total par (4 rounds - default 288 = par 72 x 4)
+          <input
+            value={winnerCoursePar}
+            onChange={(e) => setWinnerCoursePar(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+              padding: "8px 10px", borderRadius: 3,
+            }}
+          />
+          {winnerStrokes && !isNaN(parseFloat(winnerStrokes)) && !isNaN(parseFloat(winnerCoursePar)) && (
+            <div className="subline" style={{ marginTop: 4, textTransform: "none", letterSpacing: 0 }}>
+              = target {Math.round((parseFloat(winnerStrokes) - parseFloat(winnerCoursePar)) * 2) / 2 > 0 ? "+" : ""}
+              {Math.round((parseFloat(winnerStrokes) - parseFloat(winnerCoursePar)) * 2) / 2} to par
+            </div>
+          )}
+        </label>
+
+        <label style={{ display: "block", marginBottom: 10, fontSize: 12 }}>
+          Odds (e.g. -112)
+          <input
+            placeholder="-112"
+            value={winnerOdds}
+            onChange={(e) => setWinnerOdds(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+              padding: "8px 10px", borderRadius: 3,
+            }}
+          />
+        </label>
+
+        <label style={{ display: "block", marginBottom: 10, fontSize: 12 }}>
+          Wager ($)
+          <input
+            type="number"
+            placeholder="25"
+            value={winnerWagerDollars}
+            onChange={(e) => setWinnerWagerDollars(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+              padding: "8px 10px", borderRadius: 3,
+            }}
+          />
+        </label>
+
+        <label style={{ display: "block", marginBottom: 12, fontSize: 12 }}>
+          Date
+          <input
+            type="date"
+            value={winnerDate}
+            onChange={(e) => setWinnerDate(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+              padding: "8px 10px", borderRadius: 3,
+            }}
+          />
+        </label>
+
+        <button className="add-btn-inline" onClick={submitWinnerBet} style={{ width: "100%", padding: 10 }}>
+          Add bet
+        </button>
+        {winnerMsg && <div className="subline" style={{ marginTop: 8 }}>{winnerMsg}</div>}
+      </div>
 
       <h1 style={{ marginTop: 36, marginBottom: 4 }}>Load odds & lines</h1>
       <div className="subline" style={{ marginBottom: 12 }}>

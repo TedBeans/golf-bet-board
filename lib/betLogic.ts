@@ -37,6 +37,14 @@ export function parseBetType(text: string): ParsedBet {
   if ((m = t.match(/^(\d+)\s*pars or less$/i))) {
     return { type: "max", label: "PARS", target: parseInt(m[1], 10), targetDisplay: "≤ " + m[1] };
   }
+  if ((m = t.match(/^winning score\s+(-?\d+(?:\.\d+)?|E)\s+or\s+better$/i))) {
+    const val = /^E$/i.test(m[1]) ? 0 : parseFloat(m[1]);
+    return { type: "max", label: "WINNER_SCORE", target: val, targetDisplay: "≤ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
+  }
+  if ((m = t.match(/^winning score\s+(-?\d+(?:\.\d+)?|E)\s+or\s+worse$/i))) {
+    const val = /^E$/i.test(m[1]) ? 0 : parseFloat(m[1]);
+    return { type: "min", label: "WINNER_SCORE", target: val, targetDisplay: "≥ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
+  }
   return { type: "generic", label: "STAT", target: null, targetDisplay: "—" };
 }
 
@@ -62,6 +70,7 @@ export function friendlyLabel(label: string): string {
     case "BIRDIES": return "Birdies";
     case "BOGEYS": return "Bogeys";
     case "PARS": return "Pars";
+    case "WINNER_SCORE": return "Score";
     default: return "Stat";
   }
 }
@@ -79,6 +88,7 @@ export function autoGradeStatus(
   holesTotal = 18
 ): "hit" | "miss" | null {
   if (parsed.type === "generic") return null;
+  if (parsed.label === "WINNER_SCORE") return null; // always graded by hand
   if (stat === null || stat === undefined) return null;
   if (parsed.target === null || parsed.target === undefined) return null;
   if (thru === null || thru === undefined) return null;

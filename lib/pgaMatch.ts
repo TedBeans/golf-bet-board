@@ -5,6 +5,7 @@ export type PgaPlayerRow = {
   shortName: string;
   score: number | null; // this round's score to par
   thru: number | null; // holes completed this round (18 once finished)
+  total: number | null; // cumulative tournament score to par
 };
 
 export function parseScoreToPar(s: string | null | undefined): number | null {
@@ -34,7 +35,17 @@ export function extractPlayers(leaderboardJson: any): PgaPlayerRow[] {
       shortName: r.player?.shortName || "",
       score: parseScoreToPar(r.scoringData?.score),
       thru: parseThru(r.scoringData?.thru),
+      total: parseScoreToPar(r.scoringData?.total),
     }));
+}
+
+// The player currently leading the tournament - lowest cumulative score to
+// par. Used for tournament-long "winning score" bets, which track whoever
+// is in 1st right now rather than any single named player.
+export function findLeader(players: PgaPlayerRow[]): PgaPlayerRow | null {
+  const withTotal = players.filter((p) => p.total !== null);
+  if (withTotal.length === 0) return null;
+  return withTotal.reduce((best, p) => ((p.total as number) < (best.total as number) ? p : best));
 }
 
 function norm(s: string): string {

@@ -11,6 +11,7 @@ export type AutoStats = {
   gir: string | null;
   fairways: string | null;
   updatedAt: string | null;
+  leaderName?: string | null; // only set for tournament-long "winning score" bets
 };
 
 export type Bet = {

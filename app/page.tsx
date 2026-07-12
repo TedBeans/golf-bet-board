@@ -355,7 +355,16 @@ export default function Page() {
                               Resume auto
                             </button>
                           )}
-                          {b.auto && (
+                          {b.auto && parsed.label === "WINNER_SCORE" && (
+                            <span className="detail-strip">
+                              <span className="detail-hi">
+                                Leader {b.auto.leaderName ? `(${b.auto.leaderName}) ` : ""}{formatScore(b.auto.scoreToPar)}
+                              </span>
+                              {" · "}
+                              <span>Thru {b.auto.thru ?? "—"}</span>
+                            </span>
+                          )}
+                          {b.auto && parsed.label !== "WINNER_SCORE" && (
                             <span className="detail-strip">
                               <span className={parsed.label === "SCORE" ? "detail-hi" : ""}>
                                 Score {formatScore(b.auto.scoreToPar)}
