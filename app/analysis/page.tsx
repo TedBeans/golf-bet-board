@@ -9,6 +9,7 @@ import {
 import { Bet } from "../../lib/seed";
 import { parseBetType, friendlyLabel } from "../../lib/betLogic";
 import { computeUnitResult, formatUnits } from "../../lib/units";
+import { centralDateFromISO } from "../../lib/centralTime";
 import GolfFlagIcon from "../GolfFlagIcon";
 
 const GREEN = "#4CAF6E";
@@ -60,7 +61,7 @@ export default function AnalysisPage() {
   const lineData = useMemo(() => {
     const byDate: Record<string, number> = {};
     filtered.forEach((b) => {
-      const d = b.loadedDate || "unknown";
+      const d = b.loadedDate || (b.archivedAt ? centralDateFromISO(b.archivedAt) : "unknown");
       const u = computeUnitResult(b.oddsPrice, b.oddsUnits, b.status);
       if (u !== null) byDate[d] = (byDate[d] || 0) + u;
     });
