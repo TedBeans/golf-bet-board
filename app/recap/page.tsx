@@ -72,6 +72,38 @@ function BetDetailCard({ b }: { b: Bet }) {
   );
 }
 
+function buildQuickRecapText(t: string, r: string, bets: Bet[], agg: { wins: number; losses: number; units: number }): string {
+  const lines = [`${t} — ${r} (${agg.wins}-${agg.losses}, ${formatUnits(agg.units)})`, ""];
+  bets.forEach((b) => {
+    const result = b.status === "hit" ? "WIN" : b.status === "miss" ? "LOSS" : "TBD";
+    lines.push(`${b.player} ${b.bet}: ${result}`);
+  });
+  return lines.join("\n");
+}
+
+function QuickRecapBlock({ t, r, bets, agg }: { t: string; r: string; bets: Bet[]; agg: { wins: number; losses: number; units: number } }) {
+  const [copied, setCopied] = useState(false);
+  const text = buildQuickRecapText(t, r, bets, agg);
+
+  function copy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 10 }}>
+      <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, whiteSpace: "pre-wrap", color: "var(--cream)" }}>
+        {text}
+      </div>
+      <button className="add-btn-inline" onClick={copy} style={{ marginTop: 10 }}>
+        {copied ? "Copied!" : "Copy"}
+      </button>
+    </div>
+  );
+}
+
 export default function RecapPage() {
   const [archive, setArchive] = useState<Bet[]>([]);
   const [view, setView] = useState<"calendar" | "tournament">("calendar");
@@ -80,6 +112,7 @@ export default function RecapPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [expandedTourn, setExpandedTourn] = useState<string | null>(null);
   const [expandedRound, setExpandedRound] = useState<string | null>(null);
+  const [quickRecapRound, setQuickRecapRound] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
@@ -286,16 +319,28 @@ export default function RecapPage() {
                     const roundAgg = aggregate(roundBets);
                     const roundKey = `${t}|||${r}`;
                     const roundOpen = expandedRound === roundKey;
+                    const quickOpen = quickRecapRound === roundKey;
                     return (
                       <div key={r} style={{ marginBottom: 8 }}>
                         <div
                           className="round-label"
-                          style={{ display: "flex", justifyContent: "space-between", cursor: "pointer" }}
-                          onClick={() => setExpandedRound(roundOpen ? null : roundKey)}
+                          style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}
                         >
-                          <span>{r}</span>
-                          <span>{roundAgg.wins}W-{roundAgg.losses}L · {formatUnits(roundAgg.units)}</span>
+                          <span style={{ cursor: "pointer" }} onClick={() => setExpandedRound(roundOpen ? null : roundKey)}>
+                            {r}
+                          </span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span>{roundAgg.wins}W-{roundAgg.losses}L · {formatUnits(roundAgg.units)}</span>
+                            <button
+                              className="recap-btn"
+                              style={{ fontSize: 9, padding: "4px 8px" }}
+                              onClick={() => setQuickRecapRound(quickOpen ? null : roundKey)}
+                            >
+                              Quick recap
+                            </button>
+                          </span>
                         </div>
+                        {quickOpen && <QuickRecapBlock t={t} r={r} bets={roundBets} agg={roundAgg} />}
                         {roundOpen && roundBets.map((b) => <BetDetailCard key={b.id} b={b} />)}
                       </div>
                     );
