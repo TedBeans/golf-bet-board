@@ -177,6 +177,7 @@ export default function RecapPage() {
             >
               By tournament
             </button>
+            <Link href="/analysis" className="recap-btn">Analysis</Link>
           </div>
         </div>
         <div className="subline">

@@ -29,6 +29,35 @@ export default function AdminPage() {
   const [forceMsg, setForceMsg] = useState("");
   const [tab, setTab] = useState<"bets" | "tournaments">("bets");
   const [newTournName, setNewTournName] = useState("");
+  const [backupMsg, setBackupMsg] = useState("");
+
+  function downloadBackup() {
+    setBackupMsg("Preparing backup…");
+    Promise.all([
+      fetch("/api/bets").then((r) => r.json()),
+      fetch("/api/archive").then((r) => r.json()),
+      fetch("/api/mapping").then((r) => r.json()),
+    ]).then(([betsData, archiveData, mappingData]) => {
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        bets: betsData.bets || [],
+        archive: archiveData.archive || [],
+        mapping: mappingData.mapping || {},
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const dateStr = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `golf-bet-board-backup-${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setBackupMsg("Downloaded.");
+      setTimeout(() => setBackupMsg(""), 3000);
+    }).catch(() => setBackupMsg("Backup failed - try again."));
+  }
 
   useEffect(() => {
     const stored = sessionStorage.getItem("bb_passcode");
@@ -189,6 +218,15 @@ export default function AdminPage() {
       <div style={{ marginBottom: 16 }}>
         <Link href="/" className="admin-link">← back to board</Link>
       </div>
+
+      <div className="card" style={{ marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <div>
+          <div className="player" style={{ fontSize: 14 }}>Backup</div>
+          <div className="subline" style={{ marginTop: 2 }}>Downloads everything - bets, recap history, and mapping - as one file.</div>
+        </div>
+        <button className="add-btn-inline" onClick={downloadBackup}>Download backup</button>
+      </div>
+      {backupMsg && <div className="subline" style={{ marginBottom: 16 }}>{backupMsg}</div>}
 
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
         <button className={tab === "bets" ? "add-btn-inline" : "recap-btn"} onClick={() => setTab("bets")}>

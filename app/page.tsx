@@ -23,6 +23,7 @@ export default function Page() {
   const [saving, setSaving] = useState(false);
   const [syncNote, setSyncNote] = useState("");
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const [tick, setTick] = useState(0);
   const [mapping, setMapping] = useState<Mapping>(EMPTY_MAPPING);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -52,13 +53,17 @@ export default function Page() {
     loadBets().then(() => runSync());
     fetch("/api/mapping").then((r) => r.json()).then((d) => setMapping(d.mapping || EMPTY_MAPPING));
     const interval = setInterval(runSync, SYNC_INTERVAL_MS);
+    const staleCheck = setInterval(() => setTick((t) => t + 1), 30000);
 
     const stored = typeof window !== "undefined" ? sessionStorage.getItem("bb_passcode") : null;
     if (stored) {
       setPasscode(stored);
       setUnlocked(true);
     }
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearInterval(staleCheck);
+    };
   }, []);
 
   function persist(next: Bet[]) {
@@ -131,6 +136,7 @@ export default function Page() {
               <Link href="/admin" className="tedbeans-btn">TedBeans</Link>
             )}
             <Link href="/recap" className="recap-btn">Recap/Archives</Link>
+            <Link href="/analysis" className="recap-btn">Analysis</Link>
           </div>
         </div>
         <div className="subline">
@@ -147,6 +153,11 @@ export default function Page() {
         </div>
         {saving && <span className="saving">saving…</span>}
         {syncNote && <div className="sync-note">{syncNote}</div>}
+        {lastSynced && Date.now() - lastSynced.getTime() > 5 * 60 * 1000 && (
+          <div className="stale-warning">
+            ⚠ Auto-sync hasn't checked in for {Math.round((Date.now() - lastSynced.getTime()) / 60000)} min - stats may be stale.
+          </div>
+        )}
       </header>
 
       <main>
