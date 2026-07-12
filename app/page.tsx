@@ -131,6 +131,12 @@ export default function Page() {
     groups[b.t][b.r].push(b);
   });
 
+  const tournamentOrder = Object.keys(groups).sort((a, b) => {
+    const earliestA = Math.min(...Object.values(groups[a]).flat().map((bet) => timeToMinutes(bet.time)));
+    const earliestB = Math.min(...Object.values(groups[b]).flat().map((bet) => timeToMinutes(bet.time)));
+    return earliestA - earliestB;
+  });
+
   return (
     <>
       <header>
@@ -175,7 +181,7 @@ export default function Page() {
       <main>
         {bets.length === 0 && <div className="empty">No bets loaded.</div>}
 
-        {Object.keys(groups).map((tourn) => {
+        {tournamentOrder.map((tourn) => {
           const tournBets = Object.values(groups[tourn]).flat();
           const tc = { hit: 0, miss: 0, live: 0, pending: 0 } as Record<string, number>;
           tournBets.forEach((b) => (tc[b.status] = (tc[b.status] || 0) + 1));
