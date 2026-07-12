@@ -175,46 +175,6 @@ export default function Page() {
       <main>
         {bets.length === 0 && <div className="empty">No bets loaded.</div>}
 
-        {liveParlays.length > 0 && (
-          <div className="tourn">
-            <div className="tourn-head">
-              <h2>Parlays</h2>
-              <span className="subline" style={{ marginTop: 0, textTransform: "none", letterSpacing: 0 }}>
-                Tracked separately from straight-bet units
-              </span>
-            </div>
-            {liveParlays.map((p) => {
-              const legStatuses = resolveLegStatuses(p.legs, bets, archive);
-              const status = deriveParlayStatus(legStatuses);
-              return (
-                <div className={`card ${status}`} key={p.id}>
-                  <div className="card-top">
-                    <div className="who">
-                      <div className="player">{p.label}</div>
-                      <div className="bet-text">{p.oddsPrice} · {p.wagerUnits}u</div>
-                    </div>
-                    <span className={`sbtn ${status === "hit" ? "win active" : status === "miss" ? "loss active" : status === "live" ? "live active" : ""}`} style={{ cursor: "default" }}>
-                      {status === "hit" ? "WIN" : status === "miss" ? "LOSS" : status === "live" ? "IN PROGRESS" : "TBD"}
-                    </span>
-                  </div>
-                  <div style={{ marginTop: 8 }}>
-                    {legStatuses.map((ls, i) => (
-                      <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-                        <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
-                        <span className={
-                          ls.status === "hit" ? "tsum win" : ls.status === "miss" ? "tsum loss" : ls.status === "live" ? "tsum live" : "tsum tbd"
-                        }>
-                          {ls.status === "hit" ? "WIN" : ls.status === "miss" ? "LOSS" : ls.status === "live" ? "LIVE" : "TBD"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
         {Object.keys(groups).map((tourn) => {
           const tournBets = Object.values(groups[tourn]).flat();
           const tc = { hit: 0, miss: 0, live: 0, pending: 0 } as Record<string, number>;
@@ -428,6 +388,46 @@ export default function Page() {
           </div>
           );
         })}
+
+        {liveParlays.length > 0 && (
+          <div className="tourn">
+            <div className="tourn-head">
+              <h2>Parlays</h2>
+              <span className="subline" style={{ marginTop: 0, textTransform: "none", letterSpacing: 0 }}>
+                Tracked separately from straight-bet units
+              </span>
+            </div>
+            {liveParlays.map((p) => {
+              const legStatuses = resolveLegStatuses(p.legs, bets, archive);
+              const status = deriveParlayStatus(legStatuses);
+              return (
+                <div className={`card ${status}`} key={p.id}>
+                  <div className="card-top">
+                    <div className="who">
+                      <div className="player">{p.label}</div>
+                      <div className="bet-text">{p.oddsPrice} · {p.wagerUnits}u</div>
+                    </div>
+                    <span className={`sbtn ${status === "hit" ? "win active" : status === "miss" ? "loss active" : status === "live" ? "live active" : ""}`} style={{ cursor: "default" }}>
+                      {status === "hit" ? "WIN" : status === "miss" ? "LOSS" : status === "live" ? "IN PROGRESS" : "TBD"}
+                    </span>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {legStatuses.map((ls, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                        <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
+                        <span className={
+                          ls.status === "hit" ? "tsum win" : ls.status === "miss" ? "tsum loss" : ls.status === "live" ? "tsum live" : "tsum tbd"
+                        }>
+                          {ls.status === "hit" ? "WIN" : ls.status === "miss" ? "LOSS" : ls.status === "live" ? "LIVE" : "TBD"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </main>
     </>
   );
