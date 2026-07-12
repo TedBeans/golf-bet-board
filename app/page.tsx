@@ -19,7 +19,6 @@ export default function Page() {
   const [bets, setBets] = useState<Bet[] | null>(null);
   const [passcode, setPasscode] = useState("");
   const [unlocked, setUnlocked] = useState(false);
-  const [lockError, setLockError] = useState("");
   const [saving, setSaving] = useState(false);
   const [syncNote, setSyncNote] = useState("");
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
@@ -60,24 +59,6 @@ export default function Page() {
     }
     return () => clearInterval(interval);
   }, []);
-
-  function tryUnlock() {
-    setLockError("");
-    fetch("/api/bets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ passcode, bets: bets || [] }),
-    })
-      .then(async (r) => {
-        if (r.ok) {
-          setUnlocked(true);
-          sessionStorage.setItem("bb_passcode", passcode);
-        } else {
-          setLockError("Wrong passcode");
-        }
-      })
-      .catch(() => setLockError("Couldn't reach server"));
-  }
 
   function persist(next: Bet[]) {
     setBets(next);
@@ -157,21 +138,11 @@ export default function Page() {
                 <Link href="/admin" className="admin-link">auto-sync setup</Link>
               </>
             ) : (
-              <>
-                <input
-                  type="password"
-                  placeholder="passcode"
-                  value={passcode}
-                  onChange={(e) => setPasscode(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && tryUnlock()}
-                />
-                <button onClick={tryUnlock}>Unlock</button>
-              </>
+              <Link href="/admin" className="tedbeans-btn">TedBeans</Link>
             )}
             <Link href="/recap" className="admin-link">recap</Link>
           </div>
         </div>
-        {lockError && <div className="lock-error">{lockError}</div>}
         {saving && <span className="saving">saving…</span>}
         {syncNote && <div className="sync-note">{syncNote}</div>}
       </header>
