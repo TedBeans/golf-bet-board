@@ -5,9 +5,23 @@ import { Mapping } from "../../../lib/mapping";
 import { fetchPgaLeaderboard, fetchPlayerScorecardStats } from "../../../lib/pgatour";
 import { extractPlayers, findPlayerMatch, PgaPlayerRow } from "../../../lib/pgaMatch";
 import { extractScorecardStats, roundNumberFromLabel } from "../../../lib/pgaScorecard";
-import { parseBetType, autoGradeStatus } from "../../../lib/betLogic";
+import { parseBetType, autoGradeStatus, timeToMinutes } from "../../../lib/betLogic";
 
 const SYNC_LOCK_MS = 45000;
+
+// Teddy is always in Central time (Missouri) - tee times are compared
+// against Central regardless of where the server or any viewer actually is.
+function nowInCentral(): { dateStr: string; minutes: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(new Date());
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || "00";
+  const dateStr = `${get("year")}-${get("month")}-${get("day")}`;
+  const minutes = parseInt(get("hour"), 10) * 60 + parseInt(get("minute"), 10);
+  return { dateStr, minutes };
+}
 
 // Triggered by the browser (not a server cron - see README) roughly once a
 // minute while the board is open. No passcode required: this route only
@@ -39,13 +53,28 @@ export async function GET() {
   const leaderboardCache = new Map<string, PgaPlayerRow[]>();
   const scorecardCache = new Map<string, any>();
   let updatedCount = 0;
+  const { dateStr: todayCentral, minutes: nowMinutes } = nowInCentral();
 
   for (const bet of bets) {
     if (bet.autoEnabled === false) continue;
+
+    // Auto-promote TBD -> IN PROGRESS once its scheduled tee time (Central)
+    // arrives - this is what actually opens the door to fetching for it.
+    if (bet.status === "pending") {
+      const teeMinutes = timeToMinutes(bet.time);
+      const dateReached = !bet.loadedDate || todayCentral >= bet.loadedDate;
+      if (dateReached && nowMinutes >= teeMinutes) {
+        bet.status = "live";
+        updatedCount += 1;
+      }
+    }
+
     if (bet.status === "hit" || bet.status === "miss") continue; // already decided - stop pulling for it
+    if (bet.status === "pending") continue; // hasn't teed off yet - nothing to fetch
 
     const tournamentMap = mapping.tournaments[bet.t];
     if (!tournamentMap?.pgaId) continue;
+    if (tournamentMap.suspendedType && tournamentMap.suspendedType !== "none") continue; // play stopped - nothing new to fetch
     const tournamentId = tournamentMap.pgaId;
 
     try {
@@ -101,9 +130,10 @@ export async function GET() {
         bet.stat = scorecard.bogeys;
       }
 
-      // Only progress a bet forward automatically while it's still
-      // pending/live - never overwrite a status you set by hand.
-      if (bet.status === "pending" || bet.status === "live") {
+      // Only progress a bet forward automatically while it's still live -
+      // never overwrite a status you set by hand. (Pending bets already
+      // got skipped above, before they ever reach here.)
+      if (bet.status === "live") {
         const graded = autoGradeStatus(parsed, bet.stat, bet.thru);
         if (graded) bet.status = graded;
       }
