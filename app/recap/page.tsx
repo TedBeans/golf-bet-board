@@ -6,6 +6,7 @@ import { Bet } from "../../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
 import { parseBetType, trend, friendlyLabel, formatScore } from "../../lib/betLogic";
 import { computeUnitResult, formatUnits } from "../../lib/units";
+import { centralDateFromISO } from "../../lib/centralTime";
 import GolfFlagIcon from "../GolfFlagIcon";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -106,7 +107,7 @@ export default function RecapPage() {
   const dayMap = useMemo(() => {
     const m: Record<string, Bet[]> = {};
     archive.forEach((b) => {
-      const d = b.loadedDate || (b.archivedAt ? b.archivedAt.slice(0, 10) : "unknown");
+      const d = b.loadedDate || (b.archivedAt ? centralDateFromISO(b.archivedAt) : "unknown");
       (m[d] = m[d] || []).push(b);
     });
     return m;

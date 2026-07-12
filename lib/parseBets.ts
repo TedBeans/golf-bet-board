@@ -8,14 +8,17 @@ const BET_PHRASE_RE = /((-?\d+|E)\s+or\s+(?:better|worse)|\d+\+\s*greens|\d+\s*g
 
 export type ParseResult = { bets: Bet[]; warnings: string[] };
 
-export function parseBetsText(text: string): ParseResult {
+export function parseBetsText(text: string, forDate?: string): ParseResult {
   const lines = text
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
-  const today = new Date();
-  const loadedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  let loadedDate = forDate;
+  if (!loadedDate) {
+    const today = new Date();
+    loadedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  }
 
   let currentTournament = "";
   let currentRound = "";

@@ -6,6 +6,7 @@ import { Bet } from "../../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
 import { parseBetsText, ParseResult } from "../../lib/parseBets";
 import { parseOddsText, attachOddsToBets, OddsParseResult } from "../../lib/parseOdds";
+import { nowInCentral } from "../../lib/centralTime";
 import GolfFlagIcon from "../GolfFlagIcon";
 
 export default function AdminPage() {
@@ -17,6 +18,7 @@ export default function AdminPage() {
   const [saveMsg, setSaveMsg] = useState("");
 
   const [importText, setImportText] = useState("");
+  const [betsDate, setBetsDate] = useState(() => nowInCentral().dateStr);
   const [preview, setPreview] = useState<ParseResult | null>(null);
   const [importMsg, setImportMsg] = useState("");
 
@@ -109,7 +111,7 @@ export default function AdminPage() {
 
   function previewImport() {
     setImportMsg("");
-    setPreview(parseBetsText(importText));
+    setPreview(parseBetsText(importText, betsDate));
   }
 
   function confirmImport() {
@@ -131,6 +133,7 @@ export default function AdminPage() {
           setBets(merged);
           setPreview(null);
           setImportText("");
+          setBetsDate(nowInCentral().dateStr);
         } else {
           setImportMsg("Failed to save - check passcode.");
         }
@@ -205,6 +208,21 @@ export default function AdminPage() {
         This adds to the board - anything still unresolved from a prior round
         (like a suspended round) stays visible until it's decided.
       </div>
+      <label style={{ display: "block", marginBottom: 12, fontSize: 12 }}>
+        These bets are for (recap date - set this to when the round is
+        actually played, not necessarily today, e.g. pasting Round 4 the
+        night before)
+        <input
+          type="date"
+          value={betsDate}
+          onChange={(e) => setBetsDate(e.target.value)}
+          style={{
+            display: "block", width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)",
+            border: "1px solid var(--line)", color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace",
+            fontSize: 13, padding: "8px 10px", borderRadius: 3,
+          }}
+        />
+      </label>
       <textarea
         value={importText}
         onChange={(e) => setImportText(e.target.value)}

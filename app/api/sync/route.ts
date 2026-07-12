@@ -6,26 +6,9 @@ import { fetchPgaLeaderboard, fetchPlayerScorecardStats } from "../../../lib/pga
 import { extractPlayers, findPlayerMatch, PgaPlayerRow } from "../../../lib/pgaMatch";
 import { extractScorecardStats, roundNumberFromLabel } from "../../../lib/pgaScorecard";
 import { parseBetType, autoGradeStatus, timeToMinutes } from "../../../lib/betLogic";
+import { nowInCentral } from "../../../lib/centralTime";
 
 const SYNC_LOCK_MS = 45000;
-
-// Teddy is always in Central time (Missouri) - tee times and suspension
-// resume times are compared against Central regardless of where the server
-// or any viewer actually is.
-function nowInCentral(): { dateStr: string; minutes: number; dateTimeStr: string } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Chicago",
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", hour12: false,
-  }).formatToParts(new Date());
-  const get = (type: string) => parts.find((p) => p.type === type)?.value || "00";
-  const dateStr = `${get("year")}-${get("month")}-${get("day")}`;
-  const hh = get("hour");
-  const mm = get("minute");
-  const minutes = parseInt(hh, 10) * 60 + parseInt(mm, 10);
-  const dateTimeStr = `${dateStr}T${hh}:${mm}`;
-  return { dateStr, minutes, dateTimeStr };
-}
 
 // Triggered by the browser (not a server cron - see README) roughly once a
 // minute while the board is open. No passcode required: this route only
@@ -71,6 +54,19 @@ export async function GET() {
   }
   if (mappingChanged) {
     await redis.set(MAPPING_KEY, mapping);
+  }
+
+  // Bets loaded before the recap feature existed have no loadedDate at all.
+  // Backfill with today's Central date now, while they're still live, so
+  // that whenever they do finish (even after midnight, like a suspended
+  // round) they archive under the day they were actually played, not
+  // whatever day happens to be current when they finally resolve.
+  let loadedDateBackfilled = false;
+  for (const bet of bets) {
+    if (!bet.loadedDate) {
+      bet.loadedDate = todayCentral;
+      loadedDateBackfilled = true;
+    }
   }
 
   for (const bet of bets) {
@@ -193,7 +189,7 @@ export async function GET() {
     archivedCount = toArchive.length;
   }
 
-  if (updatedCount > 0 || archivedCount > 0) {
+  if (updatedCount > 0 || archivedCount > 0 || loadedDateBackfilled) {
     await redis.set(BETS_KEY, finalBets);
   }
 
