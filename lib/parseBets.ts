@@ -48,11 +48,15 @@ export function parseBetsText(text: string, forDate?: string): ParseResult {
         warnings.push(`Bet found before any tournament header: "${line}"`);
         continue;
       }
+      if (!currentRound) {
+        warnings.push(`Bet found before any "Round N:" header - skipped so it doesn't get mis-filed: "${line}"`);
+        continue;
+      }
 
       bets.push({
         id: "b" + counter++ + "_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
         t: currentTournament,
-        r: currentRound || "Round 1",
+        r: currentRound,
         time,
         player,
         bet,
@@ -73,8 +77,14 @@ export function parseBetsText(text: string, forDate?: string): ParseResult {
     }
 
     // Anything else that isn't a time line or round line is a tournament
-    // header - strip a trailing colon if present.
-    const header = line.replace(/:\s*$/, "").trim();
+    // header - strip a trailing colon and any emoji/flag characters, so a
+    // header pasted with or without a flag (e.g. "Scottish Open" vs
+    // "Scottish Open \u{1F3F4}...") always normalizes to the same tournament
+    // instead of silently forking into two separate sections.
+    const header = line
+      .replace(/:\s*$/, "")
+      .replace(/[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{E0000}-\u{E007F}\uFE0F]/gu, "")
+      .trim();
     if (header) currentTournament = header;
   }
 

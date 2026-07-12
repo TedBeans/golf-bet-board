@@ -116,6 +116,24 @@ function normalizeName(s: string): string {
   return s.toLowerCase().replace(/[.\u2019']/g, "").trim();
 }
 
+// Standard edit distance - counts single-character insertions, deletions,
+// and substitutions needed to turn one string into the other. Used to
+// catch small typos ("Jaegar" vs "Jaeger") that an exact match would miss.
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
 export type OddsMatchResult = { bets: Bet[]; matched: number; warnings: string[] };
 
 // Matches parsed odds entries onto existing bets by player name + round +
@@ -128,11 +146,31 @@ export function attachOddsToBets(entries: OddsEntry[], bets: Bet[]): OddsMatchRe
   let matched = 0;
 
   for (const entry of entries) {
-    const candidates = updated.filter((b) => {
-      if (b.r !== entry.round) return false;
-      if (normalizeName(b.player) !== normalizeName(entry.player)) return false;
-      return parseBetType(b.bet).label === entry.category;
-    });
+    const sameRoundAndType = updated.filter((b) => b.r === entry.round && parseBetType(b.bet).label === entry.category);
+
+    let candidates = sameRoundAndType.filter((b) => normalizeName(b.player) === normalizeName(entry.player));
+
+    // No exact match - try a typo-tolerant fallback before giving up. A
+    // small edit distance relative to name length catches things like a
+    // single swapped letter without falsely matching unrelated players.
+    let fuzzyMatch = false;
+    if (candidates.length === 0) {
+      const target = normalizeName(entry.player);
+      let best: Bet | null = null;
+      let bestDist = Infinity;
+      for (const b of sameRoundAndType) {
+        const dist = levenshtein(normalizeName(b.player), target);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = b;
+        }
+      }
+      const tolerance = Math.max(1, Math.round(target.length * 0.15));
+      if (best && bestDist <= tolerance) {
+        candidates = [best];
+        fuzzyMatch = true;
+      }
+    }
 
     if (candidates.length === 0) {
       warnings.push(`No matching bet found for ${entry.player} (${entry.category}, ${entry.round}) - "${entry.raw}"`);
@@ -140,6 +178,9 @@ export function attachOddsToBets(entries: OddsEntry[], bets: Bet[]): OddsMatchRe
     }
     if (candidates.length > 1) {
       warnings.push(`Multiple bets matched ${entry.player} (${entry.category}, ${entry.round}) - applied to the first one`);
+    }
+    if (fuzzyMatch) {
+      warnings.push(`Matched "${entry.player}" to "${candidates[0].player}" despite the spelling difference - double check this one.`);
     }
 
     const target = candidates[0];
