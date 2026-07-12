@@ -157,8 +157,8 @@ export async function GET() {
         birdies: scorecard?.birdies ?? null,
         bogeys: scorecard?.bogeys ?? null,
         pars: scorecard?.pars ?? null,
-        eagles: null,
-        doubleBogeys: null,
+        eagles: scorecard?.eagles ?? null,
+        doubleBogeys: scorecard?.doubleBogeys ?? null,
         gir: scorecard?.gir ?? null,
         fairways: scorecard?.fairways ?? null,
         updatedAt: new Date().toISOString(),
@@ -168,10 +168,12 @@ export async function GET() {
         bet.stat = row.score;
       } else if (parsed.label === "GIR" && scorecard?.girCount !== null && scorecard?.girCount !== undefined) {
         bet.stat = scorecard.girCount;
-      } else if (parsed.label === "BIRDIES" && scorecard?.birdies !== null && scorecard?.birdies !== undefined) {
-        bet.stat = scorecard.birdies;
-      } else if (parsed.label === "BOGEYS" && scorecard?.bogeys !== null && scorecard?.bogeys !== undefined) {
-        bet.stat = scorecard.bogeys;
+      } else if (parsed.label === "BIRDIES" && scorecard?.birdiesOrBetter !== null && scorecard?.birdiesOrBetter !== undefined) {
+        // "Birdies or better" bets also count eagles/albatrosses.
+        bet.stat = scorecard.birdiesOrBetter;
+      } else if (parsed.label === "BOGEYS" && scorecard?.bogeysOrWorse !== null && scorecard?.bogeysOrWorse !== undefined) {
+        // "Bogeys or worse" bets also count double-bogeys and up.
+        bet.stat = scorecard.bogeysOrWorse;
       } else if (parsed.label === "PARS" && scorecard?.pars !== null && scorecard?.pars !== undefined) {
         bet.stat = scorecard.pars;
       }

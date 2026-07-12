@@ -1,6 +1,10 @@
 export type ScorecardRoundStats = {
-  birdies: number | null;
-  bogeys: number | null;
+  birdies: number | null; // literal birdie count - for display only
+  bogeys: number | null; // literal bogey count - for display only
+  eagles: number | null; // eagles/albatrosses - for display only
+  doubleBogeys: number | null; // double-bogey-or-worse - for display only
+  birdiesOrBetter: number | null; // birdies + eagles - use this for "X birdies or less/better" grading
+  bogeysOrWorse: number | null; // bogeys + doubles - use this for "X bogeys or less/worse" grading
   pars: number | null;
   gir: string | null; // raw display, e.g. "72.22% (13/18)"
   girCount: number | null; // e.g. 13
@@ -8,9 +12,12 @@ export type ScorecardRoundStats = {
   fairwaysCount: number | null; // e.g. 9
 };
 
-function findLabel(list: any[], label: string): string | null {
-  const item = (list || []).find((x: any) => x.label === label);
-  return item ? item.total : null;
+function findLabel(list: any[], ...labels: string[]): string | null {
+  for (const label of labels) {
+    const item = (list || []).find((x: any) => x.label === label);
+    if (item) return item.total;
+  }
+  return null;
 }
 
 // PGA Tour represents "zero occurrences so far" as a dash, an empty string,
@@ -53,12 +60,29 @@ export function extractScorecardStats(json: any, roundNumber: number): Scorecard
   const birdiesStr = findLabel(scoring, "Birdies");
   const bogeysStr = findLabel(scoring, "Bogeys");
   const parsStr = findLabel(scoring, "Pars");
+  // Different possible labels PGA Tour might use for these - defensive,
+  // since we haven't seen a live example of either yet.
+  const eaglesStr = findLabel(scoring, "Eagles", "Eagle", "Eagles or Better", "Albatross");
+  const doubleBogeysStr = findLabel(scoring, "Double Bogeys", "Double Bogey", "Doubles", "Double Bogey or Worse", "Others");
   const girDisplay = findLabel(performance, "Greens in Regulation");
   const fairwaysDisplay = findLabel(performance, "Driving Accuracy");
 
+  const birdies = parseCountValue(birdiesStr);
+  const bogeys = parseCountValue(bogeysStr);
+  const eagles = parseCountValue(eaglesStr);
+  const doubleBogeys = parseCountValue(doubleBogeysStr);
+
   return {
-    birdies: parseCountValue(birdiesStr),
-    bogeys: parseCountValue(bogeysStr),
+    birdies,
+    bogeys,
+    eagles,
+    doubleBogeys,
+    // A "birdies or better" bet should also count anything better than a
+    // birdie (eagle, albatross); a "bogeys or worse" bet should also count
+    // anything worse than a bogey (double bogey+). These totals - not the
+    // literal counts above - are what bet grading actually uses.
+    birdiesOrBetter: birdies + eagles,
+    bogeysOrWorse: bogeys + doubleBogeys,
     pars: parseCountValue(parsStr),
     gir: fractionOnly(girDisplay),
     girCount: numeratorOf(girDisplay),
