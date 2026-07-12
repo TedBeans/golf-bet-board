@@ -20,15 +20,15 @@ export type Parlay = {
   archivedAt?: string;
 };
 
-export type LegStatus = { leg: ParlayLegRef; status: Bet["status"] | "unknown" };
+export type LegStatus = { leg: ParlayLegRef; status: Bet["status"] | "unknown"; bet: Bet | null };
 
 // Looks up each leg's current status from the live bets list or the
 // archive (whichever still has it) - a parlay never fetches PGA Tour data
 // itself, it just watches the bets it references.
 export function resolveLegStatuses(legs: ParlayLegRef[], liveBets: Bet[], archivedBets: Bet[]): LegStatus[] {
   return legs.map((leg) => {
-    const found = liveBets.find((b) => b.id === leg.betId) || archivedBets.find((b) => b.id === leg.betId);
-    return { leg, status: found ? found.status : "unknown" };
+    const found = liveBets.find((b) => b.id === leg.betId) || archivedBets.find((b) => b.id === leg.betId) || null;
+    return { leg, status: found ? found.status : "unknown", bet: found };
   });
 }
 

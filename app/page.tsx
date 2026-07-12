@@ -427,16 +427,33 @@ export default function Page() {
                     </span>
                   </div>
                   <div style={{ marginTop: 8 }}>
-                    {legStatuses.map((ls, i) => (
-                      <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-                        <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
-                        <span className={
-                          ls.status === "hit" ? "tsum win" : ls.status === "miss" ? "tsum loss" : ls.status === "live" ? "tsum live" : "tsum tbd"
-                        }>
-                          {ls.status === "hit" ? "WIN" : ls.status === "miss" ? "LOSS" : ls.status === "live" ? "LIVE" : "TBD"}
-                        </span>
-                      </div>
-                    ))}
+                    {legStatuses.map((ls, i) => {
+                      if (ls.status === "live" && ls.bet) {
+                        const legParsed = parseBetType(ls.bet.bet);
+                        const legTrend = trend(legParsed, ls.bet.stat, ls.bet.thru);
+                        const valueDisplay = legParsed.label === "SCORE" || legParsed.label === "WINNER_SCORE"
+                          ? formatScore(ls.bet.stat)
+                          : ls.bet.stat ?? "—";
+                        return (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                            <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
+                            <span className={`tsum ${legTrend === "good" ? "win" : legTrend === "bad" ? "loss" : "tbd"}`}>
+                              LIVE | {valueDisplay} thru {ls.bet.thru ?? "—"}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                          <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
+                          <span className={
+                            ls.status === "hit" ? "tsum win" : ls.status === "miss" ? "tsum loss" : "tsum tbd"
+                          }>
+                            {ls.status === "hit" ? "WIN" : ls.status === "miss" ? "LOSS" : "TBD"}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
