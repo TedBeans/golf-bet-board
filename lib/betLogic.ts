@@ -70,7 +70,7 @@ export function friendlyLabel(label: string): string {
     case "BIRDIES": return "Birdies";
     case "BOGEYS": return "Bogeys";
     case "PARS": return "Pars";
-    case "WINNER_SCORE": return "Score";
+    case "WINNER_SCORE": return "Winner";
     default: return "Stat";
   }
 }

@@ -46,6 +46,9 @@ export default function AdminPage() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [settingsMsg, setSettingsMsg] = useState("");
   const [liveParlays, setLiveParlays] = useState<Parlay[]>([]);
+  const [parlayArchiveList, setParlayArchiveList] = useState<Parlay[]>([]);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   const [selectedLegIds, setSelectedLegIds] = useState<Set<string>>(new Set());
   const [parlayLabel, setParlayLabel] = useState("");
@@ -93,6 +96,7 @@ export default function AdminPage() {
     fetch("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
     fetch("/api/settings").then((r) => r.json()).then((d) => setSettings(d.settings || DEFAULT_SETTINGS));
     fetch("/api/parlays").then((r) => r.json()).then((d) => setLiveParlays(d.parlays || []));
+    fetch("/api/parlay-archive").then((r) => r.json()).then((d) => setParlayArchiveList(d.archive || []));
   }, []);
 
   function tryUnlock() {
@@ -185,6 +189,30 @@ export default function AdminPage() {
       if (next.has(betId)) next.delete(betId);
       else next.add(betId);
       return next;
+    });
+  }
+
+  function startRename(p: Parlay) {
+    setRenamingId(p.id);
+    setRenameValue(p.label);
+  }
+
+  function saveRename(parlayId: string) {
+    const label = renameValue.trim();
+    if (!label) return;
+    fetch("/api/parlays", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, parlayId, label }),
+    }).then((r) => r.json()).then((d) => {
+      if (d.ok) {
+        setLiveParlays((prev) => prev.map((p) => (p.id === parlayId ? { ...p, label } : p)));
+        setParlayArchiveList((prev) => prev.map((p) => (p.id === parlayId ? { ...p, label } : p)));
+      } else {
+        setParlayMsg(d.error || "Rename failed.");
+        setTimeout(() => setParlayMsg(""), 3000);
+      }
+      setRenamingId(null);
     });
   }
 
@@ -959,13 +987,34 @@ export default function AdminPage() {
         {parlayMsg && <div className="subline" style={{ marginTop: 8 }}>{parlayMsg}</div>}
       </div>
 
-      {liveParlays.length > 0 && (
+      {(liveParlays.length > 0 || parlayArchiveList.length > 0) && (
         <>
-          <div className="round-label">Currently open</div>
-          {liveParlays.map((p) => (
+          <div className="round-label">All parlays (tap a name to rename it)</div>
+          {[...liveParlays, ...parlayArchiveList].map((p) => (
             <div key={p.id} className="card" style={{ marginBottom: 8 }}>
-              <div className="player" style={{ fontSize: 13 }}>{p.label} · {p.oddsPrice} · {p.wagerUnits}u</div>
-              <div className="subline" style={{ marginTop: 4 }}>{p.legs.length} legs · {p.loadedDate}</div>
+              {renamingId === p.id ? (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && saveRename(p.id)}
+                    style={{
+                      flex: 1, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                      color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                      padding: "6px 8px", borderRadius: 3,
+                    }}
+                  />
+                  <button className="add-btn-inline" onClick={() => saveRename(p.id)}>Save</button>
+                </div>
+              ) : (
+                <div className="player" style={{ fontSize: 13, cursor: "pointer" }} onClick={() => startRename(p)}>
+                  {p.label} · {p.oddsPrice} · {p.wagerUnits}u
+                </div>
+              )}
+              <div className="subline" style={{ marginTop: 4 }}>
+                {p.legs.length} legs · {p.loadedDate} · {p.status === "hit" ? "WIN" : p.status === "miss" ? "LOSS" : "open"}
+              </div>
             </div>
           ))}
         </>

@@ -48,7 +48,7 @@ export default function AnalysisPage() {
   }, []);
 
   const players = useMemo(() => Array.from(new Set(archive.map((b) => b.player))).sort(), [archive]);
-  const types = ["SCORE", "GIR", "BIRDIES", "BOGEYS"];
+  const types = ["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "WINNER_SCORE"];
 
   const filtered = useMemo(() => {
     return archive.filter((b) => {
