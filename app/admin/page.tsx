@@ -730,7 +730,7 @@ export default function AdminPage() {
           <div className="round-label">Currently open</div>
           {liveParlays.map((p) => (
             <div key={p.id} className="card" style={{ marginBottom: 8 }}>
-              <div className="player" style={{ fontSize: 13 }}>{p.label} · {p.oddsPrice} · ${p.wagerDollars} ({p.wagerUnits}u)</div>
+              <div className="player" style={{ fontSize: 13 }}>{p.label} · {p.oddsPrice} · {p.wagerUnits}u</div>
               <div className="subline" style={{ marginTop: 4 }}>{p.legs.length} legs · {p.loadedDate}</div>
             </div>
           ))}

@@ -191,7 +191,7 @@ export default function Page() {
                   <div className="card-top">
                     <div className="who">
                       <div className="player">{p.label}</div>
-                      <div className="bet-text">{p.oddsPrice} · ${p.wagerDollars} ({p.wagerUnits}u)</div>
+                      <div className="bet-text">{p.oddsPrice} · {p.wagerUnits}u</div>
                     </div>
                     <span className={`sbtn ${status === "hit" ? "win active" : status === "miss" ? "loss active" : status === "live" ? "live active" : ""}`} style={{ cursor: "default" }}>
                       {status === "hit" ? "WIN" : status === "miss" ? "LOSS" : status === "live" ? "IN PROGRESS" : "TBD"}

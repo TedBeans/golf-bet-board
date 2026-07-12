@@ -401,7 +401,7 @@ export default function RecapPage() {
                       <div className="who">
                         <div className="time">{p.loadedDate}</div>
                         <div className="player">{p.label}</div>
-                        <div className="bet-text">{p.oddsPrice} · ${p.wagerDollars} ({p.wagerUnits}u)</div>
+                        <div className="bet-text">{p.oddsPrice} · {p.wagerUnits}u</div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                         <span className={`sbtn ${p.status === "hit" ? "win active" : "loss active"}`} style={{ cursor: "default" }}>
