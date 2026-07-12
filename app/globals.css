@@ -223,6 +223,10 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
 .trend-good{ color: var(--gold-bright) !important; }
 .trend-bad{ color: var(--clay) !important; }
 .trend-neutral{ color: var(--cream) !important; }
+.pace-good{ color: var(--live) !important; }
+.pace-warn{ color: var(--gold-bright) !important; }
+.pace-bad{ color: var(--clay) !important; }
+.pace-neutral{ color: var(--cream) !important; }
 .thru-input{ font-size:15px; font-weight:600; }
 
 .auto-row{

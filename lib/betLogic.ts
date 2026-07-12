@@ -61,6 +61,58 @@ export function trend(parsed: ParsedBet, stat: number | null, thru: number | nul
   return "neutral";
 }
 
+const COUNT_LABELS = ["GIR", "BIRDIES", "BOGEYS", "PARS"];
+
+// For count-based bets (greens/birdies/bogeys/pars), compares the pace
+// you're actually keeping (stat so far ÷ holes played) against the pace
+// you'd need to sustain to hit the target (target ÷ 18) - a 3-point
+// percentage buffer either side of that required pace gives green/yellow/
+// red instead of just green/red, so you get an early read well before the
+// round's worst/best-case bound would otherwise kick in. Round score and
+// the tournament-winner bet fall back to the simpler trend() above, since
+// "percent of holes" doesn't map cleanly onto a to-par number.
+export function smartTrend(
+  parsed: ParsedBet,
+  stat: number | null,
+  thru: number | null,
+  holesTotal = HOLES_IN_ROUND
+): "good" | "warn" | "bad" | "neutral" {
+  if (!COUNT_LABELS.includes(parsed.label)) return trend(parsed, stat, thru);
+  if (parsed.type === "generic" || parsed.target === null || parsed.target === undefined) return "neutral";
+  if (stat === null || stat === undefined || isNaN(stat)) return "neutral";
+  if (thru === null || thru === undefined || isNaN(thru) || thru <= 0) return "neutral";
+
+  const requiredRate = parsed.target / holesTotal;
+  const currentRate = stat / thru;
+  const buffer = 0.03; // ~3 percentage points
+
+  if (parsed.type === "min") {
+    if (currentRate >= requiredRate + buffer) return "good";
+    if (currentRate <= requiredRate - buffer) return "bad";
+    return "warn";
+  }
+  // max type - lower pace than required is good, higher is bad (inverted)
+  if (currentRate <= requiredRate - buffer) return "good";
+  if (currentRate >= requiredRate + buffer) return "bad";
+  return "warn";
+}
+
+// Returns the actual CSS class to use for a stat value - the new green/
+// yellow/red pace scheme for count-based bets, or the existing gold/red/
+// cream scheme for score bets (unchanged, since "good" there doesn't mean
+// the same thing as an actual win).
+export function trendClassName(
+  parsed: ParsedBet,
+  stat: number | null,
+  thru: number | null,
+  holesTotal = HOLES_IN_ROUND
+): string {
+  if (COUNT_LABELS.includes(parsed.label)) {
+    return `pace-${smartTrend(parsed, stat, thru, holesTotal)}`;
+  }
+  return `trend-${trend(parsed, stat, thru)}`;
+}
+
 // Turns the internal category name into the word used in the UI - shared by
 // the target column, the stat column, and the detail strip so they all agree.
 export function friendlyLabel(label: string): string {

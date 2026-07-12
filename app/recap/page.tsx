@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
-import { parseBetType, trend, friendlyLabel, formatScore } from "../../lib/betLogic";
+import { parseBetType, trendClassName, friendlyLabel, formatScore } from "../../lib/betLogic";
 import { computeUnitResult, formatUnits, oddsMultiplier } from "../../lib/units";
 import { centralDateFromISO } from "../../lib/centralTime";
 import { Parlay } from "../../lib/parlay";
@@ -28,7 +28,7 @@ function aggregate(bets: Bet[]): { wins: number; losses: number; units: number }
 
 function BetDetailCard({ b, compact = false }: { b: Bet; compact?: boolean }) {
   const parsed = parseBetType(b.bet);
-  const cls = trend(parsed, b.stat, b.thru);
+  const cls = trendClassName(parsed, b.stat, b.thru);
   const unitResult = computeUnitResult(b.oddsPrice, b.oddsUnits, b.status);
   return (
     <div className={`card ${b.status}`} style={{ marginBottom: 8 }}>
@@ -68,7 +68,7 @@ function BetDetailCard({ b, compact = false }: { b: Bet; compact?: boolean }) {
             </div>
             <div className="sc-cell">
               <div className="sc-label">{friendlyLabel(parsed.label)}</div>
-              <div className={`sc-target trend-${cls}`}>{parsed.label === "SCORE" ? formatScore(b.stat) : b.stat ?? "—"}</div>
+              <div className={`sc-target ${cls}`}>{parsed.label === "SCORE" ? formatScore(b.stat) : b.stat ?? "—"}</div>
             </div>
             <div className="sc-cell">
               <div className="sc-label">Thru</div>

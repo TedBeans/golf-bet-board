@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../lib/mapping";
-import { parseBetType, trend, timeToMinutes, friendlyLabel, formatScore, parseScoreInput } from "../lib/betLogic";
+import { parseBetType, trend, smartTrend, trendClassName, timeToMinutes, friendlyLabel, formatScore, parseScoreInput } from "../lib/betLogic";
 import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../lib/parlay";
 import { computeUnitResult, formatUnits } from "../lib/units";
 import GolfFlagIcon from "./GolfFlagIcon";
@@ -258,7 +258,7 @@ export default function Page() {
                   <div className="round-label">{round}</div>
                   {items.map((b) => {
                     const parsed = parseBetType(b.bet);
-                    const cls = trend(parsed, b.stat, b.thru);
+                    const cls = trendClassName(parsed, b.stat, b.thru);
                     const isAuto = b.autoEnabled !== false;
                     return (
                       <div className={`card ${b.status}`} key={b.id}>
@@ -309,7 +309,7 @@ export default function Page() {
                             {parsed.label === "SCORE" ? (
                               <input
                                 disabled={!unlocked}
-                                className={`sc-input trend-${cls}`}
+                                className={`sc-input ${cls}`}
                                 type="text"
                                 inputMode="numeric"
                                 placeholder="—"
@@ -319,7 +319,7 @@ export default function Page() {
                             ) : (
                               <input
                                 disabled={!unlocked}
-                                className={`sc-input trend-${cls}`}
+                                className={`sc-input ${cls}`}
                                 type="number"
                                 step="1"
                                 placeholder="—"
@@ -430,14 +430,14 @@ export default function Page() {
                     {legStatuses.map((ls, i) => {
                       if (ls.status === "live" && ls.bet) {
                         const legParsed = parseBetType(ls.bet.bet);
-                        const legTrend = trend(legParsed, ls.bet.stat, ls.bet.thru);
+                        const legTrend = smartTrend(legParsed, ls.bet.stat, ls.bet.thru);
                         const valueDisplay = legParsed.label === "SCORE" || legParsed.label === "WINNER_SCORE"
                           ? formatScore(ls.bet.stat)
                           : ls.bet.stat ?? "—";
                         return (
                           <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
                             <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
-                            <span className={`tsum ${legTrend === "good" ? "win" : legTrend === "bad" ? "loss" : "tbd"}`}>
+                            <span className={`tsum ${legTrend === "good" ? "win" : legTrend === "bad" ? "loss" : legTrend === "warn" ? "live" : "tbd"}`}>
                               LIVE | {valueDisplay} thru {ls.bet.thru ?? "—"}
                             </span>
                           </div>
