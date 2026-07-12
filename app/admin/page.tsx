@@ -25,6 +25,8 @@ export default function AdminPage() {
   const [oddsMsg, setOddsMsg] = useState("");
 
   const [forceMsg, setForceMsg] = useState("");
+  const [tab, setTab] = useState<"bets" | "tournaments">("bets");
+  const [newTournName, setNewTournName] = useState("");
 
   useEffect(() => {
     const stored = sessionStorage.getItem("bb_passcode");
@@ -52,7 +54,22 @@ export default function AdminPage() {
     });
   }
 
-  const tournaments = Array.from(new Set(bets.map((b) => b.t)));
+  const tournaments = Array.from(new Set([...Object.keys(mapping.tournaments), ...bets.map((b) => b.t)]));
+
+  function addTournament() {
+    const name = newTournName.trim();
+    if (!name || mapping.tournaments[name]) return;
+    setMapping((m) => ({ ...m, tournaments: { ...m.tournaments, [name]: { pgaId: "" } } }));
+    setNewTournName("");
+  }
+
+  function removeTournament(name: string) {
+    setMapping((m) => {
+      const next = { ...m.tournaments };
+      delete next[name];
+      return { ...m, tournaments: next };
+    });
+  }
 
   const roundGroups = Array.from(new Set(bets.map((b) => `${b.t}|||${b.r}`))).map((key) => {
     const [t, r] = key.split("|||");
@@ -170,6 +187,17 @@ export default function AdminPage() {
         <Link href="/" className="admin-link">← back to board</Link>
       </div>
 
+      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+        <button className={tab === "bets" ? "add-btn-inline" : "recap-btn"} onClick={() => setTab("bets")}>
+          Bets
+        </button>
+        <button className={tab === "tournaments" ? "add-btn-inline" : "recap-btn"} onClick={() => setTab("tournaments")}>
+          Tournaments
+        </button>
+      </div>
+
+      {tab === "bets" && (
+      <>
       <h1 style={{ marginBottom: 4 }}>Load tonight's bets</h1>
       <div className="subline" style={{ marginBottom: 12 }}>
         Paste the nightly list in the usual format - a tournament header line,
@@ -296,8 +324,33 @@ export default function AdminPage() {
         </div>
       ))}
       {forceMsg && <div className="subline" style={{ marginBottom: 8 }}>{forceMsg}</div>}
+      </>
+      )}
 
-      <h1 style={{ marginTop: 36, marginBottom: 4 }}>Auto-sync setup</h1>
+      {tab === "tournaments" && (
+      <>
+      <h1 style={{ marginBottom: 4 }}>Add a tournament</h1>
+      <div className="subline" style={{ marginBottom: 12 }}>
+        Tournaments stay listed here permanently once added, even after all
+        their bets archive to the recap - so you can set next week's mapping
+        ahead of time, or fix an old tournament's dates whenever.
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+        <input
+          placeholder="e.g. ISCO Championship"
+          value={newTournName}
+          onChange={(e) => setNewTournName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addTournament()}
+          style={{
+            flex: 1, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+            color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+            padding: "8px 10px", borderRadius: 3,
+          }}
+        />
+        <button className="add-btn-inline" onClick={addTournament}>Add</button>
+      </div>
+
+      <h1 style={{ marginBottom: 4 }}>Auto-sync setup</h1>
       <div className="subline" style={{ marginBottom: 20 }}>
         One number per tournament. Open the tournament's leaderboard on pgatour.com
         and copy the "Rxxxxxxx" segment from the URL - for example
@@ -318,7 +371,16 @@ export default function AdminPage() {
         }
         return (
           <div key={tourn} className="card" style={{ marginBottom: 14 }}>
-            <div className="player" style={{ marginBottom: 8 }}>{tourn}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div className="player">{tourn}</div>
+              <button
+                className="resume-btn"
+                onClick={() => removeTournament(tourn)}
+                style={{ fontSize: 9 }}
+              >
+                Remove
+              </button>
+            </div>
             <input
               placeholder="e.g. R2026518"
               value={tm?.pgaId || ""}
@@ -391,6 +453,8 @@ export default function AdminPage() {
         board, matched to players by name. Edit any stat by hand and it locks
         that bet out of auto-sync until you hit "Resume auto" on it.
       </div>
+      </>
+      )}
     </main>
   );
 }
