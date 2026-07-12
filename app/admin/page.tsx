@@ -7,6 +7,8 @@ import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
 import { parseBetsText, ParseResult } from "../../lib/parseBets";
 import { parseOddsText, attachOddsToBets, OddsParseResult } from "../../lib/parseOdds";
 import { nowInCentral } from "../../lib/centralTime";
+import { Parlay, ParlayLegRef } from "../../lib/parlay";
+import { Settings, DEFAULT_SETTINGS } from "../../lib/settings";
 import GolfFlagIcon from "../GolfFlagIcon";
 
 export default function AdminPage() {
@@ -27,9 +29,21 @@ export default function AdminPage() {
   const [oddsMsg, setOddsMsg] = useState("");
 
   const [forceMsg, setForceMsg] = useState("");
-  const [tab, setTab] = useState<"bets" | "tournaments">("bets");
+  const [tab, setTab] = useState<"bets" | "tournaments" | "parlays">("bets");
   const [newTournName, setNewTournName] = useState("");
   const [backupMsg, setBackupMsg] = useState("");
+
+  const [archive, setArchive] = useState<Bet[]>([]);
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [settingsMsg, setSettingsMsg] = useState("");
+  const [liveParlays, setLiveParlays] = useState<Parlay[]>([]);
+
+  const [selectedLegIds, setSelectedLegIds] = useState<Set<string>>(new Set());
+  const [parlayLabel, setParlayLabel] = useState("");
+  const [parlayOdds, setParlayOdds] = useState("");
+  const [parlayWagerDollars, setParlayWagerDollars] = useState("");
+  const [parlayDate, setParlayDate] = useState(() => nowInCentral().dateStr);
+  const [parlayMsg, setParlayMsg] = useState("");
 
   function downloadBackup() {
     setBackupMsg("Preparing backup…");
@@ -67,6 +81,9 @@ export default function AdminPage() {
     }
     fetch("/api/bets").then((r) => r.json()).then((d) => setBets(d.bets || []));
     fetch("/api/mapping").then((r) => r.json()).then((d) => setMapping(d.mapping || EMPTY_MAPPING));
+    fetch("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
+    fetch("/api/settings").then((r) => r.json()).then((d) => setSettings(d.settings || DEFAULT_SETTINGS));
+    fetch("/api/parlays").then((r) => r.json()).then((d) => setLiveParlays(d.parlays || []));
   }, []);
 
   function tryUnlock() {
@@ -108,6 +125,73 @@ export default function AdminPage() {
     const pending = groupBets.filter((b) => b.status === "pending" || b.status === "live").length;
     return { t, r, total: groupBets.length, pending, decided: groupBets.length - pending };
   });
+
+  function saveSettings() {
+    fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, settings }),
+    }).then((r) => {
+      setSettingsMsg(r.ok ? "Saved." : "Save failed - check passcode.");
+      setTimeout(() => setSettingsMsg(""), 3000);
+    });
+  }
+
+  // Every bet currently visible for parlay-building, whether it's still
+  // live on the board or already resolved and archived - a leg from an
+  // already-decided round (like the ISCO example) still needs to show up
+  // here so past-dated parlays can reference it.
+  const pickableBets = [...bets, ...archive];
+
+  function toggleLeg(betId: string) {
+    setSelectedLegIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(betId)) next.delete(betId);
+      else next.add(betId);
+      return next;
+    });
+  }
+
+  function submitParlay() {
+    const dollars = parseFloat(parlayWagerDollars);
+    if (!parlayOdds.trim() || isNaN(dollars) || selectedLegIds.size === 0) {
+      setParlayMsg("Add odds, a wager amount, and at least one leg first.");
+      return;
+    }
+    const legs: ParlayLegRef[] = pickableBets
+      .filter((b) => selectedLegIds.has(b.id))
+      .map((b) => ({ betId: b.id, player: b.player, bet: b.bet, tournament: b.t, round: b.r }));
+
+    const parlay: Parlay = {
+      id: "parlay_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+      label: parlayLabel.trim() || `${legs.length} Pick Parlay`,
+      legs,
+      oddsPrice: parlayOdds.trim(),
+      wagerDollars: dollars,
+      wagerUnits: Math.round((dollars / (settings.unitSizeDollars || 50)) * 100) / 100,
+      status: "pending",
+      loadedDate: parlayDate,
+    };
+
+    fetch("/api/parlays", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, parlay }),
+    }).then((r) => r.json()).then((d) => {
+      if (d.ok) {
+        setLiveParlays((prev) => [...prev, d.parlay]);
+        setParlayMsg(`Added "${parlay.label}."`);
+        setSelectedLegIds(new Set());
+        setParlayLabel("");
+        setParlayOdds("");
+        setParlayWagerDollars("");
+        setParlayDate(nowInCentral().dateStr);
+      } else {
+        setParlayMsg(d.error || "Failed to save.");
+      }
+      setTimeout(() => setParlayMsg(""), 4000);
+    });
+  }
 
   function forceArchive(tourn: string, round: string) {
     fetch("/api/archive", {
@@ -234,6 +318,9 @@ export default function AdminPage() {
         </button>
         <button className={tab === "tournaments" ? "add-btn-inline" : "recap-btn"} onClick={() => setTab("tournaments")}>
           Tournaments
+        </button>
+        <button className={tab === "parlays" ? "add-btn-inline" : "recap-btn"} onClick={() => setTab("parlays")}>
+          Parlays
         </button>
       </div>
 
@@ -509,6 +596,146 @@ export default function AdminPage() {
         board, matched to players by name. Edit any stat by hand and it locks
         that bet out of auto-sync until you hit "Resume auto" on it.
       </div>
+      </>
+      )}
+
+      {tab === "parlays" && (
+      <>
+      <h1 style={{ marginBottom: 4 }}>Unit size</h1>
+      <div className="subline" style={{ marginBottom: 12 }}>
+        Used to convert a dollar wager into units for parlays.
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 24 }}>
+        <span style={{ fontSize: 13, color: "var(--cream-dim)" }}>$</span>
+        <input
+          type="number"
+          value={settings.unitSizeDollars}
+          onChange={(e) => setSettings({ unitSizeDollars: parseFloat(e.target.value) || 0 })}
+          style={{
+            width: 100, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+            color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+            padding: "8px 10px", borderRadius: 3,
+          }}
+        />
+        <span style={{ fontSize: 13, color: "var(--cream-dim)" }}>per unit</span>
+        <button className="add-btn-inline" onClick={saveSettings}>Save</button>
+        {settingsMsg && <span className="subline" style={{ marginLeft: 4 }}>{settingsMsg}</span>}
+      </div>
+
+      <h1 style={{ marginBottom: 4 }}>Build a parlay</h1>
+      <div className="subline" style={{ marginBottom: 12 }}>
+        Check off the legs (works for live or already-resolved bets), then
+        fill in the slip's odds and wager. Status tracks itself from the
+        legs you pick - it doesn't fetch anything on its own. Parlays are
+        tracked completely separately from your straight-bet units.
+      </div>
+
+      {pickableBets.length === 0 && <div className="subline">No bets loaded yet to build a parlay from.</div>}
+
+      {Object.entries(
+        pickableBets.reduce((acc: Record<string, Bet[]>, b) => {
+          const key = `${b.t} · ${b.r}`;
+          (acc[key] = acc[key] || []).push(b);
+          return acc;
+        }, {})
+      ).map(([group, groupBets]) => (
+        <div key={group} className="card" style={{ marginBottom: 10 }}>
+          <div className="player" style={{ fontSize: 13, marginBottom: 8 }}>{group}</div>
+          {groupBets.map((b) => (
+            <label key={b.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, fontSize: 12, cursor: "pointer" }}>
+              <input type="checkbox" checked={selectedLegIds.has(b.id)} onChange={() => toggleLeg(b.id)} />
+              <span style={{ color: "var(--cream)" }}>{b.player}</span>
+              <span style={{ color: "var(--cream-dim)" }}>{b.bet}</span>
+              <span
+                className={`tsum ${b.status === "hit" ? "win" : b.status === "miss" ? "loss" : b.status === "live" ? "live" : "tbd"}`}
+                style={{ marginLeft: "auto" }}
+              >
+                {b.status === "hit" ? "WIN" : b.status === "miss" ? "LOSS" : b.status === "live" ? "LIVE" : "TBD"}
+              </span>
+            </label>
+          ))}
+        </div>
+      ))}
+
+      <div className="card" style={{ marginTop: 16, marginBottom: 16 }}>
+        <div className="player" style={{ fontSize: 13, marginBottom: 8 }}>
+          {selectedLegIds.size} leg{selectedLegIds.size === 1 ? "" : "s"} selected
+        </div>
+        <label style={{ display: "block", marginBottom: 10, fontSize: 12 }}>
+          Label (optional)
+          <input
+            placeholder={`e.g. ${selectedLegIds.size || "N"} Pick Parlay`}
+            value={parlayLabel}
+            onChange={(e) => setParlayLabel(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+              padding: "8px 10px", borderRadius: 3,
+            }}
+          />
+        </label>
+        <label style={{ display: "block", marginBottom: 10, fontSize: 12 }}>
+          Odds (e.g. +950)
+          <input
+            placeholder="+950"
+            value={parlayOdds}
+            onChange={(e) => setParlayOdds(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+              padding: "8px 10px", borderRadius: 3,
+            }}
+          />
+        </label>
+        <label style={{ display: "block", marginBottom: 10, fontSize: 12 }}>
+          Wager ($)
+          <input
+            type="number"
+            placeholder="25"
+            value={parlayWagerDollars}
+            onChange={(e) => setParlayWagerDollars(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+              padding: "8px 10px", borderRadius: 3,
+            }}
+          />
+          {parlayWagerDollars && !isNaN(parseFloat(parlayWagerDollars)) && (
+            <div className="subline" style={{ marginTop: 4, textTransform: "none", letterSpacing: 0 }}>
+              = {Math.round((parseFloat(parlayWagerDollars) / (settings.unitSizeDollars || 50)) * 100) / 100}u
+            </div>
+          )}
+        </label>
+        <label style={{ display: "block", marginBottom: 12, fontSize: 12 }}>
+          Date
+          <input
+            type="date"
+            value={parlayDate}
+            onChange={(e) => setParlayDate(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+              padding: "8px 10px", borderRadius: 3,
+            }}
+          />
+        </label>
+        <button className="add-btn-inline" onClick={submitParlay} style={{ width: "100%", padding: 10 }}>
+          Add parlay
+        </button>
+        {parlayMsg && <div className="subline" style={{ marginTop: 8 }}>{parlayMsg}</div>}
+      </div>
+
+      {liveParlays.length > 0 && (
+        <>
+          <div className="round-label">Currently open</div>
+          {liveParlays.map((p) => (
+            <div key={p.id} className="card" style={{ marginBottom: 8 }}>
+              <div className="player" style={{ fontSize: 13 }}>{p.label} · {p.oddsPrice} · ${p.wagerDollars} ({p.wagerUnits}u)</div>
+              <div className="subline" style={{ marginTop: 4 }}>{p.legs.length} legs · {p.loadedDate}</div>
+            </div>
+          ))}
+        </>
+      )}
       </>
       )}
     </main>

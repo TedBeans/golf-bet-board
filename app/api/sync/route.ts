@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { redis, BETS_KEY, MAPPING_KEY, SYNC_LOCK_KEY, ARCHIVE_KEY } from "../../../lib/redis";
+import { redis, BETS_KEY, MAPPING_KEY, SYNC_LOCK_KEY, ARCHIVE_KEY, PARLAYS_KEY, PARLAY_ARCHIVE_KEY } from "../../../lib/redis";
 import { Bet } from "../../../lib/seed";
 import { Mapping } from "../../../lib/mapping";
+import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../../../lib/parlay";
 import { fetchPgaLeaderboard, fetchPlayerScorecardStats } from "../../../lib/pgatour";
 import { extractPlayers, findPlayerMatch, PgaPlayerRow } from "../../../lib/pgaMatch";
 import { extractScorecardStats, roundNumberFromLabel } from "../../../lib/pgaScorecard";
@@ -191,6 +192,31 @@ export async function GET() {
 
   if (updatedCount > 0 || archivedCount > 0 || loadedDateBackfilled) {
     await redis.set(BETS_KEY, finalBets);
+  }
+
+  // Parlays never fetch anything themselves - just re-check each leg
+  // against the live bets (post-sync) and the bet archive (which may have
+  // just grown above), then file away any parlay that's now fully decided.
+  const liveParlays = (await redis.get<Parlay[]>(PARLAYS_KEY)) || [];
+  if (liveParlays.length > 0) {
+    const archiveForLegs = (await redis.get<Bet[]>(ARCHIVE_KEY)) || [];
+
+    const stillOpen: Parlay[] = [];
+    const nowDecided: Parlay[] = [];
+    for (const p of liveParlays) {
+      const legStatuses = resolveLegStatuses(p.legs, finalBets, archiveForLegs);
+      p.status = deriveParlayStatus(legStatuses);
+      if (p.status === "hit" || p.status === "miss") {
+        nowDecided.push({ ...p, archivedAt: new Date().toISOString() });
+      } else {
+        stillOpen.push(p);
+      }
+    }
+    if (nowDecided.length > 0) {
+      const existingParlayArchive = (await redis.get<Parlay[]>(PARLAY_ARCHIVE_KEY)) || [];
+      await redis.set(PARLAY_ARCHIVE_KEY, [...existingParlayArchive, ...nowDecided]);
+    }
+    await redis.set(PARLAYS_KEY, stillOpen);
   }
 
   return NextResponse.json({ ok: true, updated: updatedCount, archived: archivedCount, errors });

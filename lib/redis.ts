@@ -16,3 +16,6 @@ export const BETS_KEY = "golf-bet-board:bets";
 export const MAPPING_KEY = "golf-bet-board:mapping";
 export const SYNC_LOCK_KEY = "golf-bet-board:last-sync-at";
 export const ARCHIVE_KEY = "golf-bet-board:archive";
+export const SETTINGS_KEY = "golf-bet-board:settings";
+export const PARLAYS_KEY = "golf-bet-board:parlays";
+export const PARLAY_ARCHIVE_KEY = "golf-bet-board:parlay-archive";

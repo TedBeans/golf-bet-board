@@ -5,8 +5,9 @@ import Link from "next/link";
 import { Bet } from "../../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
 import { parseBetType, trend, friendlyLabel, formatScore } from "../../lib/betLogic";
-import { computeUnitResult, formatUnits } from "../../lib/units";
+import { computeUnitResult, formatUnits, oddsMultiplier } from "../../lib/units";
 import { centralDateFromISO } from "../../lib/centralTime";
+import { Parlay } from "../../lib/parlay";
 import GolfFlagIcon from "../GolfFlagIcon";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -91,17 +92,20 @@ function BetDetailCard({ b, compact = false }: { b: Bet; compact?: boolean }) {
 export default function RecapPage() {
   const [archive, setArchive] = useState<Bet[]>([]);
   const [mapping, setMapping] = useState<Mapping>(EMPTY_MAPPING);
-  const [view, setView] = useState<"calendar" | "tournament">("calendar");
+  const [view, setView] = useState<"calendar" | "tournament" | "parlays">("calendar");
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [expandedTourn, setExpandedTourn] = useState<string | null>(null);
   const [expandedRound, setExpandedRound] = useState<string | null>(null);
   const [quickViewRound, setQuickViewRound] = useState<string | null>(null);
+  const [parlayArchive, setParlayArchive] = useState<Parlay[]>([]);
+  const [expandedParlay, setExpandedParlay] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
     fetch("/api/mapping").then((r) => r.json()).then((d) => setMapping(d.mapping || EMPTY_MAPPING));
+    fetch("/api/parlay-archive").then((r) => r.json()).then((d) => setParlayArchive(d.archive || []));
   }, []);
 
   const dayMap = useMemo(() => {
@@ -176,6 +180,12 @@ export default function RecapPage() {
               onClick={() => setView("tournament")}
             >
               By tournament
+            </button>
+            <button
+              className={view === "parlays" ? "add-btn-inline" : "recap-btn"}
+              onClick={() => setView("parlays")}
+            >
+              Parlays
             </button>
             <Link href="/analysis" className="recap-btn">Analysis</Link>
           </div>
@@ -348,6 +358,74 @@ export default function RecapPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {view === "parlays" && (
+          <div>
+            {parlayArchive.length === 0 && (
+              <div className="empty">No decided parlays yet - they show up here once every leg is settled.</div>
+            )}
+            {parlayArchive.length > 0 && (() => {
+              const totalUnits = Math.round(
+                parlayArchive.reduce((sum, p) => {
+                  if (p.status === "hit") return sum + p.wagerUnits * (oddsMultiplier(p.oddsPrice) || 0);
+                  if (p.status === "miss") return sum - p.wagerUnits;
+                  return sum;
+                }, 0) * 100
+              ) / 100;
+              const wins = parlayArchive.filter((p) => p.status === "hit").length;
+              const losses = parlayArchive.filter((p) => p.status === "miss").length;
+              return (
+                <div className="tourn-head" style={{ marginBottom: 16 }}>
+                  <h2>All parlays</h2>
+                  <div className="tourn-summary">
+                    <span className="tsum win">{wins}W</span>
+                    <span className="tsum loss">{losses}L</span>
+                    <span className={totalUnits >= 0 ? "tsum win" : "tsum loss"}>{formatUnits(totalUnits)}</span>
+                  </div>
+                </div>
+              );
+            })()}
+            {parlayArchive
+              .slice()
+              .sort((a, b) => (b.archivedAt || "").localeCompare(a.archivedAt || ""))
+              .map((p) => {
+                const isOpen = expandedParlay === p.id;
+                const unitResult = p.status === "hit"
+                  ? Math.round(p.wagerUnits * (oddsMultiplier(p.oddsPrice) || 0) * 100) / 100
+                  : p.status === "miss" ? -p.wagerUnits : null;
+                return (
+                  <div key={p.id} className={`card ${p.status}`} style={{ marginBottom: 10, cursor: "pointer" }} onClick={() => setExpandedParlay(isOpen ? null : p.id)}>
+                    <div className="card-top">
+                      <div className="who">
+                        <div className="time">{p.loadedDate}</div>
+                        <div className="player">{p.label}</div>
+                        <div className="bet-text">{p.oddsPrice} · ${p.wagerDollars} ({p.wagerUnits}u)</div>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                        <span className={`sbtn ${p.status === "hit" ? "win active" : "loss active"}`} style={{ cursor: "default" }}>
+                          {p.status === "hit" ? "WIN" : "LOSS"}
+                        </span>
+                        {unitResult !== null && (
+                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: unitResult >= 0 ? "var(--live)" : "var(--clay)" }}>
+                            {formatUnits(unitResult)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {isOpen && (
+                      <div style={{ marginTop: 8 }}>
+                        {p.legs.map((leg, i) => (
+                          <div key={i} style={{ fontSize: 11, color: "var(--cream-dim)", marginBottom: 4 }}>
+                            {leg.tournament} · {leg.player} · {leg.bet}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         )}
       </main>

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Bet } from "../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../lib/mapping";
 import { parseBetType, trend, timeToMinutes, friendlyLabel, formatScore, parseScoreInput } from "../lib/betLogic";
+import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../lib/parlay";
+import { computeUnitResult, formatUnits } from "../lib/units";
 import GolfFlagIcon from "./GolfFlagIcon";
 
 const SYNC_INTERVAL_MS = 60000;
@@ -25,6 +27,8 @@ export default function Page() {
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [tick, setTick] = useState(0);
   const [mapping, setMapping] = useState<Mapping>(EMPTY_MAPPING);
+  const [archive, setArchive] = useState<Bet[]>([]);
+  const [liveParlays, setLiveParlays] = useState<Parlay[]>([]);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function loadBets() {
@@ -49,10 +53,17 @@ export default function Page() {
       .catch(() => setSyncNote("Auto-sync unreachable"));
   }
 
+  function loadParlaysAndArchive() {
+    fetch("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
+    fetch("/api/parlays").then((r) => r.json()).then((d) => setLiveParlays(d.parlays || []));
+  }
+
   useEffect(() => {
     loadBets().then(() => runSync());
     fetch("/api/mapping").then((r) => r.json()).then((d) => setMapping(d.mapping || EMPTY_MAPPING));
+    loadParlaysAndArchive();
     const interval = setInterval(runSync, SYNC_INTERVAL_MS);
+    const parlayInterval = setInterval(loadParlaysAndArchive, SYNC_INTERVAL_MS);
     const staleCheck = setInterval(() => setTick((t) => t + 1), 30000);
 
     const stored = typeof window !== "undefined" ? sessionStorage.getItem("bb_passcode") : null;
@@ -62,6 +73,7 @@ export default function Page() {
     }
     return () => {
       clearInterval(interval);
+      clearInterval(parlayInterval);
       clearInterval(staleCheck);
     };
   }, []);
@@ -162,6 +174,46 @@ export default function Page() {
 
       <main>
         {bets.length === 0 && <div className="empty">No bets loaded.</div>}
+
+        {liveParlays.length > 0 && (
+          <div className="tourn">
+            <div className="tourn-head">
+              <h2>Parlays</h2>
+              <span className="subline" style={{ marginTop: 0, textTransform: "none", letterSpacing: 0 }}>
+                Tracked separately from straight-bet units
+              </span>
+            </div>
+            {liveParlays.map((p) => {
+              const legStatuses = resolveLegStatuses(p.legs, bets, archive);
+              const status = deriveParlayStatus(legStatuses);
+              return (
+                <div className={`card ${status}`} key={p.id}>
+                  <div className="card-top">
+                    <div className="who">
+                      <div className="player">{p.label}</div>
+                      <div className="bet-text">{p.oddsPrice} · ${p.wagerDollars} ({p.wagerUnits}u)</div>
+                    </div>
+                    <span className={`sbtn ${status === "hit" ? "win active" : status === "miss" ? "loss active" : status === "live" ? "live active" : ""}`} style={{ cursor: "default" }}>
+                      {status === "hit" ? "WIN" : status === "miss" ? "LOSS" : status === "live" ? "IN PROGRESS" : "TBD"}
+                    </span>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {legStatuses.map((ls, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                        <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
+                        <span className={
+                          ls.status === "hit" ? "tsum win" : ls.status === "miss" ? "tsum loss" : ls.status === "live" ? "tsum live" : "tsum tbd"
+                        }>
+                          {ls.status === "hit" ? "WIN" : ls.status === "miss" ? "LOSS" : ls.status === "live" ? "LIVE" : "TBD"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {Object.keys(groups).map((tourn) => {
           const tournBets = Object.values(groups[tourn]).flat();

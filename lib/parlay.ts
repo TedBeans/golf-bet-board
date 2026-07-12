@@ -1,0 +1,40 @@
+import { Bet } from "./seed";
+
+export type ParlayLegRef = {
+  betId: string; // the Bet.id this leg points to, at time of creation
+  player: string;
+  bet: string; // the bet description, e.g. "-2 or better"
+  tournament: string;
+  round: string;
+};
+
+export type Parlay = {
+  id: string;
+  label: string;
+  legs: ParlayLegRef[];
+  oddsPrice: string; // American odds, e.g. "+950"
+  wagerUnits: number; // e.g. 0.5
+  wagerDollars?: number; // just for display/reference
+  status: "pending" | "live" | "hit" | "miss";
+  loadedDate: string;
+  archivedAt?: string;
+};
+
+export type LegStatus = { leg: ParlayLegRef; status: Bet["status"] | "unknown" };
+
+// Looks up each leg's current status from the live bets list or the
+// archive (whichever still has it) - a parlay never fetches PGA Tour data
+// itself, it just watches the bets it references.
+export function resolveLegStatuses(legs: ParlayLegRef[], liveBets: Bet[], archivedBets: Bet[]): LegStatus[] {
+  return legs.map((leg) => {
+    const found = liveBets.find((b) => b.id === leg.betId) || archivedBets.find((b) => b.id === leg.betId);
+    return { leg, status: found ? found.status : "unknown" };
+  });
+}
+
+export function deriveParlayStatus(legStatuses: LegStatus[]): Parlay["status"] {
+  if (legStatuses.some((l) => l.status === "miss")) return "miss";
+  if (legStatuses.every((l) => l.status === "hit")) return "hit";
+  if (legStatuses.some((l) => l.status === "live" || l.status === "hit")) return "live";
+  return "pending";
+}
