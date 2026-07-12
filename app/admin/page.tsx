@@ -6,6 +6,7 @@ import { Bet } from "../../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
 import { parseBetsText, ParseResult } from "../../lib/parseBets";
 import { parseOddsText, attachOddsToBets, OddsParseResult } from "../../lib/parseOdds";
+import GolfFlagIcon from "../GolfFlagIcon";
 
 export default function AdminPage() {
   const [passcode, setPasscode] = useState("");
@@ -78,13 +79,6 @@ export default function AdminPage() {
       });
   }
 
-  function setTournamentId(tourn: string, pgaId: string) {
-    setMapping((m) => ({
-      ...m,
-      tournaments: { ...m.tournaments, [tourn]: { ...m.tournaments[tourn], pgaId } },
-    }));
-  }
-
   function saveMapping() {
     fetch("/api/mapping", {
       method: "POST",
@@ -153,7 +147,7 @@ export default function AdminPage() {
   if (!unlocked) {
     return (
       <main style={{ maxWidth: 420, margin: "80px auto", textAlign: "center" }}>
-        <h1>Bet <span>Board</span></h1>
+        <h1><GolfFlagIcon />Golf <span>Tracker</span></h1>
         <div className="subline" style={{ marginBottom: 20 }}>Auto-sync setup</div>
         <div className="lock" style={{ justifyContent: "center" }}>
           <input
@@ -310,46 +304,82 @@ export default function AdminPage() {
         pgatour.com/tournaments/2026/isco-championship/<b>R2026518</b>/leaderboard.
       </div>
 
-      {tournaments.map((tourn) => (
-        <div key={tourn} className="card" style={{ marginBottom: 14 }}>
-          <div className="player" style={{ marginBottom: 8 }}>{tourn}</div>
-          <input
-            placeholder="e.g. R2026518"
-            value={mapping.tournaments[tourn]?.pgaId || ""}
-            onChange={(e) => setTournamentId(tourn, e.target.value)}
-            style={{
-              width: "100%", background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
-              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
-              padding: "8px 10px", borderRadius: 3,
-            }}
-          />
-          <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
-            Play suspended?
-            <select
-              value={mapping.tournaments[tourn]?.suspendedType || "none"}
-              onChange={(e) =>
-                setMapping((m) => ({
-                  ...m,
-                  tournaments: {
-                    ...m.tournaments,
-                    [tourn]: { pgaId: m.tournaments[tourn]?.pgaId || "", suspendedType: e.target.value as any },
-                  },
-                }))
-              }
+      {tournaments.map((tourn) => {
+        const tm = mapping.tournaments[tourn];
+        const isSuspended = !!tm?.suspendedType && tm.suspendedType !== "none";
+        function updateTourn(patch: Partial<{ pgaId: string; suspendedType: string; suspendedUntil: string; dateRange: string }>) {
+          setMapping((m) => ({
+            ...m,
+            tournaments: {
+              ...m.tournaments,
+              [tourn]: { ...m.tournaments[tourn], pgaId: m.tournaments[tourn]?.pgaId || "", ...patch } as any,
+            },
+          }));
+        }
+        return (
+          <div key={tourn} className="card" style={{ marginBottom: 14 }}>
+            <div className="player" style={{ marginBottom: 8 }}>{tourn}</div>
+            <input
+              placeholder="e.g. R2026518"
+              value={tm?.pgaId || ""}
+              onChange={(e) => updateTourn({ pgaId: e.target.value })}
               style={{
-                width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                width: "100%", background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
                 color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
                 padding: "8px 10px", borderRadius: 3,
               }}
-            >
-              <option value="none">Not suspended</option>
-              <option value="fog">Fog</option>
-              <option value="storm">Storms</option>
-              <option value="dark">Darkness</option>
-            </select>
-          </label>
-        </div>
-      ))}
+            />
+            <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
+              Dates (for the recap page, e.g. "July 9-12, 2026")
+              <input
+                placeholder="July 9-12, 2026"
+                value={tm?.dateRange || ""}
+                onChange={(e) => updateTourn({ dateRange: e.target.value })}
+                style={{
+                  width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                  color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                  padding: "8px 10px", borderRadius: 3,
+                }}
+              />
+            </label>
+            <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
+              Play suspended?
+              <select
+                value={tm?.suspendedType || "none"}
+                onChange={(e) => updateTourn({ suspendedType: e.target.value })}
+                style={{
+                  width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                  color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                  padding: "8px 10px", borderRadius: 3,
+                }}
+              >
+                <option value="none">Not suspended</option>
+                <option value="fog">Fog</option>
+                <option value="storm">Storms</option>
+                <option value="dark">Darkness</option>
+              </select>
+            </label>
+            {isSuspended && (
+              <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
+                Auto-resume at (Central time)
+                <input
+                  type="datetime-local"
+                  value={tm?.suspendedUntil || ""}
+                  onChange={(e) => updateTourn({ suspendedUntil: e.target.value })}
+                  style={{
+                    width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                    color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                    padding: "8px 10px", borderRadius: 3,
+                  }}
+                />
+                <div className="subline" style={{ marginTop: 4, textTransform: "none", letterSpacing: 0 }}>
+                  Leave blank to lift it manually instead.
+                </div>
+              </label>
+            )}
+          </div>
+        );
+      })}
 
       <button className="add-btn-inline" onClick={saveMapping} style={{ width: "100%", padding: 10 }}>
         Save mapping

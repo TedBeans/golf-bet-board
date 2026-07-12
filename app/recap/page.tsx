@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../../lib/seed";
+import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
 import { parseBetType, trend, friendlyLabel, formatScore } from "../../lib/betLogic";
 import { computeUnitResult, formatUnits } from "../../lib/units";
+import GolfFlagIcon from "../GolfFlagIcon";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const WEEKDAY_NAMES = ["S","M","T","W","T","F","S"];
@@ -78,6 +80,7 @@ function BetDetailCard({ b, compact = false }: { b: Bet; compact?: boolean }) {
 
 export default function RecapPage() {
   const [archive, setArchive] = useState<Bet[]>([]);
+  const [mapping, setMapping] = useState<Mapping>(EMPTY_MAPPING);
   const [view, setView] = useState<"calendar" | "tournament">("calendar");
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
@@ -88,6 +91,7 @@ export default function RecapPage() {
 
   useEffect(() => {
     fetch("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
+    fetch("/api/mapping").then((r) => r.json()).then((d) => setMapping(d.mapping || EMPTY_MAPPING));
   }, []);
 
   const dayMap = useMemo(() => {
@@ -149,7 +153,7 @@ export default function RecapPage() {
     <>
       <header>
         <div className="title-row">
-          <h1>Bet <span>Board</span></h1>
+          <h1><GolfFlagIcon />Golf <span>Tracker</span></h1>
           <div className="header-actions">
             <button
               className={view === "calendar" ? "add-btn-inline" : "recap-btn"}
@@ -279,7 +283,14 @@ export default function RecapPage() {
               return (
                 <div key={t} className="tourn" style={{ marginBottom: 14 }}>
                   <div className="tourn-head" style={{ cursor: "pointer" }} onClick={() => setExpandedTourn(isOpen ? null : t)}>
-                    <h2>{t}</h2>
+                    <div className="tourn-title-row">
+                      <h2>{t}</h2>
+                      {mapping.tournaments[t]?.dateRange && (
+                        <span className="subline" style={{ marginTop: 0, textTransform: "none", letterSpacing: 0 }}>
+                          {mapping.tournaments[t]?.dateRange}
+                        </span>
+                      )}
+                    </div>
                     <div className="tourn-summary">
                       <span className="tsum win">{agg.wins}W</span>
                       <span className="tsum loss">{agg.losses}L</span>

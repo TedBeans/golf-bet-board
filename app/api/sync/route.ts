@@ -9,9 +9,10 @@ import { parseBetType, autoGradeStatus, timeToMinutes } from "../../../lib/betLo
 
 const SYNC_LOCK_MS = 45000;
 
-// Teddy is always in Central time (Missouri) - tee times are compared
-// against Central regardless of where the server or any viewer actually is.
-function nowInCentral(): { dateStr: string; minutes: number } {
+// Teddy is always in Central time (Missouri) - tee times and suspension
+// resume times are compared against Central regardless of where the server
+// or any viewer actually is.
+function nowInCentral(): { dateStr: string; minutes: number; dateTimeStr: string } {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Chicago",
     year: "numeric", month: "2-digit", day: "2-digit",
@@ -19,8 +20,11 @@ function nowInCentral(): { dateStr: string; minutes: number } {
   }).formatToParts(new Date());
   const get = (type: string) => parts.find((p) => p.type === type)?.value || "00";
   const dateStr = `${get("year")}-${get("month")}-${get("day")}`;
-  const minutes = parseInt(get("hour"), 10) * 60 + parseInt(get("minute"), 10);
-  return { dateStr, minutes };
+  const hh = get("hour");
+  const mm = get("minute");
+  const minutes = parseInt(hh, 10) * 60 + parseInt(mm, 10);
+  const dateTimeStr = `${dateStr}T${hh}:${mm}`;
+  return { dateStr, minutes, dateTimeStr };
 }
 
 // Triggered by the browser (not a server cron - see README) roughly once a
@@ -53,7 +57,21 @@ export async function GET() {
   const leaderboardCache = new Map<string, PgaPlayerRow[]>();
   const scorecardCache = new Map<string, any>();
   let updatedCount = 0;
-  const { dateStr: todayCentral, minutes: nowMinutes } = nowInCentral();
+  const { dateStr: todayCentral, minutes: nowMinutes, dateTimeStr: nowCentralDT } = nowInCentral();
+
+  // Auto-lift any suspension whose resume time has already passed, so both
+  // the overlay and the fetch-blocking clear on their own.
+  let mappingChanged = false;
+  for (const key of Object.keys(mapping.tournaments)) {
+    const tm = mapping.tournaments[key];
+    if (tm.suspendedType && tm.suspendedType !== "none" && tm.suspendedUntil && nowCentralDT >= tm.suspendedUntil) {
+      tm.suspendedType = "none";
+      mappingChanged = true;
+    }
+  }
+  if (mappingChanged) {
+    await redis.set(MAPPING_KEY, mapping);
+  }
 
   for (const bet of bets) {
     if (bet.autoEnabled === false) continue;

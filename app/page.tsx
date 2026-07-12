@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Bet } from "../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../lib/mapping";
 import { parseBetType, trend, timeToMinutes, friendlyLabel, formatScore, parseScoreInput } from "../lib/betLogic";
+import GolfFlagIcon from "./GolfFlagIcon";
 
 const SYNC_INTERVAL_MS = 60000;
 
@@ -118,7 +119,7 @@ export default function Page() {
       <header>
         <div className="title-row">
           <h1>
-            Bet <span>Board</span>
+            <GolfFlagIcon />Golf <span>Tracker</span>
           </h1>
           <div className="header-actions">
             {unlocked ? (
