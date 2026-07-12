@@ -172,7 +172,7 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
   margin-bottom: 10px;
 }
 .card.hit{ border-left-color: var(--live); background: rgba(76,175,110,0.07); }
-.card.miss{ border-left-color: var(--clay); background: rgba(192,106,76,0.06); opacity:0.75; }
+.card.miss{ border-left-color: var(--clay); background: rgba(192,106,76,0.06); }
 .card.live{ border-left-color: var(--gold-bright); background: rgba(228,190,74,0.06); }
 .card-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
 .who{ display:flex; flex-direction:column; gap:1px; }
