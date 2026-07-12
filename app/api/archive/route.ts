@@ -57,3 +57,21 @@ export async function DELETE(req: NextRequest) {
 
   return NextResponse.json({ ok: true, removed });
 }
+
+// Overwrites the whole archive - used when re-attaching odds data to bets
+// that already resolved and moved here, since the normal odds-loading flow
+// otherwise only ever touches the live board.
+export async function PUT(req: NextRequest) {
+  const body = await req.json();
+  const { passcode, archive } = body as { passcode: string; archive: Bet[] };
+
+  if (!passcode || passcode !== process.env.EDIT_PASSCODE) {
+    return NextResponse.json({ error: "Wrong passcode" }, { status: 401 });
+  }
+  if (!Array.isArray(archive)) {
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+
+  await redis.set(ARCHIVE_KEY, archive);
+  return NextResponse.json({ ok: true });
+}

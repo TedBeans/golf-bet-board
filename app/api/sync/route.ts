@@ -193,9 +193,9 @@ export async function GET() {
   }
 
   // Once every bet in a tournament+round is decided (win or loss), file the
-  // whole round away to the recap automatically - a bet stays on the live
-  // board as long as anything in its round is still pending/live, even if
-  // that means it sits alongside a newer round's bets for a day or two.
+  // whole round away to the recap automatically - but not until the day
+  // it was actually played is over, so you can review the full day's
+  // record on the live board before it moves to the recap.
   const groupMap: Record<string, Bet[]> = {};
   for (const b of bets) {
     const key = `${b.t}|||${b.r}`;
@@ -207,7 +207,9 @@ export async function GET() {
   for (const key of Object.keys(groupMap)) {
     const groupBets = groupMap[key];
     const allDecided = groupBets.every((b) => b.status === "hit" || b.status === "miss");
-    if (allDecided) {
+    const groupDate = groupBets.find((b) => b.loadedDate)?.loadedDate;
+    const dayIsOver = !groupDate || groupDate < todayCentral;
+    if (allDecided && dayIsOver) {
       groupBets.forEach((b) => toArchive.push({ ...b, archivedAt }));
     } else {
       remaining.push(...groupBets);

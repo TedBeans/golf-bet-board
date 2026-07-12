@@ -380,15 +380,29 @@ export default function AdminPage() {
 
   function confirmOdds() {
     if (!oddsPreview || oddsPreview.entries.length === 0) return;
-    const { bets: updatedBets, matched, warnings } = attachOddsToBets(oddsPreview.entries, bets);
-    fetch("/api/bets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ passcode, bets: updatedBets }),
-    }).then((r) => {
-      if (r.ok) {
-        setOddsMsg(`Matched ${matched} of ${oddsPreview.entries.length} lines.${warnings.length ? " " + warnings.length + " warning(s) below." : ""}`);
-        setBets(updatedBets);
+
+    const liveIds = new Set(bets.map((b) => b.id));
+    const combined = [...bets, ...archive];
+    const { bets: updatedCombined, matched, warnings } = attachOddsToBets(oddsPreview.entries, combined);
+    const updatedLive = updatedCombined.filter((b) => liveIds.has(b.id));
+    const updatedArchive = updatedCombined.filter((b) => !liveIds.has(b.id));
+
+    Promise.all([
+      fetch("/api/bets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passcode, bets: updatedLive }),
+      }),
+      fetch("/api/archive", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passcode, archive: updatedArchive }),
+      }),
+    ]).then(([r1, r2]) => {
+      if (r1.ok && r2.ok) {
+        setOddsMsg(`Matched ${matched} of ${oddsPreview.entries.length} lines (checked live bets and the recap).${warnings.length ? " " + warnings.length + " warning(s) below." : ""}`);
+        setBets(updatedLive);
+        setArchive(updatedArchive);
         setOddsPreview({ entries: [], warnings });
         setOddsText("");
       } else {
@@ -640,7 +654,8 @@ export default function AdminPage() {
         Paste the DraftKings-style odds block - a "Tournament Round N" header
         line, then one "Player **Over/Under** Line ... (DK) for X units" line
         per bet. Only the DK price is kept even if other books are listed.
-        Matches onto existing bets by player + category + round.
+        Matches onto existing bets by player + category + round - checks
+        both the live board and anything already archived to the recap.
       </div>
       <textarea
         value={oddsText}
