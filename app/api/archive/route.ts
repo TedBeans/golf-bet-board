@@ -75,3 +75,34 @@ export async function PUT(req: NextRequest) {
   await redis.set(ARCHIVE_KEY, archive);
   return NextResponse.json({ ok: true });
 }
+
+// Restores a tournament+round from the recap archive back onto the live
+// board - for a round that got archived before the "stay visible until the
+// day is over" rule existed, or was force-archived by mistake.
+export async function PATCH(req: NextRequest) {
+  const body = await req.json();
+  const { passcode, tournament, round } = body as { passcode: string; tournament: string; round: string };
+
+  if (!passcode || passcode !== process.env.EDIT_PASSCODE) {
+    return NextResponse.json({ error: "Wrong passcode" }, { status: 401 });
+  }
+
+  const existingArchive = (await redis.get<Bet[]>(ARCHIVE_KEY)) || [];
+  const toRestore = existingArchive.filter((b) => b.t === tournament && b.r === round);
+  const remainingArchive = existingArchive.filter((b) => !(b.t === tournament && b.r === round));
+
+  if (toRestore.length === 0) {
+    return NextResponse.json({ ok: true, restored: 0 });
+  }
+
+  const liveBets = (await redis.get<Bet[]>(BETS_KEY)) || [];
+  const restored = toRestore.map((b) => {
+    const { archivedAt, ...rest } = b;
+    return rest as Bet;
+  });
+
+  await redis.set(BETS_KEY, [...liveBets, ...restored]);
+  await redis.set(ARCHIVE_KEY, remainingArchive);
+
+  return NextResponse.json({ ok: true, restored: restored.length });
+}

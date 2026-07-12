@@ -147,6 +147,26 @@ export default function AdminPage() {
     return { t, r, total: groupBets.length, wins, losses };
   });
 
+  function restoreArchiveGroup(tourn: string, round: string) {
+    fetch("/api/archive", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, tournament: tourn, round }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) {
+          const restored = archive.filter((b) => b.t === tourn && b.r === round);
+          setArchive((prev) => prev.filter((b) => !(b.t === tourn && b.r === round)));
+          setBets((prev) => [...prev, ...restored.map(({ archivedAt, ...rest }) => rest as Bet)]);
+          setForceMsg(`Restored ${d.restored} bet(s) to the live board.`);
+        } else {
+          setForceMsg("Failed - check passcode.");
+        }
+        setTimeout(() => setForceMsg(""), 4000);
+      });
+  }
+
   function deleteArchiveGroup(tourn: string, round: string) {
     if (!confirm(`Permanently remove ${tourn} · ${round} from the recap? This can't be undone.`)) return;
     fetch("/api/archive", {
@@ -728,9 +748,11 @@ export default function AdminPage() {
 
       <h1 style={{ marginTop: 36, marginBottom: 4 }}>Archived rounds</h1>
       <div className="subline" style={{ marginBottom: 12 }}>
-        Everything currently sitting in the recap. Delete a round here to
-        remove it permanently - useful for cleaning up a junk entry, like
-        one that got force-archived under the wrong tournament or round name.
+        Everything currently sitting in the recap. Restore a round to bring
+        it back to the live board (e.g. one archived before today's
+        "stay visible until the day is over" rule existed). Delete removes
+        it permanently - useful for cleaning up a junk entry, like one that
+        got force-archived under the wrong tournament or round name.
       </div>
       {archiveGroups.length === 0 && <div className="subline">Nothing archived yet.</div>}
       {archiveGroups.map((g) => (
@@ -739,9 +761,14 @@ export default function AdminPage() {
             <div className="player" style={{ fontSize: 14 }}>{g.t} · {g.r}</div>
             <div className="subline" style={{ marginTop: 2 }}>{g.wins}W-{g.losses}L · {g.total} bet{g.total === 1 ? "" : "s"}</div>
           </div>
-          <button className="resume-btn" onClick={() => deleteArchiveGroup(g.t, g.r)} style={{ color: "var(--clay)", borderColor: "rgba(192,106,76,0.4)" }}>
-            Delete from recap
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="add-btn-inline" onClick={() => restoreArchiveGroup(g.t, g.r)}>
+              Restore to board
+            </button>
+            <button className="resume-btn" onClick={() => deleteArchiveGroup(g.t, g.r)} style={{ color: "var(--clay)", borderColor: "rgba(192,106,76,0.4)" }}>
+              Delete from recap
+            </button>
+          </div>
         </div>
       ))}
       </>
