@@ -116,9 +116,22 @@ export default function Page() {
   return (
     <>
       <header>
-        <h1>
-          Bet <span>Board</span>
-        </h1>
+        <div className="title-row">
+          <h1>
+            Bet <span>Board</span>
+          </h1>
+          <div className="header-actions">
+            {unlocked ? (
+              <>
+                <span className="unlocked">✓ unlocked</span>
+                <Link href="/admin" className="recap-btn">Setup</Link>
+              </>
+            ) : (
+              <Link href="/admin" className="tedbeans-btn">TedBeans</Link>
+            )}
+            <Link href="/recap" className="recap-btn">Recap/Archives</Link>
+          </div>
+        </div>
         <div className="subline">
           Live tournament wager tracker
           {lastSynced && (
@@ -130,18 +143,6 @@ export default function Page() {
           <div className="pill miss">LOSS <b>{counts.miss || 0}</b></div>
           <div className="pill live">LIVE <b>{counts.live || 0}</b></div>
           <div className="pill pending">TBD <b>{counts.pending || 0}</b></div>
-
-          <div className="lock">
-            {unlocked ? (
-              <>
-                <span className="unlocked">✓ editing unlocked</span>
-                <Link href="/admin" className="admin-link">auto-sync setup</Link>
-              </>
-            ) : (
-              <Link href="/admin" className="tedbeans-btn">TedBeans</Link>
-            )}
-            <Link href="/recap" className="admin-link">recap</Link>
-          </div>
         </div>
         {saving && <span className="saving">saving…</span>}
         {syncNote && <div className="sync-note">{syncNote}</div>}

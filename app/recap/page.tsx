@@ -88,7 +88,7 @@ export default function RecapPage() {
   const dayMap = useMemo(() => {
     const m: Record<string, Bet[]> = {};
     archive.forEach((b) => {
-      const d = b.loadedDate || "unknown";
+      const d = b.loadedDate || (b.archivedAt ? b.archivedAt.slice(0, 10) : "unknown");
       (m[d] = m[d] || []).push(b);
     });
     return m;
@@ -100,6 +100,24 @@ export default function RecapPage() {
       (m[b.t] = m[b.t] || []).push(b);
     });
     return m;
+  }, [archive]);
+
+  const lastRound = useMemo(() => {
+    const groups: Record<string, Bet[]> = {};
+    archive.forEach((b) => {
+      const key = `${b.t}|||${b.r}`;
+      (groups[key] = groups[key] || []).push(b);
+    });
+    let bestKey: string | null = null;
+    let bestTime = "";
+    for (const key of Object.keys(groups)) {
+      const t = groups[key][0]?.archivedAt || "";
+      if (t > bestTime) {
+        bestTime = t;
+        bestKey = key;
+      }
+    }
+    return bestKey ? { key: bestKey, bets: groups[bestKey] } : null;
   }, [archive]);
 
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
@@ -125,25 +143,25 @@ export default function RecapPage() {
   return (
     <>
       <header>
-        <h1>Bet <span>Board</span></h1>
-        <div className="subline">Recap</div>
-        <div className="summary">
-          <Link href="/" className="admin-link">← back to board</Link>
-          <div className="lock" style={{ marginLeft: "auto" }}>
+        <div className="title-row">
+          <h1>Bet <span>Board</span></h1>
+          <div className="header-actions">
             <button
-              className={view === "calendar" ? "add-btn-inline" : "resume-btn"}
+              className={view === "calendar" ? "add-btn-inline" : "recap-btn"}
               onClick={() => setView("calendar")}
             >
               Calendar
             </button>
             <button
-              className={view === "tournament" ? "add-btn-inline" : "resume-btn"}
+              className={view === "tournament" ? "add-btn-inline" : "recap-btn"}
               onClick={() => setView("tournament")}
-              style={{ marginLeft: 6 }}
             >
               By tournament
             </button>
           </div>
+        </div>
+        <div className="subline">
+          Recap <Link href="/" className="admin-link">· back to board</Link>
         </div>
       </header>
 
@@ -195,6 +213,29 @@ export default function RecapPage() {
                 );
               })}
             </div>
+
+            {lastRound && (
+              <div style={{ marginBottom: 20 }}>
+                <div className="round-label">Last round</div>
+                {(() => {
+                  const [t, r] = lastRound.key.split("|||");
+                  const agg = aggregate(lastRound.bets);
+                  return (
+                    <div className="tourn">
+                      <div className="tourn-head">
+                        <h2 style={{ fontSize: 14 }}>{t} · {r}</h2>
+                        <div className="tourn-summary">
+                          <span className="tsum win">{agg.wins}W</span>
+                          <span className="tsum loss">{agg.losses}L</span>
+                          <span className={agg.units >= 0 ? "tsum win" : "tsum loss"}>{formatUnits(agg.units)}</span>
+                        </div>
+                      </div>
+                      {lastRound.bets.map((b) => <BetDetailCard key={b.id} b={b} />)}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
 
             {selectedDate && (
               <div>

@@ -29,7 +29,8 @@ export async function POST(req: NextRequest) {
   }
 
   const existingArchive = (await redis.get<Bet[]>(ARCHIVE_KEY)) || [];
-  const stamped = toArchive.map((b) => ({ ...b, archivedAt: new Date().toISOString() }));
+  const archivedAt = new Date().toISOString();
+  const stamped = toArchive.map((b) => ({ ...b, archivedAt }));
 
   await redis.set(ARCHIVE_KEY, [...existingArchive, ...stamped]);
   await redis.set(BETS_KEY, remaining);

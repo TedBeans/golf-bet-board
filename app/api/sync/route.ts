@@ -125,11 +125,12 @@ export async function GET() {
   }
   const remaining: Bet[] = [];
   const toArchive: Bet[] = [];
+  const archivedAt = new Date().toISOString();
   for (const key of Object.keys(groupMap)) {
     const groupBets = groupMap[key];
     const allDecided = groupBets.every((b) => b.status === "hit" || b.status === "miss");
     if (allDecided) {
-      groupBets.forEach((b) => toArchive.push({ ...b, archivedAt: new Date().toISOString() }));
+      groupBets.forEach((b) => toArchive.push({ ...b, archivedAt }));
     } else {
       remaining.push(...groupBets);
     }
