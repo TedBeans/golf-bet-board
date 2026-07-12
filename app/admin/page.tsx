@@ -126,6 +126,33 @@ export default function AdminPage() {
     return { t, r, total: groupBets.length, pending, decided: groupBets.length - pending };
   });
 
+  const archiveGroups = Array.from(new Set(archive.map((b) => `${b.t}|||${b.r}`))).map((key) => {
+    const [t, r] = key.split("|||");
+    const groupBets = archive.filter((b) => b.t === t && b.r === r);
+    const wins = groupBets.filter((b) => b.status === "hit").length;
+    const losses = groupBets.filter((b) => b.status === "miss").length;
+    return { t, r, total: groupBets.length, wins, losses };
+  });
+
+  function deleteArchiveGroup(tourn: string, round: string) {
+    if (!confirm(`Permanently remove ${tourn} · ${round} from the recap? This can't be undone.`)) return;
+    fetch("/api/archive", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, tournament: tourn, round }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) {
+          setArchive((prev) => prev.filter((b) => !(b.t === tourn && b.r === round)));
+          setForceMsg(`Removed ${d.removed} bet(s) from the recap.`);
+        } else {
+          setForceMsg("Failed - check passcode.");
+        }
+        setTimeout(() => setForceMsg(""), 4000);
+      });
+  }
+
   function saveSettings() {
     fetch("/api/settings", {
       method: "POST",
@@ -467,6 +494,25 @@ export default function AdminPage() {
         </div>
       ))}
       {forceMsg && <div className="subline" style={{ marginBottom: 8 }}>{forceMsg}</div>}
+
+      <h1 style={{ marginTop: 36, marginBottom: 4 }}>Archived rounds</h1>
+      <div className="subline" style={{ marginBottom: 12 }}>
+        Everything currently sitting in the recap. Delete a round here to
+        remove it permanently - useful for cleaning up a junk entry, like
+        one that got force-archived under the wrong tournament or round name.
+      </div>
+      {archiveGroups.length === 0 && <div className="subline">Nothing archived yet.</div>}
+      {archiveGroups.map((g) => (
+        <div key={`${g.t}|||${g.r}`} className="card" style={{ marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div className="player" style={{ fontSize: 14 }}>{g.t} · {g.r}</div>
+            <div className="subline" style={{ marginTop: 2 }}>{g.wins}W-{g.losses}L · {g.total} bet{g.total === 1 ? "" : "s"}</div>
+          </div>
+          <button className="resume-btn" onClick={() => deleteArchiveGroup(g.t, g.r)} style={{ color: "var(--clay)", borderColor: "rgba(192,106,76,0.4)" }}>
+            Delete from recap
+          </button>
+        </div>
+      ))}
       </>
       )}
 

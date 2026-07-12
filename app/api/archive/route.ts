@@ -37,3 +37,23 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, archived: stamped.length });
 }
+
+// Permanently removes a tournament+round from the recap archive - for
+// cleaning up junk entries (like a bet that got force-archived under the
+// wrong tournament/round name and needs to just go away entirely).
+export async function DELETE(req: NextRequest) {
+  const body = await req.json();
+  const { passcode, tournament, round } = body as { passcode: string; tournament: string; round: string };
+
+  if (!passcode || passcode !== process.env.EDIT_PASSCODE) {
+    return NextResponse.json({ error: "Wrong passcode" }, { status: 401 });
+  }
+
+  const existingArchive = (await redis.get<Bet[]>(ARCHIVE_KEY)) || [];
+  const remaining = existingArchive.filter((b) => !(b.t === tournament && b.r === round));
+  const removed = existingArchive.length - remaining.length;
+
+  await redis.set(ARCHIVE_KEY, remaining);
+
+  return NextResponse.json({ ok: true, removed });
+}
