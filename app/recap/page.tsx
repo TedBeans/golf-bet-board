@@ -22,7 +22,7 @@ function aggregate(bets: Bet[]): { wins: number; losses: number; units: number }
   return { wins, losses, units: Math.round(units * 100) / 100 };
 }
 
-function BetDetailCard({ b }: { b: Bet }) {
+function BetDetailCard({ b, compact = false }: { b: Bet; compact?: boolean }) {
   const parsed = parseBetType(b.bet);
   const cls = trend(parsed, b.stat, b.thru);
   const unitResult = computeUnitResult(b.oddsPrice, b.oddsUnits, b.status);
@@ -46,60 +46,32 @@ function BetDetailCard({ b }: { b: Bet }) {
           )}
         </div>
       </div>
-      <div className="scorecard">
-        <div className="sc-cell">
-          <div className="sc-label">{friendlyLabel(parsed.label)}</div>
-          <div className="sc-target">{parsed.targetDisplay}</div>
-        </div>
-        <div className="sc-cell">
-          <div className="sc-label">{friendlyLabel(parsed.label)}</div>
-          <div className={`sc-target trend-${cls}`}>{parsed.label === "SCORE" ? formatScore(b.stat) : b.stat ?? "—"}</div>
-        </div>
-        <div className="sc-cell">
-          <div className="sc-label">Thru</div>
-          <div className="sc-target">{b.thru ?? "—"}</div>
-        </div>
-      </div>
-      {b.auto && (
-        <div className="auto-row">
-          <span className="detail-strip">
-            Score {formatScore(b.auto.scoreToPar)} · Greens {b.auto.gir ?? "—"} · Fairways {b.auto.fairways ?? "—"} ·
-            {" "}Birdies {b.auto.birdies ?? "—"} · Bogeys {b.auto.bogeys ?? "—"} · Pars {b.auto.pars ?? "—"}
-          </span>
-        </div>
+      {!compact && (
+        <>
+          <div className="scorecard">
+            <div className="sc-cell">
+              <div className="sc-label">{friendlyLabel(parsed.label)}</div>
+              <div className="sc-target">{parsed.targetDisplay}</div>
+            </div>
+            <div className="sc-cell">
+              <div className="sc-label">{friendlyLabel(parsed.label)}</div>
+              <div className={`sc-target trend-${cls}`}>{parsed.label === "SCORE" ? formatScore(b.stat) : b.stat ?? "—"}</div>
+            </div>
+            <div className="sc-cell">
+              <div className="sc-label">Thru</div>
+              <div className="sc-target">{b.thru ?? "—"}</div>
+            </div>
+          </div>
+          {b.auto && (
+            <div className="auto-row">
+              <span className="detail-strip">
+                Score {formatScore(b.auto.scoreToPar)} · Greens {b.auto.gir ?? "—"} · Fairways {b.auto.fairways ?? "—"} ·
+                {" "}Birdies {b.auto.birdies ?? "—"} · Bogeys {b.auto.bogeys ?? "—"} · Pars {b.auto.pars ?? "—"}
+              </span>
+            </div>
+          )}
+        </>
       )}
-    </div>
-  );
-}
-
-function buildQuickRecapText(t: string, r: string, bets: Bet[], agg: { wins: number; losses: number; units: number }): string {
-  const lines = [`${t} — ${r} (${agg.wins}-${agg.losses}, ${formatUnits(agg.units)})`, ""];
-  bets.forEach((b) => {
-    const result = b.status === "hit" ? "WIN" : b.status === "miss" ? "LOSS" : "TBD";
-    lines.push(`${b.player} ${b.bet}: ${result}`);
-  });
-  return lines.join("\n");
-}
-
-function QuickRecapBlock({ t, r, bets, agg }: { t: string; r: string; bets: Bet[]; agg: { wins: number; losses: number; units: number } }) {
-  const [copied, setCopied] = useState(false);
-  const text = buildQuickRecapText(t, r, bets, agg);
-
-  function copy() {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }
-
-  return (
-    <div className="card" style={{ marginBottom: 10 }}>
-      <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, whiteSpace: "pre-wrap", color: "var(--cream)" }}>
-        {text}
-      </div>
-      <button className="add-btn-inline" onClick={copy} style={{ marginTop: 10 }}>
-        {copied ? "Copied!" : "Copy"}
-      </button>
     </div>
   );
 }
@@ -112,7 +84,7 @@ export default function RecapPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [expandedTourn, setExpandedTourn] = useState<string | null>(null);
   const [expandedRound, setExpandedRound] = useState<string | null>(null);
-  const [quickRecapRound, setQuickRecapRound] = useState<string | null>(null);
+  const [quickViewRound, setQuickViewRound] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
@@ -319,7 +291,7 @@ export default function RecapPage() {
                     const roundAgg = aggregate(roundBets);
                     const roundKey = `${t}|||${r}`;
                     const roundOpen = expandedRound === roundKey;
-                    const quickOpen = quickRecapRound === roundKey;
+                    const quickView = quickViewRound === roundKey;
                     return (
                       <div key={r} style={{ marginBottom: 8 }}>
                         <div
@@ -334,14 +306,20 @@ export default function RecapPage() {
                             <button
                               className="recap-btn"
                               style={{ fontSize: 9, padding: "4px 8px" }}
-                              onClick={() => setQuickRecapRound(quickOpen ? null : roundKey)}
+                              onClick={() => setQuickViewRound(quickView ? null : roundKey)}
                             >
-                              Quick recap
+                              {quickView ? "Exit quick view" : "Enable quick view"}
                             </button>
                           </span>
                         </div>
-                        {quickOpen && <QuickRecapBlock t={t} r={r} bets={roundBets} agg={roundAgg} />}
-                        {roundOpen && roundBets.map((b) => <BetDetailCard key={b.id} b={b} />)}
+                        {quickView && (
+                          <div style={{ marginBottom: 4, fontSize: 11, color: "var(--cream-dim)", fontFamily: "'Oswald',sans-serif", letterSpacing: "0.05em" }}>
+                            {t} · {r} · {roundAgg.wins}W-{roundAgg.losses}L · {formatUnits(roundAgg.units)}
+                          </div>
+                        )}
+                        {quickView
+                          ? roundBets.map((b) => <BetDetailCard key={b.id} b={b} compact />)
+                          : roundOpen && roundBets.map((b) => <BetDetailCard key={b.id} b={b} />)}
                       </div>
                     );
                   })}
