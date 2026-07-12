@@ -143,6 +143,8 @@ export async function GET() {
         bet.stat = scorecard.birdies;
       } else if (parsed.label === "BOGEYS" && scorecard?.bogeys !== null && scorecard?.bogeys !== undefined) {
         bet.stat = scorecard.bogeys;
+      } else if (parsed.label === "PARS" && scorecard?.pars !== null && scorecard?.pars !== undefined) {
+        bet.stat = scorecard.pars;
       }
 
       // Only progress a bet forward automatically while it's still live -

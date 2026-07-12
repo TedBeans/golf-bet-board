@@ -4,7 +4,7 @@ const TIME_RE = /^(\d{1,2}:\d{2}\s*(?:AM|PM))\s+(.*)$/i;
 const ROUND_RE = /^round\s+(\d+)\s*:?$/i;
 // Matches the known bet-type phrases anywhere in the remainder of a line.
 // Everything before the match is treated as the player name.
-const BET_PHRASE_RE = /((-?\d+|E)\s+or\s+(?:better|worse)|\d+\+\s*greens|\d+\s*greens\s+or\s+less|\d+\s*birdies\s+or\s+less|\d+\s*bogeys\s+or\s+less)/i;
+const BET_PHRASE_RE = /((-?\d+|E)\s+or\s+(?:better|worse)|\d+\+\s*greens|\d+\s*greens\s+or\s+less|\d+\s*birdies\s+or\s+less|\d+\s*bogeys\s+or\s+less|\d+\+\s*pars|\d+\s*pars\s+or\s+less)/i;
 
 export type ParseResult = { bets: Bet[]; warnings: string[] };
 

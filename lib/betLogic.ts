@@ -31,6 +31,12 @@ export function parseBetType(text: string): ParsedBet {
   if ((m = t.match(/^(\d+)\s*bogeys or less$/i))) {
     return { type: "max", label: "BOGEYS", target: parseInt(m[1], 10), targetDisplay: "≤ " + m[1] };
   }
+  if ((m = t.match(/^(\d+)\+\s*pars$/i))) {
+    return { type: "min", label: "PARS", target: parseInt(m[1], 10), targetDisplay: "≥ " + m[1] };
+  }
+  if ((m = t.match(/^(\d+)\s*pars or less$/i))) {
+    return { type: "max", label: "PARS", target: parseInt(m[1], 10), targetDisplay: "≤ " + m[1] };
+  }
   return { type: "generic", label: "STAT", target: null, targetDisplay: "—" };
 }
 
@@ -55,6 +61,7 @@ export function friendlyLabel(label: string): string {
     case "GIR": return "Greens";
     case "BIRDIES": return "Birdies";
     case "BOGEYS": return "Bogeys";
+    case "PARS": return "Pars";
     default: return "Stat";
   }
 }
@@ -137,7 +144,7 @@ export function timeToMinutes(tstr: string): number {
 // value that belongs in this bet's "Stat" cell.
 export function autoStatValue(
   parsed: ParsedBet,
-  auto: { scoreToPar: number | null; gir: string | null; fairways: string | null; birdies: number | null; bogeys: number | null } | null | undefined
+  auto: { scoreToPar: number | null; gir: string | null; fairways: string | null; birdies: number | null; bogeys: number | null; pars?: number | null } | null | undefined
 ): number | null {
   if (!auto) return null;
   if (parsed.label === "SCORE") return auto.scoreToPar;
@@ -147,5 +154,6 @@ export function autoStatValue(
   }
   if (parsed.label === "BIRDIES") return auto.birdies;
   if (parsed.label === "BOGEYS") return auto.bogeys;
+  if (parsed.label === "PARS") return auto.pars ?? null;
   return null;
 }
