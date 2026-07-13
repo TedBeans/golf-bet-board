@@ -25,6 +25,15 @@ const SCORECARD_STATS_QUERY = `
   }
 `;
 
+const HOLE_SCORECARD_QUERY = `
+  query ScorecardCompressedV3($tournamentId: ID!, $playerId: ID!) {
+    scorecardCompressedV3(tournamentId: $tournamentId, playerId: $playerId) {
+      id
+      payload
+    }
+  }
+`;
+
 async function pgaGraphQL(operationName: string, query: string, variables: Record<string, string>): Promise<any> {
   const res = await fetch(PGA_GRAPHQL_URL, {
     method: "POST",
@@ -69,4 +78,15 @@ export async function fetchPlayerScorecardStats(tournamentId: string, playerId: 
     playerId,
   });
   return decompressPayload(json, "scorecardStatsV3Compressed");
+}
+
+// Hole-by-hole scores (hole number, par, strokes, birdie/bogey/etc status)
+// for every round played so far - a completely different query from the
+// two above, which only carry aggregate stats.
+export async function fetchPlayerHoleScores(tournamentId: string, playerId: string): Promise<any> {
+  const json = await pgaGraphQL("ScorecardCompressedV3", HOLE_SCORECARD_QUERY, {
+    tournamentId,
+    playerId,
+  });
+  return decompressPayload(json, "scorecardCompressedV3");
 }

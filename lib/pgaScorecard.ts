@@ -95,3 +95,43 @@ export function roundNumberFromLabel(label: string): number {
   const m = (label || "").match(/(\d+)/);
   return m ? parseInt(m[1], 10) : 1;
 }
+
+export type HoleScore = { hole: number; par: number; score: number | null; status: string | null };
+export type HoleScorecard = {
+  firstNine: HoleScore[]; // whichever nine was actually played first
+  firstNineLabel: string; // "OUT" or "IN"
+  secondNine: HoleScore[];
+  secondNineLabel: string;
+};
+
+function mapHoles(holes: any[]): HoleScore[] {
+  return holes
+    .map((h) => ({
+      hole: h.holeNumber,
+      par: h.par,
+      score: h.score && h.score !== "-" ? parseInt(h.score, 10) : null,
+      status: h.status ?? null,
+    }))
+    .sort((a, b) => a.hole - b.hole);
+}
+
+// Pulls one round's 18 holes out of the ScorecardCompressedV3 payload, kept
+// in the order actually played - a shotgun start means holes 10-18 can be
+// the front nine of the day, so "firstNine"/"secondNine" here always means
+// chronological order, not hole 1-9 vs 10-18.
+export function extractHoleScores(json: any, roundNumber: number): HoleScorecard | null {
+  const rounds: any[] = json?.roundScores || [];
+  const round = rounds.find((r: any) => r.roundNumber === roundNumber);
+  if (!round) return null;
+
+  const firstNine: any[] = round.firstNine?.holes || [];
+  const secondNine: any[] = round.secondNine?.holes || [];
+  if (firstNine.length === 0 && secondNine.length === 0) return null;
+
+  return {
+    firstNine: mapHoles(firstNine),
+    firstNineLabel: round.firstNine?.totalLabel || "OUT",
+    secondNine: mapHoles(secondNine),
+    secondNineLabel: round.secondNine?.totalLabel || "IN",
+  };
+}
