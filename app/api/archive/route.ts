@@ -78,16 +78,34 @@ export async function PUT(req: NextRequest) {
 
 // Restores a tournament+round from the recap archive back onto the live
 // board - for a round that got archived before the "stay visible until the
-// day is over" rule existed, or was force-archived by mistake.
+// day is over" rule existed, or was force-archived by mistake. If fixDate
+// is provided instead, the round stays in the archive and just gets its
+// loadedDate corrected - for a round whose date drifted (e.g. it predates
+// the loadedDate feature and got re-stamped with the wrong day at some
+// point, like on a restore-then-rearchive round trip).
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
-  const { passcode, tournament, round } = body as { passcode: string; tournament: string; round: string };
+  const { passcode, tournament, round, fixDate } = body as { passcode: string; tournament: string; round: string; fixDate?: string };
 
   if (!passcode || passcode !== process.env.EDIT_PASSCODE) {
     return NextResponse.json({ error: "Wrong passcode" }, { status: 401 });
   }
 
   const existingArchive = (await redis.get<Bet[]>(ARCHIVE_KEY)) || [];
+
+  if (fixDate) {
+    let count = 0;
+    const updated = existingArchive.map((b) => {
+      if (b.t === tournament && b.r === round) {
+        count += 1;
+        return { ...b, loadedDate: fixDate };
+      }
+      return b;
+    });
+    await redis.set(ARCHIVE_KEY, updated);
+    return NextResponse.json({ ok: true, updated: count });
+  }
+
   const toRestore = existingArchive.filter((b) => b.t === tournament && b.r === round);
   const remainingArchive = existingArchive.filter((b) => !(b.t === tournament && b.r === round));
 

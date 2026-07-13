@@ -144,8 +144,11 @@ export default function AdminPage() {
     const groupBets = archive.filter((b) => b.t === t && b.r === r);
     const wins = groupBets.filter((b) => b.status === "hit").length;
     const losses = groupBets.filter((b) => b.status === "miss").length;
-    return { t, r, total: groupBets.length, wins, losses };
+    const currentDate = groupBets[0]?.loadedDate || "";
+    return { t, r, total: groupBets.length, wins, losses, currentDate };
   });
+
+  const [dateFixEdits, setDateFixEdits] = useState<Record<string, string>>({});
 
   function restoreArchiveGroup(tourn: string, round: string) {
     fetch("/api/archive", {
@@ -160,6 +163,25 @@ export default function AdminPage() {
           setArchive((prev) => prev.filter((b) => !(b.t === tourn && b.r === round)));
           setBets((prev) => [...prev, ...restored.map(({ archivedAt, ...rest }) => rest as Bet)]);
           setForceMsg(`Restored ${d.restored} bet(s) to the live board.`);
+        } else {
+          setForceMsg("Failed - check passcode.");
+        }
+        setTimeout(() => setForceMsg(""), 4000);
+      });
+  }
+
+  function fixArchiveGroupDate(tourn: string, round: string, newDate: string) {
+    if (!newDate) return;
+    fetch("/api/archive", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, tournament: tourn, round, fixDate: newDate }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) {
+          setArchive((prev) => prev.map((b) => (b.t === tourn && b.r === round ? { ...b, loadedDate: newDate } : b)));
+          setForceMsg(`Updated ${d.updated} bet(s) to ${newDate}.`);
         } else {
           setForceMsg("Failed - check passcode.");
         }
@@ -755,22 +777,46 @@ export default function AdminPage() {
         got force-archived under the wrong tournament or round name.
       </div>
       {archiveGroups.length === 0 && <div className="subline">Nothing archived yet.</div>}
-      {archiveGroups.map((g) => (
-        <div key={`${g.t}|||${g.r}`} className="card" style={{ marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div>
-            <div className="player" style={{ fontSize: 14 }}>{g.t} · {g.r}</div>
-            <div className="subline" style={{ marginTop: 2 }}>{g.wins}W-{g.losses}L · {g.total} bet{g.total === 1 ? "" : "s"}</div>
+      {archiveGroups.map((g) => {
+        const key = `${g.t}|||${g.r}`;
+        const editValue = dateFixEdits[key] ?? g.currentDate;
+        return (
+          <div key={key} className="card" style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <div>
+                <div className="player" style={{ fontSize: 14 }}>{g.t} · {g.r}</div>
+                <div className="subline" style={{ marginTop: 2 }}>
+                  {g.wins}W-{g.losses}L · {g.total} bet{g.total === 1 ? "" : "s"}
+                  {g.currentDate ? ` · dated ${g.currentDate}` : " · no date set"}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="add-btn-inline" onClick={() => restoreArchiveGroup(g.t, g.r)}>
+                  Restore to board
+                </button>
+                <button className="resume-btn" onClick={() => deleteArchiveGroup(g.t, g.r)} style={{ color: "var(--clay)", borderColor: "rgba(192,106,76,0.4)" }}>
+                  Delete from recap
+                </button>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="date"
+                value={editValue}
+                onChange={(e) => setDateFixEdits((prev) => ({ ...prev, [key]: e.target.value }))}
+                style={{
+                  background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                  color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 12,
+                  padding: "6px 8px", borderRadius: 3,
+                }}
+              />
+              <button className="recap-btn" onClick={() => fixArchiveGroupDate(g.t, g.r, editValue)}>
+                Fix date
+              </button>
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="add-btn-inline" onClick={() => restoreArchiveGroup(g.t, g.r)}>
-              Restore to board
-            </button>
-            <button className="resume-btn" onClick={() => deleteArchiveGroup(g.t, g.r)} style={{ color: "var(--clay)", borderColor: "rgba(192,106,76,0.4)" }}>
-              Delete from recap
-            </button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
       </>
       )}
 

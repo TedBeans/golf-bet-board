@@ -241,7 +241,7 @@ export default function RecapPage() {
                 return (
                   <div
                     key={day}
-                    onClick={() => hasData && setSelectedDate(dateStr)}
+                    onClick={() => hasData && setSelectedDate(selectedDate === dateStr ? null : dateStr)}
                     style={{
                       background: bg, borderRadius: 4, padding: "6px 4px", minHeight: 52,
                       cursor: hasData ? "pointer" : "default",
