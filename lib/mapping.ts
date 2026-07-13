@@ -16,6 +16,8 @@ export type Mapping = {
       endDate?: string; // "YYYY-MM-DD"
       notes?: string; // free text - purse, defending champ, field notes, etc.
       upcoming?: boolean; // show on the live board's "upcoming this week" widget
+      roundPar?: number; // this course's per-round par (e.g. 70/71/72) - needed to convert
+                          // a raw strokes line (e.g. "Under 68.5") into to-par phrasing ("-2 or better")
     };
   };
 };

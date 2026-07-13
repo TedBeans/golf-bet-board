@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
-import { parseBetsText, ParseResult } from "../../lib/parseBets";
-import { parseOddsText, attachOddsToBets, OddsParseResult } from "../../lib/parseOdds";
+import { parseCombinedText, ParseResult } from "../../lib/parseCombined";
 import { defaultUnitsToWinOne } from "../../lib/units";
 import { nowInCentral } from "../../lib/centralTime";
 import { Parlay, ParlayLegRef } from "../../lib/parlay";
@@ -24,10 +23,6 @@ export default function AdminPage() {
   const [betsDate, setBetsDate] = useState(() => nowInCentral().dateStr);
   const [preview, setPreview] = useState<ParseResult | null>(null);
   const [importMsg, setImportMsg] = useState("");
-
-  const [oddsText, setOddsText] = useState("");
-  const [oddsPreview, setOddsPreview] = useState<OddsParseResult | null>(null);
-  const [oddsMsg, setOddsMsg] = useState("");
 
   const [winnerTournament, setWinnerTournament] = useState("");
   const [winnerSide, setWinnerSide] = useState<"Under" | "Over">("Under");
@@ -387,11 +382,14 @@ export default function AdminPage() {
 
   function previewImport() {
     setImportMsg("");
-    setPreview(parseBetsText(importText, betsDate));
+    const roundParLookup = (t: string) => mapping.tournaments[t]?.roundPar;
+    setPreview(parseCombinedText(importText, betsDate, roundParLookup));
   }
 
   function confirmImport() {
     if (!preview || preview.bets.length === 0) return;
+
+    const liveIds = new Set(bets.map((b) => b.id));
     fetch("/api/bets")
       .then((r) => r.json())
       .then((d) => {
@@ -405,7 +403,7 @@ export default function AdminPage() {
       })
       .then(({ r, merged }) => {
         if (r.ok) {
-          setImportMsg(`Added ${preview.bets.length} bets. Anything still unresolved from before stays on the board too.`);
+          setImportMsg(`Added ${preview.bets.length} bet(s) with odds attached. Anything still unresolved from before stays on the board too.`);
           setBets(merged);
           setPreview(null);
           setImportText("");
@@ -414,11 +412,6 @@ export default function AdminPage() {
           setImportMsg("Failed to save - check passcode.");
         }
       });
-  }
-
-  function previewOdds() {
-    setOddsMsg("");
-    setOddsPreview(parseOddsText(oddsText));
   }
 
   function backfillMissingUnits() {
@@ -446,44 +439,11 @@ export default function AdminPage() {
       if (r1.ok && r2.ok) {
         setBets(liveFixed);
         setArchive(archiveFixed);
-        setOddsMsg(`Backfilled units on ${liveChanged + archiveChanged} bet(s) using the odds price (risk-to-win-1 default).`);
+        setImportMsg(`Backfilled units on ${liveChanged + archiveChanged} bet(s) using the odds price (risk-to-win-1 default).`);
       } else {
-        setOddsMsg("Failed - check passcode.");
+        setImportMsg("Failed - check passcode.");
       }
-      setTimeout(() => setOddsMsg(""), 5000);
-    });
-  }
-
-  function confirmOdds() {
-    if (!oddsPreview || oddsPreview.entries.length === 0) return;
-
-    const liveIds = new Set(bets.map((b) => b.id));
-    const combined = [...bets, ...archive];
-    const { bets: updatedCombined, matched, warnings } = attachOddsToBets(oddsPreview.entries, combined);
-    const updatedLive = updatedCombined.filter((b) => liveIds.has(b.id));
-    const updatedArchive = updatedCombined.filter((b) => !liveIds.has(b.id));
-
-    Promise.all([
-      fetch("/api/bets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passcode, bets: updatedLive }),
-      }),
-      fetch("/api/archive", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passcode, archive: updatedArchive }),
-      }),
-    ]).then(([r1, r2]) => {
-      if (r1.ok && r2.ok) {
-        setOddsMsg(`Matched ${matched} of ${oddsPreview.entries.length} lines (checked live bets and the recap).${warnings.length ? " " + warnings.length + " warning(s) below." : ""}`);
-        setBets(updatedLive);
-        setArchive(updatedArchive);
-        setOddsPreview({ entries: [], warnings });
-        setOddsText("");
-      } else {
-        setOddsMsg("Failed to save - check passcode.");
-      }
+      setTimeout(() => setImportMsg(""), 5000);
     });
   }
 
@@ -538,9 +498,13 @@ export default function AdminPage() {
       <>
       <h1 style={{ marginBottom: 4 }}>Load tonight's bets</h1>
       <div className="subline" style={{ marginBottom: 12 }}>
-        Paste the nightly list in the usual format - a tournament header line,
-        a "Round N:" line, then one "TIME Player Name bet type:" line per bet.
-        This adds to the board - anything still unresolved from a prior round
+        One paste, bet description and odds together - a "Tournament Round N"
+        header line, then one line per bet: "TIME Player **Over/Under** Line
+        [Greens/Birdies/Bogeys/Pars] Price (DK) for X units". The plain-
+        English description (e.g. "11+ pars") is derived automatically from
+        the line and side. Score bets need a round par set on the
+        Tournaments tab first to convert raw strokes to to-par terms. This
+        adds to the board - anything still unresolved from a prior round
         (like a suspended round) stays visible until it's decided.
       </div>
       <label style={{ display: "block", marginBottom: 12, fontSize: 12 }}>
@@ -558,10 +522,13 @@ export default function AdminPage() {
           }}
         />
       </label>
+      <button className="add-btn-inline" onClick={backfillMissingUnits} style={{ marginBottom: 12 }}>
+        Backfill missing units on existing bets
+      </button>
       <textarea
         value={importText}
         onChange={(e) => setImportText(e.target.value)}
-        placeholder={"ISCO Championship:\nRound 3:\n11:00 AM Jackson Koivun -2 or better:\n..."}
+        placeholder={"Scottish Open Round 4\n6:55 AM Rory McIlroy **Over** 10.5 Pars -122 (DK) for 1.22 units\n7:28 AM Ryan Gerard **Under** 69.5 -114 (DK) for 1.14 units\n..."}
         rows={10}
         style={{
           width: "100%", background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
@@ -580,7 +547,7 @@ export default function AdminPage() {
           </div>
           {preview.bets.map((b) => (
             <div key={b.id} className="bet-text" style={{ marginBottom: 4 }}>
-              {b.t} · {b.r} · {b.time} · <b style={{ color: "var(--cream)" }}>{b.player}</b> · {b.bet}
+              {b.t} · {b.r} · {b.time} · <b style={{ color: "var(--cream)" }}>{b.player}</b> · {b.bet} · {b.oddsLine} · DK {b.oddsPrice ?? "—"} · {b.oddsUnits}u
             </div>
           ))}
           {preview.warnings.length > 0 && (
@@ -725,70 +692,6 @@ export default function AdminPage() {
         {winnerMsg && <div className="subline" style={{ marginTop: 8 }}>{winnerMsg}</div>}
       </div>
 
-      <h1 style={{ marginTop: 36, marginBottom: 4 }}>Load odds & lines</h1>
-      <div className="subline" style={{ marginBottom: 12 }}>
-        Paste the DraftKings-style odds block - a "Tournament Round N" header
-        line, then one "Player **Over/Under** Line ... (DK) for X units" line
-        per bet. Only the DK price is kept even if other books are listed.
-        Matches onto existing bets by player + category + round - checks
-        both the live board and anything already archived to the recap. If
-        "for X units" is missing from a line, it now defaults to the
-        standard 1-unit baseline (e.g. -112 → risk 1.12 to win 1; +112 →
-        risk 1 to win 1.12).
-      </div>
-      <button className="add-btn-inline" onClick={backfillMissingUnits} style={{ marginBottom: 16 }}>
-        Backfill missing units on existing bets
-      </button>
-      <textarea
-        value={oddsText}
-        onChange={(e) => setOddsText(e.target.value)}
-        placeholder={"ISCO Championship Round 3\nLucas Glover **Under** 69.5 -112 (DK) for 1.12 units\n..."}
-        rows={8}
-        style={{
-          width: "100%", background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
-          color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 12,
-          padding: "10px", borderRadius: 4, marginBottom: 8, resize: "vertical",
-        }}
-      />
-      <button className="add-btn-inline" onClick={previewOdds} style={{ marginRight: 8 }}>
-        Preview
-      </button>
-
-      {oddsPreview && oddsPreview.entries.length > 0 && (
-        <div className="card" style={{ marginTop: 12 }}>
-          <div className="player" style={{ marginBottom: 8 }}>
-            {oddsPreview.entries.length} line{oddsPreview.entries.length === 1 ? "" : "s"} parsed
-          </div>
-          {oddsPreview.entries.map((e, i) => (
-            <div key={i} className="bet-text" style={{ marginBottom: 4 }}>
-              {e.tournament} · {e.round} · <b style={{ color: "var(--cream)" }}>{e.player}</b> · {e.side} {e.lineValue} ({e.category}) · DK {e.oddsDK ?? "—"} · {e.units ?? "—"}u
-            </div>
-          ))}
-          {oddsPreview.warnings.length > 0 && (
-            <div style={{ marginTop: 10 }}>
-              {oddsPreview.warnings.map((w, i) => (
-                <div key={i} className="lock-error" style={{ marginBottom: 4 }}>{w}</div>
-              ))}
-            </div>
-          )}
-          <button
-            className="add-btn-inline"
-            onClick={confirmOdds}
-            style={{ marginTop: 12, width: "100%", padding: 10 }}
-          >
-            Attach these {oddsPreview.entries.length} lines to matching bets
-          </button>
-        </div>
-      )}
-      {oddsPreview && oddsPreview.entries.length === 0 && oddsPreview.warnings.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          {oddsPreview.warnings.map((w, i) => (
-            <div key={i} className="lock-error" style={{ marginBottom: 4 }}>{w}</div>
-          ))}
-        </div>
-      )}
-      {oddsMsg && <div className="subline" style={{ marginTop: 8 }}>{oddsMsg}</div>}
-
       <h1 style={{ marginTop: 36, marginBottom: 4 }}>Live board rounds</h1>
       <div className="subline" style={{ marginBottom: 12 }}>
         Rounds archive to the recap automatically once every bet in them is
@@ -896,7 +799,7 @@ export default function AdminPage() {
         function updateTourn(patch: Partial<{
           pgaId: string; suspendedType: string; suspendedUntil: string; dateRange: string;
           venue: string; location: string; latitude: number; longitude: number;
-          startDate: string; endDate: string; notes: string; upcoming: boolean;
+          startDate: string; endDate: string; notes: string; upcoming: boolean; roundPar: number;
         }>) {
           setMapping((m) => ({
             ...m,
@@ -934,6 +837,20 @@ export default function AdminPage() {
                 placeholder="July 9-12, 2026"
                 value={tm?.dateRange || ""}
                 onChange={(e) => updateTourn({ dateRange: e.target.value })}
+                style={{
+                  width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                  color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                  padding: "8px 10px", borderRadius: 3,
+                }}
+              />
+            </label>
+            <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
+              Round par (needed to convert score bets - e.g. "Under 68.5" needs
+              to know par is 70 to become "-2 or better")
+              <input
+                placeholder="70"
+                value={tm?.roundPar ?? ""}
+                onChange={(e) => updateTourn({ roundPar: parseInt(e.target.value, 10) || undefined })}
                 style={{
                   width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
                   color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,

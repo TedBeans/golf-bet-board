@@ -20,7 +20,7 @@ const HEADER_RE = /^(.*?)\s+Round\s+(\d+)\s*:?$/i;
 // A line starting a new entry: "Player Name **Under** ..."
 const PLAYER_START_RE = /^([A-Za-z.'\u2019\-\u00C0-\u024F ]+?)\s*\*\*/;
 
-function detectCategory(text: string): "SCORE" | "GIR" | "BIRDIES" | "BOGEYS" | "PARS" {
+export function detectCategory(text: string): "SCORE" | "GIR" | "BIRDIES" | "BOGEYS" | "PARS" {
   if (/bogeys/i.test(text)) return "BOGEYS";
   if (/birdies/i.test(text)) return "BIRDIES";
   if (/greens/i.test(text)) return "GIR";

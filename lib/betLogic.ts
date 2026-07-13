@@ -25,8 +25,14 @@ export function parseBetType(text: string): ParsedBet {
   if ((m = t.match(/^(\d+)\s*greens or less$/i))) {
     return { type: "max", label: "GIR", target: parseInt(m[1], 10), targetDisplay: "≤ " + m[1] };
   }
+  if ((m = t.match(/^(\d+)\+\s*birdies$/i))) {
+    return { type: "min", label: "BIRDIES", target: parseInt(m[1], 10), targetDisplay: "≥ " + m[1] };
+  }
   if ((m = t.match(/^(\d+)\s*birdies or less$/i))) {
     return { type: "max", label: "BIRDIES", target: parseInt(m[1], 10), targetDisplay: "≤ " + m[1] };
+  }
+  if ((m = t.match(/^(\d+)\+\s*bogeys$/i))) {
+    return { type: "min", label: "BOGEYS", target: parseInt(m[1], 10), targetDisplay: "≥ " + m[1] };
   }
   if ((m = t.match(/^(\d+)\s*bogeys or less$/i))) {
     return { type: "max", label: "BOGEYS", target: parseInt(m[1], 10), targetDisplay: "≤ " + m[1] };
