@@ -204,7 +204,7 @@ export default function Page() {
       <main>
         {bets.length === 0 && (
           <>
-            <div className="empty">No bets loaded.</div>
+            <div className="empty">No bets loaded. Upcoming events:</div>
             {Object.entries(mapping.tournaments)
               .filter(([, tm]) => tm.upcoming)
               .map(([name, tm]) => <UpcomingTournamentCard key={name} name={name} meta={tm} />)}

@@ -46,6 +46,8 @@ export default function UpcomingTournamentCard({ name, meta }: { name: string; m
       longitude: String(meta.longitude),
       daily: "weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,windspeed_10m_max",
       timezone: "auto",
+      temperature_unit: "fahrenheit",
+      windspeed_unit: "mph",
     });
     if (meta.startDate) params.set("start_date", meta.startDate);
     if (meta.endDate) params.set("end_date", meta.endDate);
