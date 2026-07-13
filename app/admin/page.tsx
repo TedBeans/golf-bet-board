@@ -732,8 +732,9 @@ export default function AdminPage() {
         per bet. Only the DK price is kept even if other books are listed.
         Matches onto existing bets by player + category + round - checks
         both the live board and anything already archived to the recap. If
-        "for X units" is missing from a line, it now defaults to risking
-        whatever it takes to win 1 unit at that price (e.g. -112 → 1.12u).
+        "for X units" is missing from a line, it now defaults to the
+        standard 1-unit baseline (e.g. -112 → risk 1.12 to win 1; +112 →
+        risk 1 to win 1.12).
       </div>
       <button className="add-btn-inline" onClick={backfillMissingUnits} style={{ marginBottom: 16 }}>
         Backfill missing units on existing bets
