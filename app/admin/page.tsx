@@ -145,6 +145,7 @@ export default function AdminPage() {
   });
 
   const [dateFixEdits, setDateFixEdits] = useState<Record<string, string>>({});
+  const [expandedArchiveTourn, setExpandedArchiveTourn] = useState<string | null>(null);
 
   function restoreArchiveGroup(tourn: string, round: string) {
     fetch("/api/archive", {
@@ -720,43 +721,71 @@ export default function AdminPage() {
         got force-archived under the wrong tournament or round name.
       </div>
       {archiveGroups.length === 0 && <div className="subline">Nothing archived yet.</div>}
-      {archiveGroups.map((g) => {
-        const key = `${g.t}|||${g.r}`;
-        const editValue = dateFixEdits[key] ?? g.currentDate;
+      {Object.entries(
+        archiveGroups.reduce((acc: Record<string, typeof archiveGroups>, g) => {
+          (acc[g.t] = acc[g.t] || []).push(g);
+          return acc;
+        }, {})
+      ).map(([tourn, rounds]) => {
+        const isOpen = expandedArchiveTourn === tourn;
+        const totalWins = rounds.reduce((s, r) => s + r.wins, 0);
+        const totalLosses = rounds.reduce((s, r) => s + r.losses, 0);
         return (
-          <div key={key} className="card" style={{ marginBottom: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <div>
-                <div className="player" style={{ fontSize: 14 }}>{g.t} · {g.r}</div>
-                <div className="subline" style={{ marginTop: 2 }}>
-                  {g.wins}W-{g.losses}L · {g.total} bet{g.total === 1 ? "" : "s"}
-                  {g.currentDate ? ` · dated ${g.currentDate}` : " · no date set"}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="add-btn-inline" onClick={() => restoreArchiveGroup(g.t, g.r)}>
-                  Restore to board
-                </button>
-                <button className="resume-btn" onClick={() => deleteArchiveGroup(g.t, g.r)} style={{ color: "var(--clay)", borderColor: "rgba(192,106,76,0.4)" }}>
-                  Delete from recap
-                </button>
+          <div key={tourn} style={{ marginBottom: 10 }}>
+            <div
+              className="card"
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
+              onClick={() => setExpandedArchiveTourn(isOpen ? null : tourn)}
+            >
+              <div className="player" style={{ fontSize: 14 }}>{tourn}</div>
+              <div className="subline" style={{ margin: 0 }}>
+                {rounds.length} round{rounds.length === 1 ? "" : "s"} · {totalWins}W-{totalLosses}L · {isOpen ? "▲" : "▼"}
               </div>
             </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                type="date"
-                value={editValue}
-                onChange={(e) => setDateFixEdits((prev) => ({ ...prev, [key]: e.target.value }))}
-                style={{
-                  background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
-                  color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 12,
-                  padding: "6px 8px", borderRadius: 3,
-                }}
-              />
-              <button className="recap-btn" onClick={() => fixArchiveGroupDate(g.t, g.r, editValue)}>
-                Fix date
-              </button>
-            </div>
+            {isOpen && (
+              <div style={{ marginTop: 8, paddingLeft: 12 }}>
+                {rounds.map((g) => {
+                  const key = `${g.t}|||${g.r}`;
+                  const editValue = dateFixEdits[key] ?? g.currentDate;
+                  return (
+                    <div key={key} className="card" style={{ marginBottom: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                        <div>
+                          <div className="player" style={{ fontSize: 14 }}>{g.t} · {g.r}</div>
+                          <div className="subline" style={{ marginTop: 2 }}>
+                            {g.wins}W-{g.losses}L · {g.total} bet{g.total === 1 ? "" : "s"}
+                            {g.currentDate ? ` · dated ${g.currentDate}` : " · no date set"}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button className="add-btn-inline" onClick={() => restoreArchiveGroup(g.t, g.r)}>
+                            Restore to board
+                          </button>
+                          <button className="resume-btn" onClick={() => deleteArchiveGroup(g.t, g.r)} style={{ color: "var(--clay)", borderColor: "rgba(192,106,76,0.4)" }}>
+                            Delete from recap
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <input
+                          type="date"
+                          value={editValue}
+                          onChange={(e) => setDateFixEdits((prev) => ({ ...prev, [key]: e.target.value }))}
+                          style={{
+                            background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                            color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 12,
+                            padding: "6px 8px", borderRadius: 3,
+                          }}
+                        />
+                        <button className="recap-btn" onClick={() => fixArchiveGroupDate(g.t, g.r, editValue)}>
+                          Fix date
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })}
