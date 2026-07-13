@@ -30,22 +30,27 @@ export default function Page() {
   const [mapping, setMapping] = useState<Mapping>(EMPTY_MAPPING);
   const [archive, setArchive] = useState<Bet[]>([]);
   const [liveParlays, setLiveParlays] = useState<Parlay[]>([]);
-  const [scorecardModal, setScorecardModal] = useState<{ player: string; loading: boolean; scorecard: any | null; message?: string } | null>(null);
+  const [scorecardModal, setScorecardModal] = useState<{ betId: string; player: string; loading: boolean; scorecard: any | null; message?: string } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function openScorecard(tourn: string, round: string, player: string) {
-    setScorecardModal({ player, loading: true, scorecard: null });
+  function openScorecard(betId: string, tourn: string, round: string, player: string) {
+    if (scorecardModal?.betId === betId) {
+      setScorecardModal(null);
+      return;
+    }
+    setScorecardModal({ betId, player, loading: true, scorecard: null });
     fetch(`/api/scorecard?tournament=${encodeURIComponent(tourn)}&round=${encodeURIComponent(round)}&player=${encodeURIComponent(player)}`)
       .then((r) => r.json())
       .then((d) => {
         setScorecardModal({
+          betId,
           player: d.player || player,
           loading: false,
           scorecard: d.scorecard || null,
           message: d.message || d.error,
         });
       })
-      .catch(() => setScorecardModal({ player, loading: false, scorecard: null, message: "Couldn't load scorecard." }));
+      .catch(() => setScorecardModal({ betId, player, loading: false, scorecard: null, message: "Couldn't load scorecard." }));
   }
 
   function loadBets() {
@@ -282,12 +287,23 @@ export default function Page() {
                         <div className="card-top">
                           <div className="who">
                             <div className="time">{b.time}</div>
-                            <div
-                              className="player"
-                              style={{ cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--cream-dim)" }}
-                              onClick={() => openScorecard(tourn, b.r, b.player)}
-                            >
-                              {b.player}
+                            <div style={{ position: "relative", display: "inline-block" }}>
+                              <div
+                                className="player"
+                                style={{ cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--cream-dim)" }}
+                                onClick={() => openScorecard(b.id, tourn, b.r, b.player)}
+                              >
+                                {b.player}
+                              </div>
+                              {scorecardModal?.betId === b.id && (
+                                <HoleScorecardModal
+                                  player={scorecardModal.player}
+                                  loading={scorecardModal.loading}
+                                  scorecard={scorecardModal.scorecard}
+                                  message={scorecardModal.message}
+                                  onClose={() => setScorecardModal(null)}
+                                />
+                              )}
                             </div>
                             <div className="bet-text">{b.bet}</div>
                             {b.oddsLine && (
@@ -484,15 +500,6 @@ export default function Page() {
           </div>
         )}
       </main>
-      {scorecardModal && (
-        <HoleScorecardModal
-          player={scorecardModal.player}
-          loading={scorecardModal.loading}
-          scorecard={scorecardModal.scorecard}
-          message={scorecardModal.message}
-          onClose={() => setScorecardModal(null)}
-        />
-      )}
     </>
   );
 }

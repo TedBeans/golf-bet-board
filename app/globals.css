@@ -227,6 +227,17 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
 .pace-warn{ color: var(--gold-bright) !important; }
 .pace-bad{ color: var(--clay) !important; }
 .pace-neutral{ color: var(--cream) !important; }
+
+.golf-sym{
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; font-size: 11px; font-family: 'JetBrains Mono', monospace;
+  color: var(--cream-dim);
+}
+.golf-sym.par{ border-radius: 0; }
+.golf-sym.birdie{ color: var(--live); border: 1px solid var(--live); border-radius: 50%; }
+.golf-sym.eagle{ color: var(--live); border: 1px solid var(--live); border-radius: 50%; box-shadow: inset 0 0 0 2px var(--fairway-dark), inset 0 0 0 3px var(--live); }
+.golf-sym.bogey{ color: var(--clay); border: 1px solid var(--clay); border-radius: 2px; }
+.golf-sym.double{ color: var(--clay); border: 1px solid var(--clay); border-radius: 2px; box-shadow: inset 0 0 0 2px var(--fairway-dark), inset 0 0 0 3px var(--clay); }
 .thru-input{ font-size:15px; font-weight:600; }
 
 .auto-row{
