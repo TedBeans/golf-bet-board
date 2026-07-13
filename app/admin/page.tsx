@@ -807,7 +807,11 @@ export default function AdminPage() {
       {tournaments.map((tourn) => {
         const tm = mapping.tournaments[tourn];
         const isSuspended = !!tm?.suspendedType && tm.suspendedType !== "none";
-        function updateTourn(patch: Partial<{ pgaId: string; suspendedType: string; suspendedUntil: string; dateRange: string }>) {
+        function updateTourn(patch: Partial<{
+          pgaId: string; suspendedType: string; suspendedUntil: string; dateRange: string;
+          venue: string; location: string; latitude: number; longitude: number;
+          startDate: string; endDate: string; notes: string; upcoming: boolean;
+        }>) {
           setMapping((m) => ({
             ...m,
             tournaments: {
@@ -851,6 +855,111 @@ export default function AdminPage() {
                 }}
               />
             </label>
+
+            <div style={{ borderTop: "1px solid var(--line)", marginTop: 14, paddingTop: 14 }}>
+              <div className="subline" style={{ marginBottom: 8 }}>For the "upcoming this week" widget on the live board</div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 10, cursor: "pointer" }}>
+                <input type="checkbox" checked={!!tm?.upcoming} onChange={(e) => updateTourn({ upcoming: e.target.checked })} />
+                Show on live board as upcoming this week
+              </label>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <label style={{ flex: 1, fontSize: 12 }}>
+                  Venue
+                  <input
+                    placeholder="Royal Birkdale Golf Club"
+                    value={tm?.venue || ""}
+                    onChange={(e) => updateTourn({ venue: e.target.value })}
+                    style={{
+                      width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                      color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                      padding: "8px 10px", borderRadius: 3,
+                    }}
+                  />
+                </label>
+                <label style={{ flex: 1, fontSize: 12 }}>
+                  Location
+                  <input
+                    placeholder="Southport, England"
+                    value={tm?.location || ""}
+                    onChange={(e) => updateTourn({ location: e.target.value })}
+                    style={{
+                      width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                      color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                      padding: "8px 10px", borderRadius: 3,
+                    }}
+                  />
+                </label>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <label style={{ flex: 1, fontSize: 12 }}>
+                  Latitude
+                  <input
+                    placeholder="53.6329"
+                    value={tm?.latitude ?? ""}
+                    onChange={(e) => updateTourn({ latitude: parseFloat(e.target.value) || undefined })}
+                    style={{
+                      width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                      color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                      padding: "8px 10px", borderRadius: 3,
+                    }}
+                  />
+                </label>
+                <label style={{ flex: 1, fontSize: 12 }}>
+                  Longitude
+                  <input
+                    placeholder="-3.0323"
+                    value={tm?.longitude ?? ""}
+                    onChange={(e) => updateTourn({ longitude: parseFloat(e.target.value) || undefined })}
+                    style={{
+                      width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                      color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                      padding: "8px 10px", borderRadius: 3,
+                    }}
+                  />
+                </label>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <label style={{ flex: 1, fontSize: 12 }}>
+                  Start date
+                  <input
+                    type="date"
+                    value={tm?.startDate || ""}
+                    onChange={(e) => updateTourn({ startDate: e.target.value })}
+                    style={{
+                      width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                      color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                      padding: "8px 10px", borderRadius: 3,
+                    }}
+                  />
+                </label>
+                <label style={{ flex: 1, fontSize: 12 }}>
+                  End date
+                  <input
+                    type="date"
+                    value={tm?.endDate || ""}
+                    onChange={(e) => updateTourn({ endDate: e.target.value })}
+                    style={{
+                      width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                      color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                      padding: "8px 10px", borderRadius: 3,
+                    }}
+                  />
+                </label>
+              </div>
+              <label style={{ display: "block", fontSize: 12 }}>
+                Notes (purse, defending champ, field strength, etc.)
+                <textarea
+                  placeholder="Defending champion: ... · Purse: $... · Field: ..."
+                  value={tm?.notes || ""}
+                  onChange={(e) => updateTourn({ notes: e.target.value })}
+                  style={{
+                    width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                    color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                    padding: "8px 10px", borderRadius: 3, minHeight: 60, resize: "vertical",
+                  }}
+                />
+              </label>
+            </div>
             <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
               Play suspended?
               <select

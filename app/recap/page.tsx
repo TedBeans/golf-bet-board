@@ -117,6 +117,14 @@ export default function RecapPage() {
     return m;
   }, [archive]);
 
+  const monthAgg = useMemo(() => {
+    const prefix = `${viewYear}-${pad(viewMonth + 1)}-`;
+    const monthBets = Object.keys(dayMap)
+      .filter((d) => d.startsWith(prefix))
+      .flatMap((d) => dayMap[d]);
+    return aggregate(monthBets);
+  }, [dayMap, viewYear, viewMonth]);
+
   const tournMap = useMemo(() => {
     const m: Record<string, Bet[]> = {};
     archive.forEach((b) => {
@@ -202,7 +210,16 @@ export default function RecapPage() {
           <>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <button className="resume-btn" onClick={() => changeMonth(-1)}>← Prev</button>
-              <div className="player">{MONTH_NAMES[viewMonth]} {viewYear}</div>
+              <div style={{ textAlign: "center" }}>
+                <div className="player">{MONTH_NAMES[viewMonth]} {viewYear}</div>
+                {(monthAgg.wins > 0 || monthAgg.losses > 0) && (
+                  <div style={{ fontSize: 11, marginTop: 2 }}>
+                    <span className="tsum win">{monthAgg.wins}W</span>{" "}
+                    <span className="tsum loss">{monthAgg.losses}L</span>{" "}
+                    <span className={monthAgg.units >= 0 ? "tsum win" : "tsum loss"}>{formatUnits(monthAgg.units)}</span>
+                  </div>
+                )}
+              </div>
               <button className="resume-btn" onClick={() => changeMonth(1)}>Next →</button>
             </div>
 

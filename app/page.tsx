@@ -9,6 +9,7 @@ import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../lib/parlay";
 import { computeUnitResult, formatUnits } from "../lib/units";
 import HoleScorecardModal from "./HoleScorecardModal";
 import GolfFlagIcon from "./GolfFlagIcon";
+import UpcomingTournamentCard from "./UpcomingTournamentCard";
 
 const SYNC_INTERVAL_MS = 60000;
 
@@ -201,7 +202,14 @@ export default function Page() {
       </header>
 
       <main>
-        {bets.length === 0 && <div className="empty">No bets loaded.</div>}
+        {bets.length === 0 && (
+          <>
+            <div className="empty">No bets loaded.</div>
+            {Object.entries(mapping.tournaments)
+              .filter(([, tm]) => tm.upcoming)
+              .map(([name, tm]) => <UpcomingTournamentCard key={name} name={name} meta={tm} />)}
+          </>
+        )}
 
         {tournamentOrder.map((tourn) => {
           const tournBets = Object.values(groups[tourn]).flat();
