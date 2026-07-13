@@ -6,6 +6,7 @@ import { Bet } from "../../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
 import { parseBetsText, ParseResult } from "../../lib/parseBets";
 import { parseOddsText, attachOddsToBets, OddsParseResult } from "../../lib/parseOdds";
+import { defaultUnitsToWinOne } from "../../lib/units";
 import { nowInCentral } from "../../lib/centralTime";
 import { Parlay, ParlayLegRef } from "../../lib/parlay";
 import { Settings, DEFAULT_SETTINGS } from "../../lib/settings";
@@ -420,6 +421,39 @@ export default function AdminPage() {
     setOddsPreview(parseOddsText(oddsText));
   }
 
+  function backfillMissingUnits() {
+    const liveFixed = bets.map((b) =>
+      b.oddsPrice && !b.oddsUnits ? { ...b, oddsUnits: String(defaultUnitsToWinOne(b.oddsPrice)) } : b
+    );
+    const archiveFixed = archive.map((b) =>
+      b.oddsPrice && !b.oddsUnits ? { ...b, oddsUnits: String(defaultUnitsToWinOne(b.oddsPrice)) } : b
+    );
+    const liveChanged = liveFixed.filter((b, i) => b.oddsUnits !== bets[i]?.oddsUnits).length;
+    const archiveChanged = archiveFixed.filter((b, i) => b.oddsUnits !== archive[i]?.oddsUnits).length;
+
+    Promise.all([
+      fetch("/api/bets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passcode, bets: liveFixed }),
+      }),
+      fetch("/api/archive", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passcode, archive: archiveFixed }),
+      }),
+    ]).then(([r1, r2]) => {
+      if (r1.ok && r2.ok) {
+        setBets(liveFixed);
+        setArchive(archiveFixed);
+        setOddsMsg(`Backfilled units on ${liveChanged + archiveChanged} bet(s) using the odds price (risk-to-win-1 default).`);
+      } else {
+        setOddsMsg("Failed - check passcode.");
+      }
+      setTimeout(() => setOddsMsg(""), 5000);
+    });
+  }
+
   function confirmOdds() {
     if (!oddsPreview || oddsPreview.entries.length === 0) return;
 
@@ -697,8 +731,13 @@ export default function AdminPage() {
         line, then one "Player **Over/Under** Line ... (DK) for X units" line
         per bet. Only the DK price is kept even if other books are listed.
         Matches onto existing bets by player + category + round - checks
-        both the live board and anything already archived to the recap.
+        both the live board and anything already archived to the recap. If
+        "for X units" is missing from a line, it now defaults to risking
+        whatever it takes to win 1 unit at that price (e.g. -112 → 1.12u).
       </div>
+      <button className="add-btn-inline" onClick={backfillMissingUnits} style={{ marginBottom: 16 }}>
+        Backfill missing units on existing bets
+      </button>
       <textarea
         value={oddsText}
         onChange={(e) => setOddsText(e.target.value)}

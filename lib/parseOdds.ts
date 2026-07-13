@@ -1,5 +1,6 @@
 import { Bet } from "./seed";
 import { parseBetType } from "./betLogic";
+import { defaultUnitsToWinOne } from "./units";
 
 export type OddsEntry = {
   tournament: string;
@@ -89,7 +90,10 @@ export function parseOddsText(text: string): OddsParseResult {
     if (!oddsDK) warnings.push(`No DK odds found for ${player} - "${line}"`);
 
     const unitsMatch = line.match(/for\s+([\d.]+)\s*units?/i);
-    const units = unitsMatch ? unitsMatch[1] : null;
+    // No explicit "for X units" in the paste - default to risking whatever
+    // it takes to win exactly 1 unit at this price, rather than leaving it
+    // blank (which silently drops the bet out of every units calculation).
+    const units = unitsMatch ? unitsMatch[1] : String(defaultUnitsToWinOne(oddsDK));
 
     if (!currentTournament) {
       warnings.push(`Entry found before any tournament header: "${line}"`);
