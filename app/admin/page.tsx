@@ -10,6 +10,42 @@ import { nowInCentral } from "../../lib/centralTime";
 import { Parlay, ParlayLegRef } from "../../lib/parlay";
 import { Settings, DEFAULT_SETTINGS } from "../../lib/settings";
 import GolfFlagIcon from "../GolfFlagIcon";
+import HoleScorecardModal from "../HoleScorecardModal";
+import { useScorecardPopover } from "../useScorecardPopover";
+
+function ArchivedRoundBets({ bets }: { bets: Bet[] }) {
+  const { openKey, state, open } = useScorecardPopover();
+  return (
+    <div style={{ marginTop: 8 }}>
+      {bets.map((b) => (
+        <div key={b.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+          <span style={{ position: "relative", display: "inline-block" }}>
+            <span
+              style={{ color: "var(--cream)", cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--cream-dim)" }}
+              onClick={() => open(b.id, b.t, b.r, b.player)}
+            >
+              {b.player}
+            </span>
+            {" "}
+            <span style={{ color: "var(--cream-dim)" }}>{b.bet}</span>
+            {openKey === b.id && (
+              <HoleScorecardModal
+                player={b.player}
+                loading={state?.loading ?? false}
+                scorecard={state?.scorecard ?? null}
+                message={state?.message}
+                onClose={() => open(b.id, b.t, b.r, b.player)}
+              />
+            )}
+          </span>
+          <span className={b.status === "hit" ? "tsum win" : b.status === "miss" ? "tsum loss" : "tsum tbd"}>
+            {b.status === "hit" ? "WIN" : b.status === "miss" ? "LOSS" : b.status === "live" ? "LIVE" : "TBD"}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function AdminPage() {
   const [passcode, setPasscode] = useState("");
@@ -781,6 +817,7 @@ export default function AdminPage() {
                           Fix date
                         </button>
                       </div>
+                      <ArchivedRoundBets bets={archive.filter((b) => b.t === g.t && b.r === g.r)} />
                     </div>
                   );
                 })}

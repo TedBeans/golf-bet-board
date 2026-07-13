@@ -9,6 +9,8 @@ import { computeUnitResult, formatUnits, oddsMultiplier } from "../../lib/units"
 import { centralDateFromISO } from "../../lib/centralTime";
 import { Parlay } from "../../lib/parlay";
 import GolfFlagIcon from "../GolfFlagIcon";
+import HoleScorecardModal from "../HoleScorecardModal";
+import { useScorecardPopover } from "../useScorecardPopover";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const WEEKDAY_NAMES = ["S","M","T","W","T","F","S"];
@@ -30,20 +32,56 @@ function BetDetailCard({ b, compact = false }: { b: Bet; compact?: boolean }) {
   const parsed = parseBetType(b.bet);
   const cls = trendClassName(parsed, b.stat, b.thru);
   const unitResult = computeUnitResult(b.oddsPrice, b.oddsUnits, b.status);
+  const { openKey, state: scorecardState, open: openScorecard } = useScorecardPopover();
+  const isOpen = openKey === b.id;
   return (
     <div className={`card ${b.status}`} style={{ marginBottom: 8 }}>
       <div className="card-top" style={{ alignItems: "center" }}>
         {compact ? (
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
             <span className="time">{b.time}</span>
-            <span className="player" style={{ fontSize: 14 }}>{b.player}</span>
+            <span style={{ position: "relative", display: "inline-block" }}>
+              <span
+                className="player"
+                style={{ fontSize: 14, cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--cream-dim)" }}
+                onClick={() => openScorecard(b.id, b.t, b.r, b.player)}
+              >
+                {b.player}
+              </span>
+              {isOpen && (
+                <HoleScorecardModal
+                  player={b.player}
+                  loading={scorecardState?.loading ?? false}
+                  scorecard={scorecardState?.scorecard ?? null}
+                  message={scorecardState?.message}
+                  onClose={() => openScorecard(b.id, b.t, b.r, b.player)}
+                />
+              )}
+            </span>
             <span className="bet-text" style={{ margin: 0 }}>{b.bet}</span>
             {b.oddsLine && <span className="odds-line" style={{ margin: 0 }}>{b.oddsLine} · DK {b.oddsPrice ?? "—"}</span>}
           </div>
         ) : (
           <div className="who">
             <div className="time">{b.time}</div>
-            <div className="player">{b.player}</div>
+            <div style={{ position: "relative", display: "inline-block" }}>
+              <div
+                className="player"
+                style={{ cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--cream-dim)" }}
+                onClick={() => openScorecard(b.id, b.t, b.r, b.player)}
+              >
+                {b.player}
+              </div>
+              {isOpen && (
+                <HoleScorecardModal
+                  player={b.player}
+                  loading={scorecardState?.loading ?? false}
+                  scorecard={scorecardState?.scorecard ?? null}
+                  message={scorecardState?.message}
+                  onClose={() => openScorecard(b.id, b.t, b.r, b.player)}
+                />
+              )}
+            </div>
             <div className="bet-text">{b.bet}</div>
             {b.oddsLine && <div className="odds-line">{b.oddsLine} · DK {b.oddsPrice ?? "—"}</div>}
           </div>
