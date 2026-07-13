@@ -261,7 +261,7 @@ export default function RecapPage() {
               })}
             </div>
 
-            {lastRound && (
+            {lastRound && !selectedDate && (
               <div style={{ marginBottom: 20 }}>
                 <div className="round-label">Last round</div>
                 {(() => {
