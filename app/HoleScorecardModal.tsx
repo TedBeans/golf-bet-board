@@ -39,7 +39,7 @@ function NineRow({ holes, label }: { holes: Hole[]; label: string }) {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, alignItems: "center" }}>
         {holes.map((h) => (
-          <div key={h.hole} style={{ display: "flex", justifyContent: "center" }}>
+          <div key={h.hole} style={{ display: "flex", justifyContent: "center", padding: "0 2px" }}>
             <span className={`golf-sym ${symbolClass(h)}`}>{h.score ?? "—"}</span>
           </div>
         ))}
@@ -68,7 +68,7 @@ export default function HoleScorecardModal({
     <div
       onClick={(e) => e.stopPropagation()}
       style={{
-        position: "absolute", bottom: "calc(100% + 6px)", left: 0, zIndex: 20,
+        position: "absolute", bottom: "calc(100% - 6px)", left: 28, zIndex: 20,
         background: "#0F1216", border: "1px solid var(--line)", borderRadius: 4,
         padding: "8px 10px", minWidth: 260, boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
       }}

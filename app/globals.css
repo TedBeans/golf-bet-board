@@ -235,9 +235,9 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
 }
 .golf-sym.par{ border-radius: 0; }
 .golf-sym.birdie{ color: var(--live); border: 1px solid var(--live); border-radius: 50%; }
-.golf-sym.eagle{ color: var(--live); border: 1px solid var(--live); border-radius: 50%; box-shadow: inset 0 0 0 2px var(--fairway-dark), inset 0 0 0 3px var(--live); }
+.golf-sym.eagle{ color: var(--live); border: 1px solid var(--live); border-radius: 50%; outline: 1px solid var(--live); outline-offset: 2px; }
 .golf-sym.bogey{ color: var(--clay); border: 1px solid var(--clay); border-radius: 2px; }
-.golf-sym.double{ color: var(--clay); border: 1px solid var(--clay); border-radius: 2px; box-shadow: inset 0 0 0 2px var(--fairway-dark), inset 0 0 0 3px var(--clay); }
+.golf-sym.double{ color: var(--clay); border: 1px solid var(--clay); border-radius: 2px; outline: 1px solid var(--clay); outline-offset: 2px; }
 .thru-input{ font-size:15px; font-weight:600; }
 
 .auto-row{
