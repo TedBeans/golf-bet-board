@@ -866,6 +866,7 @@ export default function AdminPage() {
           pgaId: string; suspendedType: string; suspendedUntil: string; dateRange: string;
           venue: string; location: string; latitude: number; longitude: number;
           startDate: string; endDate: string; notes: string; upcoming: boolean; roundPar: number;
+          dataSource: string;
         }>) {
           setMapping((m) => ({
             ...m,
@@ -897,6 +898,24 @@ export default function AdminPage() {
                 padding: "8px 10px", borderRadius: 3,
               }}
             />
+            <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
+              Live data source
+              <select
+                value={tm?.dataSource || "pgatour"}
+                onChange={(e) => updateTourn({ dataSource: e.target.value })}
+                style={{
+                  display: "block", width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)",
+                  border: "1px solid var(--line)", color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace",
+                  fontSize: 13, padding: "8px 10px", borderRadius: 3,
+                }}
+              >
+                <option value="pgatour">PGA Tour (default)</option>
+                <option value="theopen">theopen.com (Open Championship fallback)</option>
+              </select>
+              <span className="subline" style={{ display: "block", marginTop: 4 }}>
+                Only switch this if PGA Tour's feed comes back empty for a tournament. On theopen.com, GIR bets won't auto-grade (check /api/debug-open first).
+              </span>
+            </label>
             <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
               Dates (for the recap page, e.g. "July 9-12, 2026")
               <input

@@ -6,6 +6,8 @@ import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../../../lib/par
 import { fetchPgaLeaderboard, fetchPlayerScorecardStats } from "../../../lib/pgatour";
 import { extractPlayers, findPlayerMatch, findLeader, PgaPlayerRow } from "../../../lib/pgaMatch";
 import { extractScorecardStats, roundNumberFromLabel } from "../../../lib/pgaScorecard";
+import { fetchOpenLeaderboard } from "../../../lib/theopen";
+import { extractOpenPlayers, findOpenPlayerMatch, findOpenLeader, computeOpenStats, OpenPlayerRow } from "../../../lib/openMatch";
 import { parseBetType, autoGradeStatus, timeToMinutes } from "../../../lib/betLogic";
 import { nowInCentral } from "../../../lib/centralTime";
 
@@ -40,6 +42,7 @@ export async function GET() {
   const errors: string[] = [];
   const leaderboardCache = new Map<string, PgaPlayerRow[]>();
   const scorecardCache = new Map<string, any>();
+  let openPlayersCache: OpenPlayerRow[] | null = null;
   let updatedCount = 0;
   const { dateStr: todayCentral, minutes: nowMinutes, dateTimeStr: nowCentralDT } = nowInCentral();
 
@@ -93,14 +96,91 @@ export async function GET() {
     const tournamentId = tournamentMap.pgaId;
 
     try {
+      const parsed = parseBetType(bet.bet);
+
+      if (tournamentMap.dataSource === "theopen") {
+        // theopen.com's own feed: everything (score, birdies, bogeys, pars)
+        // is derived directly from hole-by-hole strokes vs par - no second
+        // "scorecard stats" call needed, unlike the PGA Tour path below.
+        // GIR is NOT available this way (see lib/openMatch.ts) and simply
+        // stays null/unset for this data source until the statistics feed
+        // is confirmed to carry it per-player.
+        if (!openPlayersCache) {
+          const raw = await fetchOpenLeaderboard();
+          openPlayersCache = extractOpenPlayers(raw);
+        }
+        const players = openPlayersCache;
+
+        if (parsed.label === "WINNER_SCORE") {
+          const leader = findOpenLeader(players);
+          if (!leader) {
+            errors.push(`${bet.t}: couldn't find a tournament leader (theopen)`);
+            continue;
+          }
+          const leaderStats = computeOpenStats(leader.player, roundNumberFromLabel(bet.r));
+          bet.thru = leaderStats.thru;
+          bet.stat = leader.totalToPar;
+          bet.auto = {
+            thru: leaderStats.thru,
+            scoreToPar: leader.totalToPar,
+            birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
+            updatedAt: new Date().toISOString(),
+            leaderName: leader.player.displayName,
+          };
+          updatedCount += 1;
+          continue;
+        }
+
+        const row = findOpenPlayerMatch(bet.player, players);
+        if (!row) {
+          errors.push(`${bet.player}: no match on theopen.com leaderboard`);
+          continue;
+        }
+        const roundNum = roundNumberFromLabel(bet.r);
+        const stats = computeOpenStats(row, roundNum);
+
+        bet.thru = stats.thru;
+        bet.auto = {
+          thru: stats.thru,
+          scoreToPar: stats.scoreToPar,
+          birdies: stats.birdies,
+          bogeys: stats.bogeys,
+          pars: stats.pars,
+          eagles: stats.eagles,
+          doubleBogeys: stats.doubleBogeys,
+          gir: null, // not available from theopen.com's feed - see lib/openMatch.ts
+          fairways: null,
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (parsed.label === "SCORE" && stats.scoreToPar !== null) {
+          bet.stat = stats.scoreToPar;
+        } else if (parsed.label === "BIRDIES") {
+          bet.stat = stats.birdiesOrBetter;
+        } else if (parsed.label === "BOGEYS") {
+          bet.stat = stats.bogeysOrWorse;
+        } else if (parsed.label === "PARS") {
+          bet.stat = stats.pars;
+        }
+        // GIR bets: intentionally left ungraded on this data source - no
+        // auto stat available, so bet.stat stays whatever it was (null on
+        // a fresh bet), same as any other bet with autoEnabled turned off.
+
+        if (bet.status === "live") {
+          const graded = autoGradeStatus(parsed, bet.stat, bet.thru);
+          if (graded) bet.status = graded;
+        }
+
+        updatedCount += 1;
+        continue;
+      }
+
       let players = leaderboardCache.get(tournamentId);
       if (!players) {
         const raw = await fetchPgaLeaderboard(tournamentId);
         players = extractPlayers(raw);
         leaderboardCache.set(tournamentId, players);
       }
-
-      const parsed = parseBetType(bet.bet);
 
       // Tournament-long "winning score" bets track whoever is currently in
       // 1st place, not a specific named player - no scorecard fetch needed,

@@ -18,6 +18,10 @@ export type Mapping = {
       upcoming?: boolean; // show on the live board's "upcoming this week" widget
       roundPar?: number; // this course's per-round par (e.g. 70/71/72) - needed to convert
                           // a raw strokes line (e.g. "Under 68.5") into to-par phrasing ("-2 or better")
+      dataSource?: "pgatour" | "theopen"; // which live feed to pull from - defaults to pgatour.
+                                           // theopen.com relays its own data for The Open Championship;
+                                           // PGA Tour's feed may or may not carry it - this lets you
+                                           // flip a single tournament over to the fallback with no code change.
     };
   };
 };
