@@ -2,13 +2,9 @@
 // Network tab. Unlike PGA Tour's GraphQL+gzip setup, this is plain REST:
 // GET requests returning uncompressed JSON, keyed by ?feedType=.
 //
-// Base URL inferred from a confirmed sibling request
-// (https://www.theopen.com/api/LiveComponentsScannerApi/Config) - Config,
-// scoring, GetVersionInfo, and GetPlayersInfo all appeared as separate
-// requests under what looks like the same shared API root in the site's
-// own Network tab. Worth a quick sanity check against /api/debug-open once
-// live - if this guess is wrong, the fix is just this one line.
-const OPEN_BASE_URL = "https://www.theopen.com/api/LiveComponentsScannerApi";
+// Confirmed via DevTools Headers tab: GET https://scoring.theopen.com/scoring?feedType=traditional
+// No auth header required - just a plain GET, 200 OK.
+const OPEN_BASE_URL = "https://scoring.theopen.com";
 
 async function openFetch(feedType: "traditional" | "coursepars" | "statistics"): Promise<any> {
   const res = await fetch(`${OPEN_BASE_URL}/scoring?feedType=${feedType}`, {
