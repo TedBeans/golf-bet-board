@@ -59,7 +59,7 @@ function BetDetailCard({ b, compact = false }: { b: Bet; compact?: boolean }) {
               )}
             </span>
             <span className="bet-text" style={{ margin: 0 }}>{b.bet}</span>
-            {b.oddsLine && <span className="odds-line" style={{ margin: 0 }}>{b.oddsLine} · DK {b.oddsPrice ?? "—"}</span>}
+            {b.oddsLine && <span className="odds-line" style={{ margin: 0 }}>{b.oddsLine} · {b.sportsbook || "DK"} {b.oddsPrice ?? "—"}</span>}
           </div>
         ) : (
           <div className="who">
@@ -83,7 +83,7 @@ function BetDetailCard({ b, compact = false }: { b: Bet; compact?: boolean }) {
               )}
             </div>
             <div className="bet-text">{b.bet}</div>
-            {b.oddsLine && <div className="odds-line">{b.oddsLine} · DK {b.oddsPrice ?? "—"}</div>}
+            {b.oddsLine && <div className="odds-line">{b.oddsLine} · {b.sportsbook || "DK"} {b.oddsPrice ?? "—"}</div>}
           </div>
         )}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>

@@ -27,7 +27,8 @@ export type Bet = {
   autoEnabled?: boolean; // if true, sync will overwrite stat/thru/auto
   auto?: AutoStats | null; // full detail line from last successful sync
   oddsLine?: string | null; // e.g. "Under 69.5"
-  oddsPrice?: string | null; // DK price only, e.g. "-112"
+  oddsPrice?: string | null; // American odds price, e.g. "-112"
+  sportsbook?: string | null; // e.g. "DK", "CZR" - which book these odds are from; defaults to "DK" for display if unset (legacy bets)
   oddsUnits?: string | null; // e.g. "1.12"
   loadedDate?: string; // "YYYY-MM-DD" - the day these bets were loaded onto the board
   archivedAt?: string; // ISO timestamp - when this bet moved to the recap

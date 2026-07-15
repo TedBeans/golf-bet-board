@@ -135,9 +135,13 @@ export function parseCombinedText(
     const lineValue = lineValMatch[1];
     const category = segment ? "SCORE" : detectCategory(afterSide);
 
-    const dkMatch = line.match(/([+-]\d+)\s*\(\s*DK\s*\)/i);
-    const oddsDK = dkMatch ? dkMatch[1] : null;
-    if (!oddsDK) warnings.push(`No DK odds found for ${player} - "${line}"`);
+    // Any 2-5 letter book code works here - DK (DraftKings), CZR
+    // (Caesars), FD (FanDuel), MGM, etc - whichever book actually offered
+    // this line.
+    const oddsMatch = line.match(/([+-]\d+)\s*\(\s*([A-Za-z]{2,5})\s*\)/);
+    const oddsDK = oddsMatch ? oddsMatch[1] : null;
+    const sportsbook = oddsMatch ? oddsMatch[2].toUpperCase() : null;
+    if (!oddsDK) warnings.push(`No odds price found for ${player} - "${line}"`);
 
     const unitsMatch = line.match(/for\s+([\d.]+)\s*units?/i);
     const units = unitsMatch ? unitsMatch[1] : String(defaultUnitsToWinOne(oddsDK));
@@ -168,6 +172,7 @@ export function parseCombinedText(
       auto: null,
       oddsLine: `${side} ${lineValue}`,
       oddsPrice: oddsDK,
+      sportsbook,
       oddsUnits: units,
       loadedDate,
     });
