@@ -225,7 +225,10 @@ export default function Page() {
   }
 
   const counts = { hit: 0, miss: 0, live: 0, pending: 0 } as Record<string, number>;
-  bets.forEach((b) => (counts[b.status] = (counts[b.status] || 0) + 1));
+  // TedBeans plays are tracked in their own section with their own
+  // win/loss framing - they never factor into this top-level summary,
+  // same as they're already excluded from the regular recaps.
+  bets.filter((b) => !b.personal).forEach((b) => (counts[b.status] = (counts[b.status] || 0) + 1));
 
   const regularBets = bets.filter((b) => !b.personal);
   // hidden is an admin-only display toggle - the bet still exists, still
