@@ -606,7 +606,7 @@ export default function Page() {
                               {" · "}
                               {cutLine !== undefined ? `Cut line ${formatScore(cutLine)}` : "cut line not set yet"}
                             </>
-                          ) : parsed.label === "H2H" ? (
+                          ) : parsed.label === "H2H" || parsed.label === "TIE" ? (
                             <>
                               {b.player} {formatScore(b.auto?.scoreToPar ?? null)} vs {parsed.h2hOpponent}{" "}
                               {formatScore(b.auto?.opponentScoreToPar ?? null)}

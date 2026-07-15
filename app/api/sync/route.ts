@@ -233,7 +233,7 @@ export async function GET() {
           continue;
         }
 
-        if (parsed.label === "H2H") {
+        if (parsed.label === "H2H" || parsed.label === "TIE") {
           const roundNum = parsed.h2hScope === "round" ? parsed.h2hRoundNum ?? null : null;
           const opponentName = parsed.h2hOpponent || "";
 
@@ -260,9 +260,8 @@ export async function GET() {
             opponentThru: opponentStat.thru,
           };
 
-          // Always grades on better score for the scope, per TedBeans' own
-          // call. Round scope: both already fetched for that exact round,
-          // so just check both are thru 18. Tournament scope: needs both
+          // Round scope: both already fetched for that exact round, so
+          // just check both are thru 18. Tournament scope: needs both
           // players to have finished round 4 specifically - a player who
           // missed the cut never reaches round 4, so a missed-cut pairing
           // simply never auto-grades here (safer than guessing at a "made
@@ -283,9 +282,17 @@ export async function GET() {
           }
 
           if (bothFinished && subjectStat.scoreToPar !== null && opponentStat.scoreToPar !== null) {
-            if (subjectStat.scoreToPar < opponentStat.scoreToPar) bet.status = "hit";
-            else if (subjectStat.scoreToPar > opponentStat.scoreToPar) bet.status = "miss";
-            // An exact tie: most books push (refund) a head-to-head rather
+            if (parsed.label === "TIE") {
+              // Here an exact tie IS the win condition - unlike H2H, there's
+              // no ambiguity to leave unresolved: any inequality is an
+              // unambiguous, immediate loss.
+              bet.status = subjectStat.scoreToPar === opponentStat.scoreToPar ? "hit" : "miss";
+            } else if (subjectStat.scoreToPar < opponentStat.scoreToPar) {
+              bet.status = "hit";
+            } else if (subjectStat.scoreToPar > opponentStat.scoreToPar) {
+              bet.status = "miss";
+            }
+            // H2H exact tie: most books push (refund) a head-to-head rather
             // than lose it, and there's no "push" status here yet - leave
             // it for you to settle by hand rather than guessing it as a loss.
           }

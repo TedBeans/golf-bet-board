@@ -22,13 +22,26 @@ export const PERSONAL_ROUND_LABEL = "TedBeans Plays";
 
 // H2H is always "PlayerA vs PlayerB <scope>" - the bet is on PlayerA (the
 // first name listed) to have the better score for that scope, per TedBeans'
-// own call. Checked before the other three patterns since none of them
-// share its "vs ... Round N / Tournament" shape.
+// own call. Checked before the other patterns since none of them share its
+// "vs ... Round N / Tournament" shape.
 const H2H_ROUND_RE = /^(.*?)\s+vs\.?\s+(.*?)\s+Round\s+(\d+)$/i;
 const H2H_TOURNAMENT_RE = /^(.*?)\s+vs\.?\s+(.*?)\s+Tournament$/i;
+
+// Tie matchups - a genuinely different bet than H2H: the wager wins only if
+// the two players finish the scope at the exact same score, not if either
+// one beats the other. "Matchup" at the end is optional since it's just
+// flavor text, not load-bearing.
+const TIE_ROUND_RE = /^(.*?)\s+and\s+(.*?)\s+to\s+tie\s+Round\s+(\d+)(?:\s+Matchup)?$/i;
+const TIE_TOURNAMENT_RE = /^(.*?)\s+and\s+(.*?)\s+to\s+tie\s+Tournament(?:\s+Matchup)?$/i;
+
 const TOPN_RE = /^(.*?)\s+Top\s+(\d+)$/i;
-const WINNER_RE = /^(.*?)\s+Winner$/i;
-const MAKECUT_RE = /^(.*?)\s+Make\s*Cut$/i;
+// Accepts plain "Winner" or "outright winner" - either way, stored as the
+// same canonical "Winner" phrase, so nothing downstream needs to know which
+// input variant was actually typed.
+const WINNER_RE = /^(.*?)\s+(?:outright\s+)?winner$/i;
+// Accepts "Make Cut", "make the cut", "to make the cut", "to make cut" -
+// all stored as the same canonical "Make Cut" phrase.
+const MAKECUT_RE = /^(.*?)\s+(?:to\s+)?make\s+(?:the\s+)?cut$/i;
 
 const ODDS_RE = /([+-]\d+)\s*\(\s*([A-Za-z]{2,5})\s*\)/;
 const UNITS_RE = /for\s+([\d.]+)\s*units?/i;
@@ -78,6 +91,12 @@ export function parsePersonalText(text: string, forDate: string | undefined): Pa
     } else if ((m = descriptor.match(H2H_TOURNAMENT_RE))) {
       player = m[1].trim();
       phrase = `H2H vs ${m[2].trim()} (Tournament)`;
+    } else if ((m = descriptor.match(TIE_ROUND_RE))) {
+      player = m[1].trim();
+      phrase = `Tie vs ${m[2].trim()} (Round ${m[3]})`;
+    } else if ((m = descriptor.match(TIE_TOURNAMENT_RE))) {
+      player = m[1].trim();
+      phrase = `Tie vs ${m[2].trim()} (Tournament)`;
     } else if ((m = descriptor.match(TOPN_RE))) {
       player = m[1].trim();
       phrase = `Top ${m[2]}`;
@@ -90,7 +109,7 @@ export function parsePersonalText(text: string, forDate: string | undefined): Pa
     }
 
     if (!player || !phrase) {
-      warnings.push(`Couldn't recognize a bet type (Top N / Winner / Make Cut / "vs ... Round N" / "vs ... Tournament") in: "${line}"`);
+      warnings.push(`Couldn't recognize a bet type (Top N / Winner / outright Winner / Make Cut / to make the cut / "vs ... Round N" / "vs ... Tournament" / "and ... to tie Round N" / "and ... to tie Tournament") in: "${line}"`);
       continue;
     }
 

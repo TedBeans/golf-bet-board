@@ -30,6 +30,16 @@ export function parseBetType(text: string): ParsedBet {
   if ((m = t.match(/^h2h vs (.+?) \(tournament\)$/i))) {
     return { type: "generic", label: "H2H", target: null, targetDisplay: "—", h2hOpponent: m[1].trim(), h2hScope: "tournament" };
   }
+  // Tie matchups reuse H2H's opponent/scope fields (h2hOpponent/h2hScope/
+  // h2hRoundNum) since the shape is identical - only the win condition
+  // differs (exact equality, not "better score"), which the sync route
+  // branches on via the label.
+  if ((m = t.match(/^tie vs (.+?) \(round (\d+)\)$/i))) {
+    return { type: "generic", label: "TIE", target: null, targetDisplay: "—", h2hOpponent: m[1].trim(), h2hScope: "round", h2hRoundNum: parseInt(m[2], 10) };
+  }
+  if ((m = t.match(/^tie vs (.+?) \(tournament\)$/i))) {
+    return { type: "generic", label: "TIE", target: null, targetDisplay: "—", h2hOpponent: m[1].trim(), h2hScope: "tournament" };
+  }
   if ((m = t.match(/^top\s+(\d+)$/i))) {
     return { type: "generic", label: "TOP_N", target: null, targetDisplay: "—", topN: parseInt(m[1], 10) };
   }
@@ -181,6 +191,7 @@ export function friendlyLabel(label: string, segment?: "front9" | "back9"): stri
     case "TOP_N": return "Top N";
     case "MAKE_CUT": return "Make Cut";
     case "H2H": return "H2H";
+    case "TIE": return "Tie";
     default: return "Stat";
   }
 }

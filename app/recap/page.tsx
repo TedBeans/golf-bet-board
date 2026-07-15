@@ -28,12 +28,14 @@ function aggregate(bets: Bet[]): { wins: number; losses: number; units: number }
   return { wins, losses, units: Math.round(units * 100) / 100 };
 }
 
-function BetDetailCard({ b, compact = false }: { b: Bet; compact?: boolean }) {
+function BetDetailCard({ b, compact = false, mapping }: { b: Bet; compact?: boolean; mapping?: Mapping }) {
   const parsed = parseBetType(b.bet);
   const cls = trendClassName(parsed, b.stat, b.thru);
   const unitResult = computeUnitResult(b.oddsPrice, b.oddsUnits, b.status);
   const { openKey, state: scorecardState, open: openScorecard } = useScorecardPopover();
   const isOpen = openKey === b.id;
+  const isPersonal = !!b.personal;
+  const cutLine = mapping?.tournaments[b.t]?.cutLine;
   return (
     <div className={`card ${b.status}`} style={{ marginBottom: 8 }}>
       <div className="card-top" style={{ alignItems: "center" }}>
@@ -99,27 +101,54 @@ function BetDetailCard({ b, compact = false }: { b: Bet; compact?: boolean }) {
       </div>
       {!compact && (
         <>
-          <div className="scorecard">
-            <div className="sc-cell">
-              <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
-              <div className="sc-target">{parsed.targetDisplay}</div>
-            </div>
-            <div className="sc-cell">
-              <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
-              <div className={`sc-target ${cls}`}>{parsed.label === "SCORE" ? formatScore(b.stat) : b.stat ?? "—"}</div>
-            </div>
-            <div className="sc-cell">
-              <div className="sc-label">Thru</div>
-              <div className="sc-target">{b.thru ?? "—"}</div>
-            </div>
-          </div>
-          {b.auto && (
-            <div className="auto-row">
+          {isPersonal ? (
+            <div className="auto-row" style={{ marginTop: 8 }}>
               <span className="detail-strip">
-                Score {formatScore(b.auto.scoreToPar)} · Greens {b.auto.gir ?? "—"} · Fairways {b.auto.fairways ?? "—"} ·
-                {" "}Birdies {b.auto.birdies ?? "—"} · Bogeys {b.auto.bogeys ?? "—"} · Pars {b.auto.pars ?? "—"}
+                {parsed.label === "MAKE_CUT" ? (
+                  <>
+                    Round 1 {formatScore(b.auto?.scoreToPar ?? null)} thru {b.auto?.thru ?? "—"}
+                    {" · "}
+                    {cutLine !== undefined ? `Cut line ${formatScore(cutLine)}` : "cut line not set yet"}
+                  </>
+                ) : parsed.label === "H2H" || parsed.label === "TIE" ? (
+                  <>
+                    {b.player} {formatScore(b.auto?.scoreToPar ?? null)} vs {parsed.h2hOpponent}{" "}
+                    {formatScore(b.auto?.opponentScoreToPar ?? null)}
+                    {" · "}thru {b.auto?.thru ?? "—"}/{b.auto?.opponentThru ?? "—"}
+                  </>
+                ) : (
+                  <>
+                    Position {b.auto?.position ?? "—"} ({formatScore(b.auto?.scoreToPar ?? null)})
+                    {" · "}thru {b.auto?.thru ?? "—"}
+                  </>
+                )}
               </span>
             </div>
+          ) : (
+            <>
+              <div className="scorecard">
+                <div className="sc-cell">
+                  <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
+                  <div className="sc-target">{parsed.targetDisplay}</div>
+                </div>
+                <div className="sc-cell">
+                  <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
+                  <div className={`sc-target ${cls}`}>{parsed.label === "SCORE" ? formatScore(b.stat) : b.stat ?? "—"}</div>
+                </div>
+                <div className="sc-cell">
+                  <div className="sc-label">Thru</div>
+                  <div className="sc-target">{b.thru ?? "—"}</div>
+                </div>
+              </div>
+              {b.auto && (
+                <div className="auto-row">
+                  <span className="detail-strip">
+                    Score {formatScore(b.auto.scoreToPar)} · Greens {b.auto.gir ?? "—"} · Fairways {b.auto.fairways ?? "—"} ·
+                    {" "}Birdies {b.auto.birdies ?? "—"} · Bogeys {b.auto.bogeys ?? "—"} · Pars {b.auto.pars ?? "—"}
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
@@ -405,7 +434,7 @@ export default function RecapPage() {
                           <span className={agg.units >= 0 ? "tsum win" : "tsum loss"}>{formatUnits(agg.units)}</span>
                         </div>
                       </div>
-                      {lastRound.bets.map((b) => <BetDetailCard key={b.id} b={b} />)}
+                      {lastRound.bets.map((b) => <BetDetailCard key={b.id} b={b} mapping={mapping} />)}
                     </div>
                   );
                 })()}
@@ -429,7 +458,7 @@ export default function RecapPage() {
                           <span className={agg.units >= 0 ? "tsum win" : "tsum loss"}>{formatUnits(agg.units)}</span>
                         </div>
                       </div>
-                      {groupBets.map((b) => <BetDetailCard key={b.id} b={b} />)}
+                      {groupBets.map((b) => <BetDetailCard key={b.id} b={b} mapping={mapping} />)}
                     </div>
                   );
                 })}
@@ -495,8 +524,8 @@ export default function RecapPage() {
                           </div>
                         )}
                         {quickView
-                          ? roundBets.map((b) => <BetDetailCard key={b.id} b={b} compact />)
-                          : roundOpen && roundBets.map((b) => <BetDetailCard key={b.id} b={b} />)}
+                          ? roundBets.map((b) => <BetDetailCard key={b.id} b={b} compact mapping={mapping} />)
+                          : roundOpen && roundBets.map((b) => <BetDetailCard key={b.id} b={b} mapping={mapping} />)}
                       </div>
                     );
                   })}
@@ -535,7 +564,7 @@ export default function RecapPage() {
                       <span className="tsum loss">{tBets.filter((b) => b.status === "miss").length}L</span>
                     </div>
                   </div>
-                  {isOpen && tBets.map((b) => <BetDetailCard key={b.id} b={b} />)}
+                  {isOpen && tBets.map((b) => <BetDetailCard key={b.id} b={b} mapping={mapping} />)}
                 </div>
               );
             })}
