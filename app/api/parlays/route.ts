@@ -32,6 +32,24 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, parlay });
 }
 
+// Full overwrite of the live parlays list - used for drag-and-drop
+// reordering in the admin UI (same pattern as /api/archive's PUT, used
+// there for the units-backfill tool).
+export async function PUT(req: NextRequest) {
+  const body = await req.json();
+  const { passcode, parlays } = body as { passcode: string; parlays: Parlay[] };
+
+  if (!passcode || passcode !== process.env.EDIT_PASSCODE) {
+    return NextResponse.json({ error: "Wrong passcode" }, { status: 401 });
+  }
+  if (!Array.isArray(parlays)) {
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+
+  await redis.set(PARLAYS_KEY, parlays);
+  return NextResponse.json({ ok: true });
+}
+
 // Renames a parlay wherever it currently lives - still open, or already
 // settled and sitting in the recap archive.
 export async function PATCH(req: NextRequest) {

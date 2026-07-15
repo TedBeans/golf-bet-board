@@ -39,6 +39,13 @@ export type Bet = {
   personal?: boolean; // TedBeans' own tournament-long props (Winner/Top N/Make Cut/H2H) -
                        // tracked in their own "TedBeans Plays" section/recap tab, never
                        // mixed into the regular calendar/tournament recaps
+  hidden?: boolean; // personal straight bets only - admin-only toggle (Bets tab) to keep a
+                    // bet you only ever parlayed off the live board's straight-bets list,
+                    // without affecting its sync/grading or its use as a parlay leg
+  personalOrder?: number; // drag-and-drop display order among personal bets for the same
+                           // tournament - unset until you actually reorder something, at
+                           // which point it "crystallizes" the current order (see admin's
+                           // reorder handler); falls back to array order when unset
 };
 
 export const SEED: Bet[] = [

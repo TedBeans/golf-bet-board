@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../lib/mapping";
-import { parseBetType, trend, smartTrend, trendClassName, timeToMinutes, friendlyLabel, formatScore, parseScoreInput } from "../lib/betLogic";
+import { parseBetType, trend, smartTrend, trendClassName, timeToMinutes, friendlyLabel, formatScore, parseScoreInput, matchPlayStatus } from "../lib/betLogic";
 import { positionRank } from "../lib/positions";
-import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../lib/parlay";
+import { sortByPersonalOrder } from "../lib/personalOrder";
+import { Parlay, ParlayLegRef, LegStatus, resolveLegStatuses, deriveParlayStatus } from "../lib/parlay";
 import { computeUnitResult, formatUnits } from "../lib/units";
 import HoleScorecardModal from "./HoleScorecardModal";
 import GolfFlagIcon from "./GolfFlagIcon";
@@ -20,6 +21,84 @@ const RAINDROPS = Array.from({ length: 18 }).map((_, i) => ({
   delay: (i * 0.41) % 2.2,
   duration: 0.7 + (i % 5) * 0.09,
 }));
+
+// A parlay leg's live status line - what shows next to the player/bet text
+// while it's still in progress. Personal bet types get their own framing
+// (position for Top N/Winner, match-play up/down/All Square for H2H/Tie);
+// everything else falls back to the existing value-and-thru display.
+function legLiveDetail(bet: Bet): string {
+  const p = parseBetType(bet.bet);
+  if (p.label === "TOP_N" || p.label === "WINNER") {
+    return `${bet.auto?.position ?? "—"} thru ${bet.auto?.thru ?? "—"}`;
+  }
+  if (p.label === "H2H" || p.label === "TIE") {
+    const subjectThru = bet.auto?.thru ?? null;
+    const opponentThru = bet.auto?.opponentThru ?? null;
+    const thru = subjectThru !== null && opponentThru !== null
+      ? Math.min(subjectThru, opponentThru)
+      : subjectThru ?? opponentThru ?? null;
+    return `${matchPlayStatus(bet.auto?.scoreToPar ?? null, bet.auto?.opponentScoreToPar ?? null)} thru ${thru ?? "—"}`;
+  }
+  const valueDisplay = p.label === "SCORE" || p.label === "WINNER_SCORE" ? formatScore(bet.stat) : bet.stat ?? "—";
+  return `${valueDisplay} thru ${bet.thru ?? "—"}`;
+}
+
+// Badge color for a live personal leg - directional (currently ahead/tied/
+// behind), not a final result. Non-personal legs keep using the existing
+// smartTrend-driven coloring at the call site, which already handles
+// SCORE/GIR/BIRDIES/etc correctly.
+function legStatusClass(bet: Bet): "win" | "loss" | "live" {
+  const p = parseBetType(bet.bet);
+  if (p.label === "TOP_N" && p.topN !== undefined) {
+    const rank = positionRank(bet.auto?.position ?? null);
+    return rank !== null && rank <= p.topN ? "win" : "live";
+  }
+  if (p.label === "WINNER") {
+    return bet.auto?.position === "1" ? "win" : "live";
+  }
+  if (p.label === "H2H") {
+    const s = bet.auto?.scoreToPar ?? null;
+    const o = bet.auto?.opponentScoreToPar ?? null;
+    if (s === null || o === null) return "live";
+    return s < o ? "win" : s > o ? "loss" : "live";
+  }
+  if (p.label === "TIE") {
+    const s = bet.auto?.scoreToPar ?? null;
+    const o = bet.auto?.opponentScoreToPar ?? null;
+    if (s === null || o === null) return "live";
+    return s === o ? "win" : "loss";
+  }
+  return "live";
+}
+
+// One leg row, shared between the regular Parlays section and the TedBeans
+// Plays parlays sub-section - both need identical live-status rendering.
+function LegRow({ ls }: { ls: LegStatus }) {
+  if (ls.status === "live" && ls.bet) {
+    const badgeClass = ls.bet.personal
+      ? legStatusClass(ls.bet)
+      : (() => {
+          const t = smartTrend(parseBetType(ls.bet!.bet), ls.bet!.stat, ls.bet!.thru);
+          return t === "good" ? "win" : t === "bad" ? "loss" : t === "warn" ? "live" : "tbd";
+        })();
+    return (
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+        <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
+        <span className={`tsum ${badgeClass}`}>
+          LIVE | {legLiveDetail(ls.bet)}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+      <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
+      <span className={ls.status === "hit" ? "tsum win" : ls.status === "miss" ? "tsum loss" : "tsum tbd"}>
+        {ls.status === "hit" ? "WIN" : ls.status === "miss" ? "LOSS" : "TBD"}
+      </span>
+    </div>
+  );
+}
 
 export default function Page() {
   const [bets, setBets] = useState<Bet[] | null>(null);
@@ -149,9 +228,13 @@ export default function Page() {
   bets.forEach((b) => (counts[b.status] = (counts[b.status] || 0) + 1));
 
   const regularBets = bets.filter((b) => !b.personal);
-  const personalBets = bets.filter((b) => b.personal);
+  // hidden is an admin-only display toggle - the bet still exists, still
+  // syncs, and still works as a parlay leg (see LegRow/legLiveDetail above,
+  // which pull straight from bets/archive regardless of hidden), it's just
+  // suppressed from this standalone straight-bets list.
+  const personalBets = sortByPersonalOrder(bets.filter((b) => b.personal && !b.hidden));
   const regularParlays = liveParlays.filter((p) => !p.personal);
-  const personalParlays = liveParlays.filter((p) => p.personal);
+  const personalParlays = sortByPersonalOrder(liveParlays.filter((p) => p.personal));
 
   const groups: Record<string, Record<string, Bet[]>> = {};
   regularBets.forEach((b) => {
@@ -163,6 +246,9 @@ export default function Page() {
   // Personal plays are tournament-long, not per-round, so they're grouped
   // by tournament only - never by b.r (which is always the same constant
   // "TedBeans Plays" label for every one of them, see lib/parsePersonal.ts).
+  // personalBets is already sorted by drag-and-drop order above, and
+  // Object.keys/array push both preserve insertion order, so each group
+  // comes out already in the right display order too.
   const personalGroups: Record<string, Bet[]> = {};
   personalBets.forEach((b) => {
     (personalGroups[b.t] = personalGroups[b.t] || []).push(b);
@@ -488,33 +574,9 @@ export default function Page() {
                     </span>
                   </div>
                   <div style={{ marginTop: 8 }}>
-                    {legStatuses.map((ls, i) => {
-                      if (ls.status === "live" && ls.bet) {
-                        const legParsed = parseBetType(ls.bet.bet);
-                        const legTrend = smartTrend(legParsed, ls.bet.stat, ls.bet.thru);
-                        const valueDisplay = legParsed.label === "SCORE" || legParsed.label === "WINNER_SCORE"
-                          ? formatScore(ls.bet.stat)
-                          : ls.bet.stat ?? "—";
-                        return (
-                          <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-                            <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
-                            <span className={`tsum ${legTrend === "good" ? "win" : legTrend === "bad" ? "loss" : legTrend === "warn" ? "live" : "tbd"}`}>
-                              LIVE | {valueDisplay} thru {ls.bet.thru ?? "—"}
-                            </span>
-                          </div>
-                        );
-                      }
-                      return (
-                        <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-                          <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
-                          <span className={
-                            ls.status === "hit" ? "tsum win" : ls.status === "miss" ? "tsum loss" : "tsum tbd"
-                          }>
-                            {ls.status === "hit" ? "WIN" : ls.status === "miss" ? "LOSS" : "TBD"}
-                          </span>
-                        </div>
-                      );
-                    })}
+                    {legStatuses.map((ls, i) => (
+                      <LegRow key={i} ls={ls} />
+                    ))}
                   </div>
                 </div>
               );
@@ -647,14 +709,7 @@ export default function Page() {
                       </div>
                       <div style={{ marginTop: 8 }}>
                         {legStatuses.map((ls, i) => (
-                          <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-                            <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
-                            <span className={
-                              ls.status === "hit" ? "tsum win" : ls.status === "miss" ? "tsum loss" : ls.status === "live" ? "tsum live" : "tsum tbd"
-                            }>
-                              {ls.status === "hit" ? "WIN" : ls.status === "miss" ? "LOSS" : ls.status === "live" ? "LIVE" : "TBD"}
-                            </span>
-                          </div>
+                          <LegRow key={i} ls={ls} />
                         ))}
                       </div>
                     </div>

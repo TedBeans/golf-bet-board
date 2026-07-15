@@ -272,6 +272,21 @@ export function gradeMakeCut(
   return null; // within the line after round 1, waiting on round 2 to finish
 }
 
+// Formats an H2H/Tie matchup's live status the way match play is actually
+// described - "Up 2", "Down 1", "All Square" - rather than two raw scores
+// side by side. A positive diff (opponent's score minus the subject's)
+// means the subject is ahead, since a lower score is better in golf. Used
+// for both H2H (where being "up" is the point) and Tie bets (where seeing
+// exactly how far from level you are is still the useful signal).
+export function matchPlayStatus(subjectScoreToPar: number | null | undefined, opponentScoreToPar: number | null | undefined): string {
+  if (subjectScoreToPar === null || subjectScoreToPar === undefined || opponentScoreToPar === null || opponentScoreToPar === undefined) {
+    return "—";
+  }
+  const diff = opponentScoreToPar - subjectScoreToPar;
+  if (diff === 0) return "All Square";
+  return diff > 0 ? `Up ${diff}` : `Down ${Math.abs(diff)}`;
+}
+
 // Displays a to-par number the way golf actually reads it - "E" for even,
 // "+3" for over, "-2" for under - while the underlying value stays a plain
 // number (0, 3, -2) for all math and grading.

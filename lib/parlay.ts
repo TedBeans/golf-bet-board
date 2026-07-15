@@ -21,6 +21,8 @@ export type Parlay = {
   personal?: boolean; // true when every leg is a personal play (see lib/seed.ts's Bet.personal) -
                        // set automatically at creation time, tracked in its own "TedBeans Plays"
                        // sub-section rather than the regular Parlays section/recap tab
+  personalOrder?: number; // drag-and-drop display order among personal parlays - same
+                           // "crystallizes on first reorder" convention as Bet.personalOrder
 };
 
 export type LegStatus = { leg: ParlayLegRef; status: Bet["status"] | "unknown"; bet: Bet | null };

@@ -6,6 +6,7 @@ import { Bet } from "../../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
 import { parseCombinedText, ParseResult } from "../../lib/parseCombined";
 import { parsePersonalText, ParsePersonalResult } from "../../lib/parsePersonal";
+import { sortByPersonalOrder } from "../../lib/personalOrder";
 import { defaultUnitsToWinOne } from "../../lib/units";
 import { nowInCentral } from "../../lib/centralTime";
 import { Parlay, ParlayLegRef } from "../../lib/parlay";
@@ -515,6 +516,65 @@ export default function AdminPage() {
       });
   }
 
+  const [draggedBetId, setDraggedBetId] = useState<string | null>(null);
+  const [draggedParlayId, setDraggedParlayId] = useState<string | null>(null);
+
+  // Reorders a tournament's personal straight bets only - assigns fresh
+  // personalOrder values (0, 1, 2, ...) to just that tournament's personal
+  // bets, leaving every other bet's order untouched. Unordered bets sort by
+  // their existing array position until the first time you actually drag
+  // something (see lib/personalOrder.ts).
+  function reorderPersonalBets(tourn: string, draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
+    const tournBets = sortByPersonalOrder(bets.filter((b) => b.personal && b.t === tourn));
+    const fromIdx = tournBets.findIndex((b) => b.id === draggedId);
+    const toIdx = tournBets.findIndex((b) => b.id === targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const reordered = [...tournBets];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+    const orderMap = new Map(reordered.map((b, i) => [b.id, i]));
+    const updated = bets.map((b) => (orderMap.has(b.id) ? { ...b, personalOrder: orderMap.get(b.id) } : b));
+    setBets(updated);
+    fetch("/api/bets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, bets: updated }),
+    });
+  }
+
+  // Hidden is purely a live-board display toggle - the bet keeps syncing
+  // and grading normally in the background, and still works as a parlay
+  // leg, since it's just filtered out of the standalone straight-bets list.
+  function togglePersonalHidden(betId: string) {
+    const updated = bets.map((b) => (b.id === betId ? { ...b, hidden: !b.hidden } : b));
+    setBets(updated);
+    fetch("/api/bets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, bets: updated }),
+    });
+  }
+
+  function reorderPersonalParlays(draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
+    const personalOnly = sortByPersonalOrder(liveParlays.filter((p) => p.personal));
+    const fromIdx = personalOnly.findIndex((p) => p.id === draggedId);
+    const toIdx = personalOnly.findIndex((p) => p.id === targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const reordered = [...personalOnly];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+    const orderMap = new Map(reordered.map((p, i) => [p.id, i]));
+    const updated = liveParlays.map((p) => (orderMap.has(p.id) ? { ...p, personalOrder: orderMap.get(p.id) } : p));
+    setLiveParlays(updated);
+    fetch("/api/parlays", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, parlays: updated }),
+    });
+  }
+
   function backfillMissingUnits() {
     const liveFixed = bets.map((b) =>
       b.oddsPrice && !b.oddsUnits ? { ...b, oddsUnits: String(defaultUnitsToWinOne(b.oddsPrice)) } : b
@@ -871,6 +931,70 @@ export default function AdminPage() {
         </div>
       )}
       {personalMsg && <div className="subline" style={{ marginTop: 8 }}>{personalMsg}</div>}
+
+      <h1 style={{ marginTop: 36, marginBottom: 4 }}>Manage TedBeans Plays</h1>
+      <div className="subline" style={{ marginBottom: 12 }}>
+        Drag to reorder how these show up on the live board - grouped by
+        tournament for straight bets, separately for parlays. Hiding a
+        straight bet only removes it from the live board's straight-bets
+        list; it keeps syncing and grading normally in the background, and
+        still works exactly the same as a parlay leg.
+      </div>
+
+      {Object.entries(
+        bets.filter((b) => b.personal).reduce((acc: Record<string, Bet[]>, b) => {
+          (acc[b.t] = acc[b.t] || []).push(b);
+          return acc;
+        }, {})
+      ).map(([tourn, tournBets]) => (
+        <div key={tourn} className="card" style={{ marginBottom: 14 }}>
+          <div className="player" style={{ fontSize: 13, marginBottom: 8 }}>{tourn}</div>
+          {sortByPersonalOrder(tournBets).map((b) => (
+            <div
+              key={b.id}
+              draggable
+              onDragStart={() => setDraggedBetId(b.id)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => draggedBetId && reorderPersonalBets(tourn, draggedBetId, b.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "6px 4px",
+                marginBottom: 4, cursor: "grab", opacity: b.hidden ? 0.5 : 1,
+                borderRadius: 3, background: draggedBetId === b.id ? "rgba(228,190,74,0.08)" : "transparent",
+              }}
+            >
+              <span style={{ color: "var(--cream-dim)", fontSize: 14 }}>⠿</span>
+              <span style={{ color: "var(--cream)", fontSize: 12, flex: 1 }}>{b.player} · {b.bet}</span>
+              {b.hidden && <span className="subline" style={{ margin: 0, fontSize: 10 }}>hidden</span>}
+              <button className="recap-btn" style={{ fontSize: 9, padding: "4px 8px" }} onClick={() => togglePersonalHidden(b.id)}>
+                {b.hidden ? "Unhide" : "Hide"}
+              </button>
+            </div>
+          ))}
+        </div>
+      ))}
+
+      {liveParlays.filter((p) => p.personal).length > 0 && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="player" style={{ fontSize: 13, marginBottom: 8 }}>Personal parlays</div>
+          {sortByPersonalOrder(liveParlays.filter((p) => p.personal)).map((p) => (
+            <div
+              key={p.id}
+              draggable
+              onDragStart={() => setDraggedParlayId(p.id)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => draggedParlayId && reorderPersonalParlays(draggedParlayId, p.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "6px 4px",
+                marginBottom: 4, cursor: "grab", borderRadius: 3,
+                background: draggedParlayId === p.id ? "rgba(228,190,74,0.08)" : "transparent",
+              }}
+            >
+              <span style={{ color: "var(--cream-dim)", fontSize: 14 }}>⠿</span>
+              <span style={{ color: "var(--cream)", fontSize: 12, flex: 1 }}>{p.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <h1 style={{ marginTop: 36, marginBottom: 4 }}>Live board rounds</h1>
       <div className="subline" style={{ marginBottom: 12 }}>
