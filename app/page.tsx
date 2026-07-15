@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Bet } from "../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../lib/mapping";
 import { parseBetType, trend, smartTrend, trendClassName, timeToMinutes, friendlyLabel, formatScore, parseScoreInput } from "../lib/betLogic";
+import { positionRank } from "../lib/positions";
 import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../lib/parlay";
 import { computeUnitResult, formatUnits } from "../lib/units";
 import HoleScorecardModal from "./HoleScorecardModal";
@@ -147,11 +148,24 @@ export default function Page() {
   const counts = { hit: 0, miss: 0, live: 0, pending: 0 } as Record<string, number>;
   bets.forEach((b) => (counts[b.status] = (counts[b.status] || 0) + 1));
 
+  const regularBets = bets.filter((b) => !b.personal);
+  const personalBets = bets.filter((b) => b.personal);
+  const regularParlays = liveParlays.filter((p) => !p.personal);
+  const personalParlays = liveParlays.filter((p) => p.personal);
+
   const groups: Record<string, Record<string, Bet[]>> = {};
-  bets.forEach((b) => {
+  regularBets.forEach((b) => {
     groups[b.t] = groups[b.t] || {};
     groups[b.t][b.r] = groups[b.t][b.r] || [];
     groups[b.t][b.r].push(b);
+  });
+
+  // Personal plays are tournament-long, not per-round, so they're grouped
+  // by tournament only - never by b.r (which is always the same constant
+  // "TedBeans Plays" label for every one of them, see lib/parsePersonal.ts).
+  const personalGroups: Record<string, Bet[]> = {};
+  personalBets.forEach((b) => {
+    (personalGroups[b.t] = personalGroups[b.t] || []).push(b);
   });
 
   const tournamentOrder = Object.keys(groups).sort((a, b) => {
@@ -451,7 +465,7 @@ export default function Page() {
           );
         })}
 
-        {liveParlays.length > 0 && (
+        {regularParlays.length > 0 && (
           <div className="tourn">
             <div className="tourn-head">
               <h2>Parlays</h2>
@@ -459,7 +473,7 @@ export default function Page() {
                 Tracked separately from straight-bet units
               </span>
             </div>
-            {liveParlays.map((p) => {
+            {regularParlays.map((p) => {
               const legStatuses = resolveLegStatuses(p.legs, bets, archive);
               const status = deriveParlayStatus(legStatuses);
               return (
@@ -505,6 +519,149 @@ export default function Page() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {(personalBets.length > 0 || personalParlays.length > 0) && (
+          <div className="tourn">
+            <div className="tourn-head">
+              <h2>TedBeans Plays</h2>
+              <span className="subline" style={{ marginTop: 0, textTransform: "none", letterSpacing: 0 }}>
+                Personal props - tracked separately from straight bets/parlays and excluded from the regular recaps
+              </span>
+            </div>
+
+            {Object.keys(personalGroups).map((tourn) => (
+              <div key={tourn}>
+                <div className="round-label">{tourn}</div>
+                {personalGroups[tourn].map((b) => {
+                  const parsed = parseBetType(b.bet);
+                  const posRank = positionRank(b.auto?.position ?? null);
+                  const inTopN = parsed.label === "TOP_N" && parsed.topN !== undefined && posRank !== null && posRank <= parsed.topN;
+                  const cutLine = mapping.tournaments[tourn]?.cutLine;
+                  return (
+                    <div className={`card ${b.status}`} key={b.id}>
+                      <div className="card-top">
+                        <div className="who">
+                          <div style={{ position: "relative", display: "inline-block" }}>
+                            <div
+                              className="player"
+                              style={{ cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--cream-dim)" }}
+                              onClick={() =>
+                                openScorecard(
+                                  b.id,
+                                  tourn,
+                                  parsed.h2hScope === "round" && parsed.h2hRoundNum ? `Round ${parsed.h2hRoundNum}` : b.r,
+                                  b.player
+                                )
+                              }
+                            >
+                              {b.player}
+                            </div>
+                            {scorecardModal?.betId === b.id && (
+                              <HoleScorecardModal
+                                player={scorecardModal.player}
+                                loading={scorecardModal.loading}
+                                scorecard={scorecardModal.scorecard}
+                                message={scorecardModal.message}
+                                onClose={() => setScorecardModal(null)}
+                              />
+                            )}
+                          </div>
+                          <div className="bet-text">{b.bet}</div>
+                          {b.oddsPrice && (
+                            <div className="odds-line">{b.sportsbook || "DK"} {b.oddsPrice} · {b.oddsUnits}u</div>
+                          )}
+                        </div>
+                        <div className="status-btns">
+                          {b.status === "pending" && <span className="tbd-badge">TBD</span>}
+                          <button
+                            disabled={!unlocked}
+                            className={`sbtn win ${b.status === "hit" ? "active" : ""}`}
+                            onClick={() => cycleStatus(b.id, "hit")}
+                          >
+                            WIN
+                          </button>
+                          <button
+                            disabled={!unlocked}
+                            className={`sbtn live ${b.status === "live" ? "active" : ""}`}
+                            onClick={() => cycleStatus(b.id, "live")}
+                          >
+                            IN PROGRESS
+                          </button>
+                          <button
+                            disabled={!unlocked}
+                            className={`sbtn loss ${b.status === "miss" ? "active" : ""}`}
+                            onClick={() => cycleStatus(b.id, "miss")}
+                          >
+                            LOSS
+                          </button>
+                        </div>
+                      </div>
+                      <div className="auto-row">
+                        <span className="detail-strip">
+                          {parsed.label === "MAKE_CUT" ? (
+                            <>
+                              Round 1 {formatScore(b.auto?.scoreToPar ?? null)} thru {b.auto?.thru ?? "—"}
+                              {" · "}
+                              {cutLine !== undefined ? `Cut line ${formatScore(cutLine)}` : "cut line not set yet"}
+                            </>
+                          ) : parsed.label === "H2H" ? (
+                            <>
+                              {b.player} {formatScore(b.auto?.scoreToPar ?? null)} vs {parsed.h2hOpponent}{" "}
+                              {formatScore(b.auto?.opponentScoreToPar ?? null)}
+                              {" · "}thru {b.auto?.thru ?? "—"}/{b.auto?.opponentThru ?? "—"}
+                            </>
+                          ) : (
+                            <>
+                              <span className={inTopN ? "detail-hi" : ""}>
+                                Position {b.auto?.position ?? "—"} ({formatScore(b.auto?.scoreToPar ?? null)})
+                              </span>
+                              {" · "}thru {b.auto?.thru ?? "—"}
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+
+            {personalParlays.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <div className="round-label">Parlays</div>
+                {personalParlays.map((p) => {
+                  const legStatuses = resolveLegStatuses(p.legs, bets, archive);
+                  const status = deriveParlayStatus(legStatuses);
+                  return (
+                    <div className={`card ${status}`} key={p.id}>
+                      <div className="card-top">
+                        <div className="who">
+                          <div className="player">{p.label}</div>
+                          <div className="bet-text">{p.oddsPrice} · {p.wagerUnits}u</div>
+                        </div>
+                        <span className={`sbtn ${status === "hit" ? "win active" : status === "miss" ? "loss active" : status === "live" ? "live active" : ""}`} style={{ cursor: "default" }}>
+                          {status === "hit" ? "WIN" : status === "miss" ? "LOSS" : status === "live" ? "IN PROGRESS" : "TBD"}
+                        </span>
+                      </div>
+                      <div style={{ marginTop: 8 }}>
+                        {legStatuses.map((ls, i) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                            <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
+                            <span className={
+                              ls.status === "hit" ? "tsum win" : ls.status === "miss" ? "tsum loss" : ls.status === "live" ? "tsum live" : "tsum tbd"
+                            }>
+                              {ls.status === "hit" ? "WIN" : ls.status === "miss" ? "LOSS" : ls.status === "live" ? "LIVE" : "TBD"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </main>

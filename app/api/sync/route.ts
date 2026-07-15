@@ -5,10 +5,11 @@ import { Mapping } from "../../../lib/mapping";
 import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../../../lib/parlay";
 import { fetchPgaLeaderboard, fetchPlayerScorecardStats, fetchPlayerHoleScores } from "../../../lib/pgatour";
 import { extractPlayers, findPlayerMatch, findLeader, PgaPlayerRow } from "../../../lib/pgaMatch";
-import { extractScorecardStats, roundNumberFromLabel, computeSegmentStats } from "../../../lib/pgaScorecard";
+import { extractScorecardStats, roundNumberFromLabel, computeSegmentStats, computeFullRoundStats } from "../../../lib/pgaScorecard";
 import { fetchOpenLeaderboard } from "../../../lib/theopen";
 import { extractOpenPlayers, findOpenPlayerMatch, findOpenLeader, computeOpenStats, OpenPlayerRow } from "../../../lib/openMatch";
-import { parseBetType, autoGradeStatus, timeToMinutes } from "../../../lib/betLogic";
+import { parseBetType, autoGradeStatus, timeToMinutes, gradeMakeCut } from "../../../lib/betLogic";
+import { computePositions, PositionEntry } from "../../../lib/positions";
 import { nowInCentral } from "../../../lib/centralTime";
 
 const SYNC_LOCK_MS = 45000;
@@ -43,8 +44,51 @@ export async function GET() {
   const leaderboardCache = new Map<string, PgaPlayerRow[]>();
   const scorecardCache = new Map<string, any>();
   let openPlayersCache: OpenPlayerRow[] | null = null;
+  // Field-wide position rankings for personal Winner/Top N bets - computed
+  // once per tournament per sync pass (several personal bets often share
+  // the same tournament), not once per bet.
+  const positionsCache = new Map<string, Map<string, string>>();
   let updatedCount = 0;
   const { dateStr: todayCentral, minutes: nowMinutes, dateTimeStr: nowCentralDT } = nowInCentral();
+
+  // Shared round-stat lookups for personal plays (Make Cut, H2H) - both
+  // return a specific round's thru/score-to-par (or the tournament-wide
+  // cumulative total when roundNum is null), regardless of which round is
+  // "currently active" tournament-wide, unlike a leaderboard row's own
+  // score/thru fields. theopen.com already has this per hole in the cached
+  // leaderboard payload; PGA Tour needs the same hole-by-hole fetch the
+  // Front 9/Back 9 branch below already uses, cached the same way.
+  async function getOpenRoundStat(openPlayers: OpenPlayerRow[], playerName: string, roundNum: number | null) {
+    const row = findOpenPlayerMatch(playerName, openPlayers);
+    if (!row) return null;
+    if (roundNum === null) {
+      const agg = computeOpenStats(row, null);
+      return { id: row.id, thru: agg.holesPlayed || null, scoreToPar: agg.holesPlayed > 0 ? agg.totalToPar : null };
+    }
+    const r = computeOpenStats(row, roundNum);
+    return { id: row.id, thru: r.thru, scoreToPar: r.scoreToPar };
+  }
+
+  async function getPgaRoundStat(tournamentId: string, pgaPlayers: PgaPlayerRow[], playerName: string, roundNum: number | null) {
+    const row = findPlayerMatch(playerName, pgaPlayers);
+    if (!row) return null;
+    if (roundNum === null) {
+      return { id: row.id, thru: null as number | null, scoreToPar: row.total };
+    }
+    const key = `holes:${tournamentId}:${row.id}`;
+    let holeJson = scorecardCache.get(key);
+    if (holeJson === undefined) {
+      try {
+        holeJson = await fetchPlayerHoleScores(tournamentId, row.id);
+      } catch {
+        holeJson = null;
+      }
+      scorecardCache.set(key, holeJson);
+    }
+    if (!holeJson) return { id: row.id, thru: null as number | null, scoreToPar: null as number | null };
+    const stats = computeFullRoundStats(holeJson, roundNum);
+    return { id: row.id, thru: stats?.thru ?? null, scoreToPar: stats?.scoreToPar ?? null };
+  }
 
   // Auto-lift any suspension whose resume time has already passed, so both
   // the overlay and the fetch-blocking clear on their own.
@@ -78,7 +122,10 @@ export async function GET() {
 
     // Auto-promote TBD -> IN PROGRESS once its scheduled tee time (Central)
     // arrives - this is what actually opens the door to fetching for it.
-    if (bet.status === "pending") {
+    // Personal plays skip this entirely: they're tournament-long, start out
+    // already "live" at creation (see lib/parsePersonal.ts), and have no
+    // single tee time to gate on.
+    if (!bet.personal && bet.status === "pending") {
       const teeMinutes = timeToMinutes(bet.time);
       const dateReached = !bet.loadedDate || todayCentral >= bet.loadedDate;
       if (dateReached && nowMinutes >= teeMinutes) {
@@ -97,6 +144,160 @@ export async function GET() {
 
     try {
       const parsed = parseBetType(bet.bet);
+
+      // Personal plays: a completely separate handling path, but reusing
+      // the exact same leaderboard/openPlayers caches as everything else
+      // below (same tournament, same dataSource) rather than fetching
+      // anything twice.
+      if (bet.personal) {
+        const useOpen = tournamentMap.dataSource === "theopen";
+
+        if (useOpen) {
+          if (!openPlayersCache) {
+            const raw = await fetchOpenLeaderboard();
+            openPlayersCache = extractOpenPlayers(raw);
+          }
+        } else if (!leaderboardCache.get(tournamentId)) {
+          const raw = await fetchPgaLeaderboard(tournamentId);
+          leaderboardCache.set(tournamentId, extractPlayers(raw));
+        }
+        const openPlayers = useOpen ? openPlayersCache! : null;
+        const pgaPlayers = useOpen ? null : leaderboardCache.get(tournamentId)!;
+
+        if (parsed.label === "WINNER" || parsed.label === "TOP_N") {
+          // Live position only - both settle by hand per TedBeans' own
+          // call, never auto-graded.
+          let positions = positionsCache.get(bet.t);
+          if (!positions) {
+            const entries: PositionEntry[] = useOpen
+              ? openPlayers!.map((p) => {
+                  const s = computeOpenStats(p, null);
+                  return { id: p.id, totalToPar: s.holesPlayed > 0 ? s.totalToPar : null };
+                })
+              : pgaPlayers!.map((p) => ({ id: p.id, totalToPar: p.total }));
+            positions = computePositions(entries);
+            positionsCache.set(bet.t, positions);
+          }
+
+          const stat = useOpen
+            ? await getOpenRoundStat(openPlayers!, bet.player, null)
+            : await getPgaRoundStat(tournamentId, pgaPlayers!, bet.player, null);
+          if (!stat) {
+            errors.push(`${bet.player}: no match on leaderboard (personal play)`);
+            continue;
+          }
+
+          bet.thru = stat.thru;
+          bet.stat = stat.scoreToPar;
+          bet.auto = {
+            thru: stat.thru,
+            scoreToPar: stat.scoreToPar,
+            birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
+            updatedAt: new Date().toISOString(),
+            position: positions.get(stat.id) ?? null,
+          };
+          updatedCount += 1;
+          continue;
+        }
+
+        if (parsed.label === "MAKE_CUT") {
+          const r1 = useOpen
+            ? await getOpenRoundStat(openPlayers!, bet.player, 1)
+            : await getPgaRoundStat(tournamentId, pgaPlayers!, bet.player, 1);
+          const r2 = useOpen
+            ? await getOpenRoundStat(openPlayers!, bet.player, 2)
+            : await getPgaRoundStat(tournamentId, pgaPlayers!, bet.player, 2);
+
+          if (!r1) {
+            errors.push(`${bet.player}: no match on leaderboard (personal play)`);
+            continue;
+          }
+
+          bet.thru = r1.thru;
+          bet.stat = r1.scoreToPar;
+          bet.auto = {
+            thru: r1.thru,
+            scoreToPar: r1.scoreToPar,
+            birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
+            updatedAt: new Date().toISOString(),
+          };
+
+          const graded = gradeMakeCut(
+            { thru: r1.thru, scoreToPar: r1.scoreToPar },
+            { thru: r2?.thru ?? null, scoreToPar: r2?.scoreToPar ?? null },
+            tournamentMap.cutLine
+          );
+          if (graded) bet.status = graded;
+
+          updatedCount += 1;
+          continue;
+        }
+
+        if (parsed.label === "H2H") {
+          const roundNum = parsed.h2hScope === "round" ? parsed.h2hRoundNum ?? null : null;
+          const opponentName = parsed.h2hOpponent || "";
+
+          const subjectStat = useOpen
+            ? await getOpenRoundStat(openPlayers!, bet.player, roundNum)
+            : await getPgaRoundStat(tournamentId, pgaPlayers!, bet.player, roundNum);
+          const opponentStat = useOpen
+            ? await getOpenRoundStat(openPlayers!, opponentName, roundNum)
+            : await getPgaRoundStat(tournamentId, pgaPlayers!, opponentName, roundNum);
+
+          if (!subjectStat || !opponentStat) {
+            errors.push(`${bet.player} vs ${opponentName}: couldn't match both players on the leaderboard`);
+            continue;
+          }
+
+          bet.thru = subjectStat.thru;
+          bet.stat = subjectStat.scoreToPar;
+          bet.auto = {
+            thru: subjectStat.thru,
+            scoreToPar: subjectStat.scoreToPar,
+            birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
+            updatedAt: new Date().toISOString(),
+            opponentScoreToPar: opponentStat.scoreToPar,
+            opponentThru: opponentStat.thru,
+          };
+
+          // Always grades on better score for the scope, per TedBeans' own
+          // call. Round scope: both already fetched for that exact round,
+          // so just check both are thru 18. Tournament scope: needs both
+          // players to have finished round 4 specifically - a player who
+          // missed the cut never reaches round 4, so a missed-cut pairing
+          // simply never auto-grades here (safer than guessing at a "made
+          // the cut" signal neither feed reliably exposes) and needs
+          // settling by hand, same as Winner/Top N already do.
+          const FINAL_ROUND = 4;
+          let bothFinished: boolean;
+          if (parsed.h2hScope === "round") {
+            bothFinished = subjectStat.thru === 18 && opponentStat.thru === 18;
+          } else {
+            const subjectFinal = useOpen
+              ? await getOpenRoundStat(openPlayers!, bet.player, FINAL_ROUND)
+              : await getPgaRoundStat(tournamentId, pgaPlayers!, bet.player, FINAL_ROUND);
+            const opponentFinal = useOpen
+              ? await getOpenRoundStat(openPlayers!, opponentName, FINAL_ROUND)
+              : await getPgaRoundStat(tournamentId, pgaPlayers!, opponentName, FINAL_ROUND);
+            bothFinished = subjectFinal?.thru === 18 && opponentFinal?.thru === 18;
+          }
+
+          if (bothFinished && subjectStat.scoreToPar !== null && opponentStat.scoreToPar !== null) {
+            if (subjectStat.scoreToPar < opponentStat.scoreToPar) bet.status = "hit";
+            else if (subjectStat.scoreToPar > opponentStat.scoreToPar) bet.status = "miss";
+            // An exact tie: most books push (refund) a head-to-head rather
+            // than lose it, and there's no "push" status here yet - leave
+            // it for you to settle by hand rather than guessing it as a loss.
+          }
+
+          updatedCount += 1;
+          continue;
+        }
+
+        // Unrecognized personal bet type - shouldn't happen given the
+        // parser, but leave it alone rather than guessing at anything.
+        continue;
+      }
 
       if (tournamentMap.dataSource === "theopen") {
         // theopen.com's own feed: everything (score, birdies, bogeys, pars)

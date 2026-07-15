@@ -18,6 +18,9 @@ export type Parlay = {
   status: "pending" | "live" | "hit" | "miss";
   loadedDate: string;
   archivedAt?: string;
+  personal?: boolean; // true when every leg is a personal play (see lib/seed.ts's Bet.personal) -
+                       // set automatically at creation time, tracked in its own "TedBeans Plays"
+                       // sub-section rather than the regular Parlays section/recap tab
 };
 
 export type LegStatus = { leg: ParlayLegRef; status: Bet["status"] | "unknown"; bet: Bet | null };

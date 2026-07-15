@@ -126,6 +126,31 @@ export function computeSegmentStats(
   return { thru, scoreToPar };
 }
 
+// Full-round (all 18 holes) equivalent of computeSegmentStats above - used
+// by personal Make Cut and round-scoped H2H bets, which need a specific
+// round's thru/score-to-par regardless of which round is currently "active"
+// tournament-wide (unlike the regular leaderboard row's score/thru, which
+// only ever reflects whatever round is live right now). Kept as a separate
+// function rather than making segment optional on computeSegmentStats, so
+// that already-shipped function's signature never has to change.
+export function computeFullRoundStats(json: any, roundNumber: number): { thru: number; scoreToPar: number } | null {
+  const rounds: any[] = json?.roundScores || [];
+  const round = rounds.find((r: any) => r.roundNumber === roundNumber);
+  if (!round) return null;
+
+  const allHoles = [...(round.firstNine?.holes || []), ...(round.secondNine?.holes || [])];
+
+  let thru = 0;
+  let scoreToPar = 0;
+  for (const h of allHoles) {
+    if (h.score && h.score !== "-") {
+      thru += 1;
+      scoreToPar += parseInt(h.score, 10) - h.par;
+    }
+  }
+  return { thru, scoreToPar };
+}
+
 export type HoleScore = { hole: number; par: number; score: number | null; status: string | null };
 export type HoleScorecard = {
   firstNine: HoleScore[]; // whichever nine was actually played first

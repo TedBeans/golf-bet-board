@@ -12,6 +12,10 @@ export type AutoStats = {
   fairways: string | null;
   updatedAt: string | null;
   leaderName?: string | null; // only set for tournament-long "winning score" bets
+  position?: string | null; // personal Winner/Top N bets only - live leaderboard position
+                             // computed ourselves (e.g. "T7"), ties handled via lib/positions.ts
+  opponentScoreToPar?: number | null; // personal H2H bets only - the opponent's score for the same scope
+  opponentThru?: number | null; // personal H2H bets only - opponent's holes completed for that scope
 };
 
 export type Bet = {
@@ -32,6 +36,9 @@ export type Bet = {
   oddsUnits?: string | null; // e.g. "1.12"
   loadedDate?: string; // "YYYY-MM-DD" - the day these bets were loaded onto the board
   archivedAt?: string; // ISO timestamp - when this bet moved to the recap
+  personal?: boolean; // TedBeans' own tournament-long props (Winner/Top N/Make Cut/H2H) -
+                       // tracked in their own "TedBeans Plays" section/recap tab, never
+                       // mixed into the regular calendar/tournament recaps
 };
 
 export const SEED: Bet[] = [

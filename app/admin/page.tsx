@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Bet } from "../../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
 import { parseCombinedText, ParseResult } from "../../lib/parseCombined";
+import { parsePersonalText, ParsePersonalResult } from "../../lib/parsePersonal";
 import { defaultUnitsToWinOne } from "../../lib/units";
 import { nowInCentral } from "../../lib/centralTime";
 import { Parlay, ParlayLegRef } from "../../lib/parlay";
@@ -59,6 +60,11 @@ export default function AdminPage() {
   const [betsDate, setBetsDate] = useState(() => nowInCentral().dateStr);
   const [preview, setPreview] = useState<ParseResult | null>(null);
   const [importMsg, setImportMsg] = useState("");
+
+  const [personalText, setPersonalText] = useState("");
+  const [personalDate, setPersonalDate] = useState(() => nowInCentral().dateStr);
+  const [personalPreview, setPersonalPreview] = useState<ParsePersonalResult | null>(null);
+  const [personalMsg, setPersonalMsg] = useState("");
 
   const [winnerTournament, setWinnerTournament] = useState("");
   const [winnerSide, setWinnerSide] = useState<"Under" | "Over">("Under");
@@ -300,6 +306,9 @@ export default function AdminPage() {
     const legs: ParlayLegRef[] = pickableBets
       .filter((b) => selectedLegIds.has(b.id))
       .map((b) => ({ betId: b.id, player: b.player, bet: b.bet, tournament: b.t, round: b.r }));
+    const allLegsPersonal = pickableBets
+      .filter((b) => selectedLegIds.has(b.id))
+      .every((b) => b.personal === true);
 
     const parlay: Parlay = {
       id: "parlay_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
@@ -310,6 +319,7 @@ export default function AdminPage() {
       wagerUnits: Math.round((dollars / (settings.unitSizeDollars || 50)) * 100) / 100,
       status: "pending",
       loadedDate: parlayDate,
+      personal: allLegsPersonal,
     };
 
     fetch("/api/parlays", {
@@ -469,6 +479,38 @@ export default function AdminPage() {
           setBetsDate(nowInCentral().dateStr);
         } else {
           setImportMsg("Failed to save - check passcode.");
+        }
+      });
+  }
+
+  function previewPersonal() {
+    setPersonalMsg("");
+    setPersonalPreview(parsePersonalText(personalText, personalDate));
+  }
+
+  function confirmPersonal() {
+    if (!personalPreview || personalPreview.bets.length === 0) return;
+
+    fetch("/api/bets")
+      .then((r) => r.json())
+      .then((d) => {
+        const current: Bet[] = d.bets || [];
+        const merged = [...current, ...personalPreview.bets];
+        return fetch("/api/bets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ passcode, bets: merged }),
+        }).then((r) => ({ r, merged }));
+      })
+      .then(({ r, merged }) => {
+        if (r.ok) {
+          setPersonalMsg(`Added ${personalPreview.bets.length} personal play(s) to "TedBeans Plays."`);
+          setBets(merged);
+          setPersonalPreview(null);
+          setPersonalText("");
+          setPersonalDate(nowInCentral().dateStr);
+        } else {
+          setPersonalMsg("Failed to save - check passcode.");
         }
       });
   }
@@ -753,6 +795,83 @@ export default function AdminPage() {
         {winnerMsg && <div className="subline" style={{ marginTop: 8 }}>{winnerMsg}</div>}
       </div>
 
+      <h1 style={{ marginTop: 36, marginBottom: 4 }}>TedBeans Plays</h1>
+      <div className="subline" style={{ marginBottom: 12 }}>
+        Your own personal props - outright Winner, Top N finish, Make Cut,
+        or H2H matchups - kept in their own section on the live board and
+        their own recap tab, never mixed into the regular calendar/tournament
+        recaps. Just the tournament name on its own line (no round header -
+        these are tournament-long), then one bet per line:
+      </div>
+      <div className="bet-text" style={{ marginBottom: 12, whiteSpace: "pre-wrap" }}>
+        {"The Open Championship\nWyndham Clark Top 10 +450 (DK) for 25 units\nAkshay Bhatia Winner +8000 (DK) for 10 units\nSomeone Else Make Cut -200 (DK) for 5 units\nWyndham Clark vs Jon Rahm Round 1 +110 (DK) for 1 unit"}
+      </div>
+      <div className="subline" style={{ marginBottom: 12 }}>
+        Winner and Top N show a live leaderboard position but settle by
+        hand. Make Cut auto-grades once your round 2 is finished (set the
+        tournament's cut line on the Tournaments tab first). H2H always
+        auto-grades on whoever named first having the better score for the
+        stated scope, once both players finish it. For your 4-way top-10
+        parlay: paste the 4 "Top N" lines below, then combine them on the
+        Parlays tab as usual.
+      </div>
+      <label style={{ display: "block", marginBottom: 12, fontSize: 12 }}>
+        These plays are for (recap date)
+        <input
+          type="date"
+          value={personalDate}
+          onChange={(e) => setPersonalDate(e.target.value)}
+          style={{
+            display: "block", width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)",
+            border: "1px solid var(--line)", color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace",
+            fontSize: 13, padding: "8px 10px", borderRadius: 3,
+          }}
+        />
+      </label>
+      <textarea
+        value={personalText}
+        onChange={(e) => setPersonalText(e.target.value)}
+        placeholder={"The Open Championship\nWyndham Clark Top 10 +450 (DK) for 25 units\n..."}
+        rows={6}
+        style={{
+          width: "100%", background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+          color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 12,
+          padding: "10px", borderRadius: 4, marginBottom: 8, resize: "vertical",
+        }}
+      />
+      <button className="add-btn-inline" onClick={previewPersonal} style={{ marginRight: 8 }}>
+        Preview
+      </button>
+
+      {personalPreview && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <div className="player" style={{ marginBottom: 8 }}>
+            {personalPreview.bets.length} personal play{personalPreview.bets.length === 1 ? "" : "s"} parsed
+          </div>
+          {personalPreview.bets.map((b) => (
+            <div key={b.id} className="bet-text" style={{ marginBottom: 4 }}>
+              {b.t} · <b style={{ color: "var(--cream)" }}>{b.player}</b> · {b.bet} · {b.sportsbook || "DK"} {b.oddsPrice ?? "—"} · {b.oddsUnits}u
+            </div>
+          ))}
+          {personalPreview.warnings.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              {personalPreview.warnings.map((w, i) => (
+                <div key={i} className="lock-error" style={{ marginBottom: 4 }}>{w}</div>
+              ))}
+            </div>
+          )}
+          <button
+            className="add-btn-inline"
+            onClick={confirmPersonal}
+            disabled={personalPreview.bets.length === 0}
+            style={{ marginTop: 12, width: "100%", padding: 10 }}
+          >
+            Add these {personalPreview.bets.length} play(s) to TedBeans Plays
+          </button>
+        </div>
+      )}
+      {personalMsg && <div className="subline" style={{ marginTop: 8 }}>{personalMsg}</div>}
+
       <h1 style={{ marginTop: 36, marginBottom: 4 }}>Live board rounds</h1>
       <div className="subline" style={{ marginBottom: 12 }}>
         Rounds archive to the recap automatically once every bet in them is
@@ -908,7 +1027,7 @@ export default function AdminPage() {
           pgaId: string; suspendedType: string; suspendedUntil: string; dateRange: string;
           venue: string; location: string; latitude: number; longitude: number;
           startDate: string; endDate: string; notes: string; upcoming: boolean; roundPar: number;
-          front9Par: number; back9Par: number; dataSource: string;
+          front9Par: number; back9Par: number; dataSource: string; cutLine: number;
         }>) {
           setMapping((m) => ({
             ...m,
@@ -1013,6 +1132,22 @@ export default function AdminPage() {
                 />
               </label>
             </div>
+
+            <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
+              Cut line (score-to-par, e.g. 2 for "+2") - for TedBeans' personal
+              "Make Cut" plays. Leave blank until the real cut is announced;
+              nothing grades until it's set.
+              <input
+                placeholder="e.g. 2"
+                value={tm?.cutLine ?? ""}
+                onChange={(e) => updateTourn({ cutLine: e.target.value === "" ? (undefined as any) : parseInt(e.target.value, 10) })}
+                style={{
+                  width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                  color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                  padding: "8px 10px", borderRadius: 3,
+                }}
+              />
+            </label>
 
             <div style={{ borderTop: "1px solid var(--line)", marginTop: 14, paddingTop: 14 }}>
               <div className="subline" style={{ marginBottom: 8 }}>For the "upcoming this week" widget on the live board</div>
@@ -1217,6 +1352,11 @@ export default function AdminPage() {
               <input type="checkbox" checked={selectedLegIds.has(b.id)} onChange={() => toggleLeg(b.id)} />
               <span style={{ color: "var(--cream)" }}>{b.player}</span>
               <span style={{ color: "var(--cream-dim)" }}>{b.bet}</span>
+              {b.personal && (
+                <span style={{ fontSize: 9, color: "var(--gold-bright)", border: "1px solid var(--gold-bright)", borderRadius: 3, padding: "1px 5px" }}>
+                  TedBeans
+                </span>
+              )}
               <span
                 className={`tsum ${b.status === "hit" ? "win" : b.status === "miss" ? "loss" : b.status === "live" ? "live" : "tbd"}`}
                 style={{ marginLeft: "auto" }}

@@ -25,6 +25,10 @@ export type Mapping = {
                                            // theopen.com relays its own data for The Open Championship;
                                            // PGA Tour's feed may or may not carry it - this lets you
                                            // flip a single tournament over to the fallback with no code change.
+      cutLine?: number; // score-to-par cutoff (e.g. 2 for "+2") - enter this once the real cut is
+                         // announced. Personal "Make Cut" plays auto-grade off this the moment each
+                         // player's round 2 is fully finished; leave unset before the cut happens
+                         // (nothing grades until it's set, same as any other bet missing a required input).
     };
   };
 };

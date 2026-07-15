@@ -9,11 +9,36 @@ export type ParsedBet = {
   segment?: "front9" | "back9"; // set only for a 9-hole-segment SCORE bet -
                                  // holes 1-9 or 10-18 by literal hole number,
                                  // never "whichever nine was played first"
+  topN?: number; // TOP_N personal bets only - the N in "Top N"
+  h2hOpponent?: string; // H2H personal bets only - the other named player
+  h2hScope?: "round" | "tournament"; // H2H personal bets only
+  h2hRoundNum?: number; // H2H personal bets only, when h2hScope is "round"
 };
 
 export function parseBetType(text: string): ParsedBet {
   const t = (text || "").trim();
   let m: RegExpMatchArray | null;
+
+  // Personal plays (see lib/parsePersonal.ts) - all four are "generic" type
+  // since none of them grade off a stat/thru bound the way SCORE/GIR/etc
+  // do: Winner and Top N settle by hand, Make Cut and H2H auto-grade via
+  // their own bespoke logic in the sync route (see gradeMakeCut below and
+  // the H2H handling in app/api/sync/route.ts), not autoGradeStatus.
+  if ((m = t.match(/^h2h vs (.+?) \(round (\d+)\)$/i))) {
+    return { type: "generic", label: "H2H", target: null, targetDisplay: "—", h2hOpponent: m[1].trim(), h2hScope: "round", h2hRoundNum: parseInt(m[2], 10) };
+  }
+  if ((m = t.match(/^h2h vs (.+?) \(tournament\)$/i))) {
+    return { type: "generic", label: "H2H", target: null, targetDisplay: "—", h2hOpponent: m[1].trim(), h2hScope: "tournament" };
+  }
+  if ((m = t.match(/^top\s+(\d+)$/i))) {
+    return { type: "generic", label: "TOP_N", target: null, targetDisplay: "—", topN: parseInt(m[1], 10) };
+  }
+  if ((m = t.match(/^winner$/i))) {
+    return { type: "generic", label: "WINNER", target: null, targetDisplay: "—" };
+  }
+  if ((m = t.match(/^make\s*cut$/i))) {
+    return { type: "generic", label: "MAKE_CUT", target: null, targetDisplay: "—" };
+  }
 
   if ((m = t.match(/^front 9:\s*(-?\d+|E)\s+or better$/i))) {
     const val = /^E$/i.test(m[1]) ? 0 : parseInt(m[1], 10);
@@ -152,6 +177,10 @@ export function friendlyLabel(label: string, segment?: "front9" | "back9"): stri
     case "BOGEYS": return "Bogeys";
     case "PARS": return "Pars";
     case "WINNER_SCORE": return "Winner";
+    case "WINNER": return "Winner";
+    case "TOP_N": return "Top N";
+    case "MAKE_CUT": return "Make Cut";
+    case "H2H": return "H2H";
     default: return "Stat";
   }
 }
@@ -203,6 +232,33 @@ export function autoGradeStatus(
     return null;
   }
   return null;
+}
+
+// Bespoke grading for personal "Make Cut" bets - deliberately kept outside
+// autoGradeStatus (which refuses all "generic"-type bets, personal plays
+// included) since this needs the tournament's cutLine, which isn't part of
+// the bet phrase itself, only the mapping. Round 1 busting the cutline on
+// its own is an immediate, guaranteed miss regardless of round 2 (strokes
+// only ever add to the total, never subtract) - so that direction never
+// waits on round 2 data existing at all. The hit direction, and any miss
+// caused by round 2 alone, both require round 2 to be fully finished
+// before grading - never guessed at mid-round.
+export function gradeMakeCut(
+  round1: { thru: number | null; scoreToPar: number | null },
+  round2: { thru: number | null; scoreToPar: number | null },
+  cutLine: number | null | undefined
+): "hit" | "miss" | null {
+  if (cutLine === null || cutLine === undefined) return null; // cut not announced/entered yet
+  if (round1.thru !== 18 || round1.scoreToPar === null) return null; // round 1 itself not finished yet
+
+  if (round1.scoreToPar > cutLine) return "miss"; // busts the line on round 1 alone - can't be undone
+
+  if (round2.thru === 18 && round2.scoreToPar !== null) {
+    const combined = round1.scoreToPar + round2.scoreToPar;
+    return combined <= cutLine ? "hit" : "miss";
+  }
+
+  return null; // within the line after round 1, waiting on round 2 to finish
 }
 
 // Displays a to-par number the way golf actually reads it - "E" for even,

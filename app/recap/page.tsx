@@ -127,10 +127,80 @@ function BetDetailCard({ b, compact = false }: { b: Bet; compact?: boolean }) {
   );
 }
 
+function ParlayArchiveList({ parlays }: { parlays: Parlay[] }) {
+  const [expandedParlay, setExpandedParlay] = useState<string | null>(null);
+
+  if (parlays.length === 0) {
+    return <div className="empty">No decided parlays yet - they show up here once every leg is settled.</div>;
+  }
+
+  const totalUnits = Math.round(
+    parlays.reduce((sum, p) => {
+      if (p.status === "hit") return sum + p.wagerUnits * (oddsMultiplier(p.oddsPrice) || 0);
+      if (p.status === "miss") return sum - p.wagerUnits;
+      return sum;
+    }, 0) * 100
+  ) / 100;
+  const wins = parlays.filter((p) => p.status === "hit").length;
+  const losses = parlays.filter((p) => p.status === "miss").length;
+
+  return (
+    <div>
+      <div className="tourn-head" style={{ marginBottom: 16 }}>
+        <h2>All parlays</h2>
+        <div className="tourn-summary">
+          <span className="tsum win">{wins}W</span>
+          <span className="tsum loss">{losses}L</span>
+          <span className={totalUnits >= 0 ? "tsum win" : "tsum loss"}>{formatUnits(totalUnits)}</span>
+        </div>
+      </div>
+      {parlays
+        .slice()
+        .sort((a, b) => (b.archivedAt || "").localeCompare(a.archivedAt || ""))
+        .map((p) => {
+          const isOpen = expandedParlay === p.id;
+          const unitResult = p.status === "hit"
+            ? Math.round(p.wagerUnits * (oddsMultiplier(p.oddsPrice) || 0) * 100) / 100
+            : p.status === "miss" ? -p.wagerUnits : null;
+          return (
+            <div key={p.id} className={`card ${p.status}`} style={{ marginBottom: 10, cursor: "pointer" }} onClick={() => setExpandedParlay(isOpen ? null : p.id)}>
+              <div className="card-top">
+                <div className="who">
+                  <div className="time">{p.loadedDate}</div>
+                  <div className="player">{p.label}</div>
+                  <div className="bet-text">{p.oddsPrice} · {p.wagerUnits}u</div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                  <span className={`sbtn ${p.status === "hit" ? "win active" : "loss active"}`} style={{ cursor: "default" }}>
+                    {p.status === "hit" ? "WIN" : "LOSS"}
+                  </span>
+                  {unitResult !== null && (
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: unitResult >= 0 ? "var(--live)" : "var(--clay)" }}>
+                      {formatUnits(unitResult)}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {isOpen && (
+                <div style={{ marginTop: 8 }}>
+                  {p.legs.map((leg, i) => (
+                    <div key={i} style={{ fontSize: 11, color: "var(--cream-dim)", marginBottom: 4 }}>
+                      {leg.tournament} · {leg.player} · {leg.bet}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+    </div>
+  );
+}
+
 export default function RecapPage() {
   const [archive, setArchive] = useState<Bet[]>([]);
   const [mapping, setMapping] = useState<Mapping>(EMPTY_MAPPING);
-  const [view, setView] = useState<"calendar" | "tournament" | "parlays">("calendar");
+  const [view, setView] = useState<"calendar" | "tournament" | "parlays" | "tedbeans">("calendar");
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -138,7 +208,6 @@ export default function RecapPage() {
   const [expandedRound, setExpandedRound] = useState<string | null>(null);
   const [quickViewRound, setQuickViewRound] = useState<string | null>(null);
   const [parlayArchive, setParlayArchive] = useState<Parlay[]>([]);
-  const [expandedParlay, setExpandedParlay] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
@@ -146,14 +215,29 @@ export default function RecapPage() {
     fetch("/api/parlay-archive").then((r) => r.json()).then((d) => setParlayArchive(d.archive || []));
   }, []);
 
+  const regularParlayArchive = useMemo(() => parlayArchive.filter((p) => !p.personal), [parlayArchive]);
+  const personalParlayArchive = useMemo(() => parlayArchive.filter((p) => p.personal), [parlayArchive]);
+
   const dayMap = useMemo(() => {
     const m: Record<string, Bet[]> = {};
-    archive.forEach((b) => {
+    archive.filter((b) => !b.personal).forEach((b) => {
       const d = b.loadedDate || (b.archivedAt ? centralDateFromISO(b.archivedAt) : "unknown");
       (m[d] = m[d] || []).push(b);
     });
     return m;
   }, [archive]);
+
+  // TedBeans' personal plays (Winner/Top N/Make Cut/H2H) never appear in
+  // the regular calendar/tournament recaps above - they get their own tab,
+  // grouped by tournament only since they're tournament-long, not per-round.
+  const personalArchive = useMemo(() => archive.filter((b) => b.personal), [archive]);
+  const personalTournMap = useMemo(() => {
+    const m: Record<string, Bet[]> = {};
+    personalArchive.forEach((b) => {
+      (m[b.t] = m[b.t] || []).push(b);
+    });
+    return m;
+  }, [personalArchive]);
 
   const monthAgg = useMemo(() => {
     const prefix = `${viewYear}-${pad(viewMonth + 1)}-`;
@@ -165,7 +249,7 @@ export default function RecapPage() {
 
   const tournMap = useMemo(() => {
     const m: Record<string, Bet[]> = {};
-    archive.forEach((b) => {
+    archive.filter((b) => !b.personal).forEach((b) => {
       (m[b.t] = m[b.t] || []).push(b);
     });
     return m;
@@ -173,7 +257,7 @@ export default function RecapPage() {
 
   const lastRound = useMemo(() => {
     const groups: Record<string, Bet[]> = {};
-    archive.forEach((b) => {
+    archive.filter((b) => !b.personal).forEach((b) => {
       const key = `${b.t}|||${b.r}`;
       (groups[key] = groups[key] || []).push(b);
     });
@@ -232,6 +316,12 @@ export default function RecapPage() {
               onClick={() => setView("parlays")}
             >
               Parlays
+            </button>
+            <button
+              className={view === "tedbeans" ? "add-btn-inline" : "recap-btn"}
+              onClick={() => setView("tedbeans")}
+            >
+              TedBeans Plays
             </button>
             <Link href="/analysis" className="recap-btn">Analysis</Link>
           </div>
@@ -417,70 +507,45 @@ export default function RecapPage() {
         )}
 
         {view === "parlays" && (
+          <ParlayArchiveList parlays={regularParlayArchive} />
+        )}
+
+        {view === "tedbeans" && (
           <div>
-            {parlayArchive.length === 0 && (
-              <div className="empty">No decided parlays yet - they show up here once every leg is settled.</div>
+            {personalArchive.length === 0 && personalParlayArchive.length === 0 && (
+              <div className="empty">No decided personal plays yet - they show up here once every play for a tournament is settled.</div>
             )}
-            {parlayArchive.length > 0 && (() => {
-              const totalUnits = Math.round(
-                parlayArchive.reduce((sum, p) => {
-                  if (p.status === "hit") return sum + p.wagerUnits * (oddsMultiplier(p.oddsPrice) || 0);
-                  if (p.status === "miss") return sum - p.wagerUnits;
-                  return sum;
-                }, 0) * 100
-              ) / 100;
-              const wins = parlayArchive.filter((p) => p.status === "hit").length;
-              const losses = parlayArchive.filter((p) => p.status === "miss").length;
+
+            {Object.keys(personalTournMap).map((t) => {
+              const tBets = personalTournMap[t];
+              const isOpen = expandedTourn === `tedbeans:${t}`;
               return (
-                <div className="tourn-head" style={{ marginBottom: 16 }}>
-                  <h2>All parlays</h2>
-                  <div className="tourn-summary">
-                    <span className="tsum win">{wins}W</span>
-                    <span className="tsum loss">{losses}L</span>
-                    <span className={totalUnits >= 0 ? "tsum win" : "tsum loss"}>{formatUnits(totalUnits)}</span>
+                <div key={t} className="tourn" style={{ marginBottom: 14 }}>
+                  <div className="tourn-head" style={{ cursor: "pointer" }} onClick={() => setExpandedTourn(isOpen ? null : `tedbeans:${t}`)}>
+                    <div className="tourn-title-row">
+                      <h2>{t}</h2>
+                      {mapping.tournaments[t]?.dateRange && (
+                        <span className="subline" style={{ marginTop: 0, textTransform: "none", letterSpacing: 0 }}>
+                          {mapping.tournaments[t]?.dateRange}
+                        </span>
+                      )}
+                    </div>
+                    <div className="tourn-summary">
+                      <span className="tsum win">{tBets.filter((b) => b.status === "hit").length}W</span>
+                      <span className="tsum loss">{tBets.filter((b) => b.status === "miss").length}L</span>
+                    </div>
                   </div>
+                  {isOpen && tBets.map((b) => <BetDetailCard key={b.id} b={b} />)}
                 </div>
               );
-            })()}
-            {parlayArchive
-              .slice()
-              .sort((a, b) => (b.archivedAt || "").localeCompare(a.archivedAt || ""))
-              .map((p) => {
-                const isOpen = expandedParlay === p.id;
-                const unitResult = p.status === "hit"
-                  ? Math.round(p.wagerUnits * (oddsMultiplier(p.oddsPrice) || 0) * 100) / 100
-                  : p.status === "miss" ? -p.wagerUnits : null;
-                return (
-                  <div key={p.id} className={`card ${p.status}`} style={{ marginBottom: 10, cursor: "pointer" }} onClick={() => setExpandedParlay(isOpen ? null : p.id)}>
-                    <div className="card-top">
-                      <div className="who">
-                        <div className="time">{p.loadedDate}</div>
-                        <div className="player">{p.label}</div>
-                        <div className="bet-text">{p.oddsPrice} · {p.wagerUnits}u</div>
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                        <span className={`sbtn ${p.status === "hit" ? "win active" : "loss active"}`} style={{ cursor: "default" }}>
-                          {p.status === "hit" ? "WIN" : "LOSS"}
-                        </span>
-                        {unitResult !== null && (
-                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: unitResult >= 0 ? "var(--live)" : "var(--clay)" }}>
-                            {formatUnits(unitResult)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {isOpen && (
-                      <div style={{ marginTop: 8 }}>
-                        {p.legs.map((leg, i) => (
-                          <div key={i} style={{ fontSize: 11, color: "var(--cream-dim)", marginBottom: 4 }}>
-                            {leg.tournament} · {leg.player} · {leg.bet}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            })}
+
+            {personalParlayArchive.length > 0 && (
+              <div style={{ marginTop: 20 }}>
+                <div className="round-label">Parlays</div>
+                <ParlayArchiveList parlays={personalParlayArchive} />
+              </div>
+            )}
           </div>
         )}
       </main>
