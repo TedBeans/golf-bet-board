@@ -18,6 +18,9 @@ export type Mapping = {
       upcoming?: boolean; // show on the live board's "upcoming this week" widget
       roundPar?: number; // this course's per-round par (e.g. 70/71/72) - needed to convert
                           // a raw strokes line (e.g. "Under 68.5") into to-par phrasing ("-2 or better")
+      front9Par?: number; // holes 1-9 only - needed for "Front 9 Score" bets (often != roundPar/2,
+                           // e.g. Royal Birkdale plays 34 out / 36 in)
+      back9Par?: number; // holes 10-18 only
       dataSource?: "pgatour" | "theopen"; // which live feed to pull from - defaults to pgatour.
                                            // theopen.com relays its own data for The Open Championship;
                                            // PGA Tour's feed may or may not carry it - this lets you

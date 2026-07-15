@@ -3,9 +3,9 @@ import { redis, BETS_KEY, MAPPING_KEY, SYNC_LOCK_KEY, ARCHIVE_KEY, PARLAYS_KEY, 
 import { Bet } from "../../../lib/seed";
 import { Mapping } from "../../../lib/mapping";
 import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../../../lib/parlay";
-import { fetchPgaLeaderboard, fetchPlayerScorecardStats } from "../../../lib/pgatour";
+import { fetchPgaLeaderboard, fetchPlayerScorecardStats, fetchPlayerHoleScores } from "../../../lib/pgatour";
 import { extractPlayers, findPlayerMatch, findLeader, PgaPlayerRow } from "../../../lib/pgaMatch";
-import { extractScorecardStats, roundNumberFromLabel } from "../../../lib/pgaScorecard";
+import { extractScorecardStats, roundNumberFromLabel, computeSegmentStats } from "../../../lib/pgaScorecard";
 import { fetchOpenLeaderboard } from "../../../lib/theopen";
 import { extractOpenPlayers, findOpenPlayerMatch, findOpenLeader, computeOpenStats, OpenPlayerRow } from "../../../lib/openMatch";
 import { parseBetType, autoGradeStatus, timeToMinutes } from "../../../lib/betLogic";
@@ -137,7 +137,9 @@ export async function GET() {
           continue;
         }
         const roundNum = roundNumberFromLabel(bet.r);
-        const stats = computeOpenStats(row, roundNum);
+        const holeRange: [number, number] | undefined =
+          parsed.segment === "front9" ? [1, 9] : parsed.segment === "back9" ? [10, 18] : undefined;
+        const stats = computeOpenStats(row, roundNum, holeRange);
 
         bet.thru = stats.thru;
         bet.auto = {
@@ -218,6 +220,40 @@ export async function GET() {
       }
 
       const roundNum = roundNumberFromLabel(bet.r);
+
+      // Front 9 / Back 9 score bets need literal hole numbers 1-9 or
+      // 10-18, which the round-aggregate scorecard call doesn't have -
+      // this needs the same hole-by-hole data the scorecard popover uses.
+      if (parsed.segment) {
+        const holeKey = `holes:${tournamentId}:${row.id}`;
+        let holeJson = scorecardCache.get(holeKey);
+        if (holeJson === undefined) {
+          try {
+            holeJson = await fetchPlayerHoleScores(tournamentId, row.id);
+          } catch {
+            holeJson = null;
+          }
+          scorecardCache.set(holeKey, holeJson);
+        }
+        const segStats = holeJson ? computeSegmentStats(holeJson, roundNum, parsed.segment) : null;
+
+        bet.thru = segStats?.thru ?? null;
+        bet.stat = segStats?.scoreToPar ?? null;
+        bet.auto = {
+          thru: segStats?.thru ?? null,
+          scoreToPar: segStats?.scoreToPar ?? null,
+          birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (bet.status === "live") {
+          const graded = autoGradeStatus(parsed, bet.stat, bet.thru);
+          if (graded) bet.status = graded;
+        }
+        updatedCount += 1;
+        continue;
+      }
+
       const scorecardKey = `${tournamentId}:${row.id}`;
       let scorecardJson = scorecardCache.get(scorecardKey);
       if (scorecardJson === undefined) {

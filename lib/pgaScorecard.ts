@@ -96,6 +96,36 @@ export function roundNumberFromLabel(label: string): number {
   return m ? parseInt(m[1], 10) : 1;
 }
 
+// Front 9 / Back 9 score bets need literal hole numbers 1-9 or 10-18 -
+// never "whichever nine was played first" (a shotgun start can mean the
+// group's actual front nine of the day was holes 10-18). Uses the same
+// hole-by-hole data as the scorecard popover, just filtered by hole number
+// instead of split by play order.
+export function computeSegmentStats(
+  json: any,
+  roundNumber: number,
+  segment: "front9" | "back9"
+): { thru: number; scoreToPar: number } | null {
+  const rounds: any[] = json?.roundScores || [];
+  const round = rounds.find((r: any) => r.roundNumber === roundNumber);
+  if (!round) return null;
+
+  const allHoles = [...(round.firstNine?.holes || []), ...(round.secondNine?.holes || [])];
+  const lo = segment === "front9" ? 1 : 10;
+  const hi = segment === "front9" ? 9 : 18;
+  const inRange = allHoles.filter((h: any) => h.holeNumber >= lo && h.holeNumber <= hi);
+
+  let thru = 0;
+  let scoreToPar = 0;
+  for (const h of inRange) {
+    if (h.score && h.score !== "-") {
+      thru += 1;
+      scoreToPar += parseInt(h.score, 10) - h.par;
+    }
+  }
+  return { thru, scoreToPar };
+}
+
 export type HoleScore = { hole: number; par: number; score: number | null; status: string | null };
 export type HoleScorecard = {
   firstNine: HoleScore[]; // whichever nine was actually played first

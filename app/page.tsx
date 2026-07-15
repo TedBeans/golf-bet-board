@@ -348,11 +348,11 @@ export default function Page() {
 
                         <div className="scorecard">
                           <div className="sc-cell">
-                            <div className="sc-label">{friendlyLabel(parsed.label)}</div>
+                            <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
                             <div className="sc-target">{parsed.targetDisplay}</div>
                           </div>
                           <div className="sc-cell">
-                            <div className="sc-label">{friendlyLabel(parsed.label)}</div>
+                            <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
                             {parsed.label === "SCORE" ? (
                               <input
                                 disabled={!unlocked}

@@ -74,7 +74,15 @@ export type OpenDerivedStats = {
 // roundNumber: pass a specific round (1-4) to get that round's thru/score;
 // pass null to aggregate across every round played so far (used by
 // findOpenLeader for the tournament total).
-export function computeOpenStats(player: OpenPlayerRow, roundNumber: number | null): OpenDerivedStats {
+// holeRange: optional [lo, hi] to restrict to literal hole numbers (e.g.
+// [1,9] for a Front 9 bet, [10,18] for Back 9) - never "whichever nine was
+// played first", since a shotgun start can mean the group's actual front
+// nine of the day was holes 10-18.
+export function computeOpenStats(
+  player: OpenPlayerRow,
+  roundNumber: number | null,
+  holeRange?: [number, number]
+): OpenDerivedStats {
   const rounds = roundNumber === null ? player.rounds : player.rounds.filter((r) => r.id === roundNumber);
 
   let birdies = 0, eagles = 0, pars = 0, bogeys = 0, doubleBogeys = 0;
@@ -85,6 +93,7 @@ export function computeOpenStats(player: OpenPlayerRow, roundNumber: number | nu
 
   for (const round of rounds) {
     for (const hole of round.info || []) {
+      if (holeRange && (hole.holeId < holeRange[0] || hole.holeId > holeRange[1])) continue;
       if (!hole.playerStrokes || hole.playerStrokes <= 0) continue; // not played yet
       const diff = hole.playerStrokes - hole.holePar;
       totalToPar += diff;

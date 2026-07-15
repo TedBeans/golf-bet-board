@@ -101,11 +101,11 @@ function BetDetailCard({ b, compact = false }: { b: Bet; compact?: boolean }) {
         <>
           <div className="scorecard">
             <div className="sc-cell">
-              <div className="sc-label">{friendlyLabel(parsed.label)}</div>
+              <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
               <div className="sc-target">{parsed.targetDisplay}</div>
             </div>
             <div className="sc-cell">
-              <div className="sc-label">{friendlyLabel(parsed.label)}</div>
+              <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
               <div className={`sc-target ${cls}`}>{parsed.label === "SCORE" ? formatScore(b.stat) : b.stat ?? "—"}</div>
             </div>
             <div className="sc-cell">

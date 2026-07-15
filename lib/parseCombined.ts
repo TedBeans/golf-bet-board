@@ -6,13 +6,20 @@ import { defaultUnitsToWinOne } from "./units";
 // together on one line.
 const HEADER_RE = /^(.*?)\s+Round\s+(\d+)\s*:?$/i;
 const TIME_RE = /^(\d{1,2}:\d{2}\s*[AP]M)\s+/i;
+// A "Front 9 Score"/"Back 9 Score" suffix sitting between the player's name
+// and the odds marker, e.g. "Robert MacIntyre Front 9 Score **Under** 34.5" -
+// this is the one category whose qualifier comes before the side/line
+// instead of after, unlike "**Over** 10.5 Pars".
+const SEGMENT_SUFFIX_RE = /^(.*?)\s+(front|back)\s*(?:9|nine)\s*score$/i;
 
 export type ParseResult = { bets: Bet[]; warnings: string[] };
+export type Segment = "front9" | "back9" | undefined;
 
 // Converts a raw sportsbook line (side + line value + category) into the
 // plain-English phrase the rest of the app already understands ("11+
-// pars", "-2 or better", etc). Returns null only for SCORE bets when no
-// round par is on file yet - that's the one category that actually needs
+// pars", "-2 or better", "Front 9: -2 or better", etc). Returns null only
+// for SCORE bets when no par is on file yet for the relevant scope (full
+// round, or front/back 9) - that's the one category that actually needs
 // external info (the course's par) to convert raw strokes to to-par terms;
 // every count-based category (greens/birdies/bogeys/pars) is pure
 // arithmetic and never needs it.
@@ -20,17 +27,21 @@ export function deriveBetPhrase(
   side: "Over" | "Under",
   lineValue: string,
   category: "SCORE" | "GIR" | "BIRDIES" | "BOGEYS" | "PARS",
-  roundPar: number | undefined
+  par: number | undefined,
+  segment?: Segment
 ): string | null {
   const line = parseFloat(lineValue);
   if (isNaN(line)) return null;
 
   if (category === "SCORE") {
-    if (roundPar === undefined) return null;
+    if (par === undefined) return null;
     const targetStrokes = side === "Under" ? Math.floor(line) : Math.ceil(line);
-    const targetToPar = targetStrokes - roundPar;
+    const targetToPar = targetStrokes - par;
     const display = targetToPar === 0 ? "E" : targetToPar > 0 ? `+${targetToPar}` : `${targetToPar}`;
-    return side === "Under" ? `${display} or better` : `${display} or worse`;
+    const suffix = side === "Under" ? "or better" : "or worse";
+    if (segment === "front9") return `Front 9: ${display} ${suffix}`;
+    if (segment === "back9") return `Back 9: ${display} ${suffix}`;
+    return `${display} ${suffix}`;
   }
 
   const noun = category === "GIR" ? "greens" : category === "BIRDIES" ? "birdies" : category === "BOGEYS" ? "bogeys" : "pars";
@@ -43,13 +54,13 @@ export function deriveBetPhrase(
 }
 
 // Parses the combined format: a "Tournament Round N" header, then one line
-// per bet: "TIME Player **Over/Under** Line [Category] Price (DK) for X
-// units" - both the plain-English bet description and the odds come from
-// this single line, no separate odds paste needed.
+// per bet: "TIME Player [Front/Back 9 Score] **Over/Under** Line [Category]
+// Price (DK) for X units" - both the plain-English bet description and the
+// odds come from this single line, no separate odds paste needed.
 export function parseCombinedText(
   text: string,
   forDate: string | undefined,
-  roundParLookup: (tournament: string) => number | undefined
+  parLookup: (tournament: string, segment?: Segment) => number | undefined
 ): ParseResult {
   const rawLines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
 
@@ -100,9 +111,20 @@ export function parseCombinedText(
       warnings.push(`Couldn't find Over/Under in: "${line}"`);
       continue;
     }
-    const player = rest.slice(0, sideAt).trim();
+    const preSide = rest.slice(0, sideAt).trim();
     const sideMatch = rest.slice(sideAt).match(/^\*\*(\w+)\*\*/)!;
     const side: "Over" | "Under" = /^over$/i.test(sideMatch[1]) ? "Over" : "Under";
+
+    // Strip a "Front 9 Score"/"Back 9 Score" suffix off the player name if
+    // present - this is the one category whose qualifier sits before the
+    // odds marker instead of after.
+    let player = preSide;
+    let segment: Segment = undefined;
+    const segMatch = preSide.match(SEGMENT_SUFFIX_RE);
+    if (segMatch) {
+      player = segMatch[1].trim();
+      segment = /^front$/i.test(segMatch[2]) ? "front9" : "back9";
+    }
 
     const afterSide = rest.slice(sideAt + sideMatch[0].length);
     const lineValMatch = afterSide.match(/([\d.]+)/);
@@ -111,7 +133,7 @@ export function parseCombinedText(
       continue;
     }
     const lineValue = lineValMatch[1];
-    const category = detectCategory(afterSide);
+    const category = segment ? "SCORE" : detectCategory(afterSide);
 
     const dkMatch = line.match(/([+-]\d+)\s*\(\s*DK\s*\)/i);
     const oddsDK = dkMatch ? dkMatch[1] : null;
@@ -125,9 +147,10 @@ export function parseCombinedText(
       continue;
     }
 
-    const phrase = deriveBetPhrase(side, lineValue, category, roundParLookup(currentTournament));
+    const phrase = deriveBetPhrase(side, lineValue, category, parLookup(currentTournament, segment), segment);
     if (!phrase) {
-      warnings.push(`No round par on file for "${currentTournament}" - add one in the Tournaments tab to convert score bets. Skipped: "${line}"`);
+      const parLabel = segment === "front9" ? "front-9 par" : segment === "back9" ? "back-9 par" : "round par";
+      warnings.push(`No ${parLabel} on file for "${currentTournament}" - add one in the Tournaments tab to convert score bets. Skipped: "${line}"`);
       continue;
     }
 

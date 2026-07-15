@@ -350,6 +350,23 @@ export default function AdminPage() {
       });
   }
 
+  function deleteSingleBet(betId: string) {
+    const updated = bets.filter((b) => b.id !== betId);
+    fetch("/api/bets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, bets: updated }),
+    }).then((r) => {
+      if (r.ok) {
+        setBets(updated);
+        setForceMsg("Bet removed from the live board.");
+      } else {
+        setForceMsg("Failed - check passcode.");
+      }
+      setTimeout(() => setForceMsg(""), 4000);
+    });
+  }
+
   function saveMapping() {
     fetch("/api/mapping", {
       method: "POST",
@@ -419,8 +436,13 @@ export default function AdminPage() {
 
   function previewImport() {
     setImportMsg("");
-    const roundParLookup = (t: string) => mapping.tournaments[t]?.roundPar;
-    setPreview(parseCombinedText(importText, betsDate, roundParLookup));
+    const parLookup = (t: string, segment?: "front9" | "back9") => {
+      const tm = mapping.tournaments[t];
+      if (segment === "front9") return tm?.front9Par;
+      if (segment === "back9") return tm?.back9Par;
+      return tm?.roundPar;
+    };
+    setPreview(parseCombinedText(importText, betsDate, parLookup));
   }
 
   function confirmImport() {
@@ -736,14 +758,32 @@ export default function AdminPage() {
         etc.) and you want to file it away manually.
       </div>
       {roundGroups.map((g) => (
-        <div key={`${g.t}|||${g.r}`} className="card" style={{ marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div>
-            <div className="player" style={{ fontSize: 14 }}>{g.t} · {g.r}</div>
-            <div className="subline" style={{ marginTop: 2 }}>{g.decided} decided · {g.pending} still pending/live</div>
+        <div key={`${g.t}|||${g.r}`} className="card" style={{ marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div className="player" style={{ fontSize: 14 }}>{g.t} · {g.r}</div>
+              <div className="subline" style={{ marginTop: 2 }}>{g.decided} decided · {g.pending} still pending/live</div>
+            </div>
+            <button className="add-btn-inline" onClick={() => forceArchive(g.t, g.r)}>
+              Force archive
+            </button>
           </div>
-          <button className="add-btn-inline" onClick={() => forceArchive(g.t, g.r)}>
-            Force archive
-          </button>
+          <div style={{ marginTop: 10 }}>
+            {bets.filter((b) => b.t === g.t && b.r === g.r).map((b) => (
+              <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, marginBottom: 4 }}>
+                <span>
+                  <span style={{ color: "var(--cream)" }}>{b.player}</span>{" "}
+                  <span style={{ color: "var(--cream-dim)" }}>{b.bet}</span>
+                </span>
+                <button
+                  onClick={() => confirm(`Remove ${b.player} - "${b.bet}" from the live board? This can't be undone.`) && deleteSingleBet(b.id)}
+                  style={{ background: "none", border: "none", color: "var(--clay)", fontSize: 11, cursor: "pointer", padding: "2px 6px" }}
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       ))}
       {forceMsg && <div className="subline" style={{ marginBottom: 8 }}>{forceMsg}</div>}
@@ -866,7 +906,7 @@ export default function AdminPage() {
           pgaId: string; suspendedType: string; suspendedUntil: string; dateRange: string;
           venue: string; location: string; latitude: number; longitude: number;
           startDate: string; endDate: string; notes: string; upcoming: boolean; roundPar: number;
-          dataSource: string;
+          front9Par: number; back9Par: number; dataSource: string;
         }>) {
           setMapping((m) => ({
             ...m,
@@ -943,6 +983,34 @@ export default function AdminPage() {
                 }}
               />
             </label>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <label style={{ flex: 1, fontSize: 12 }}>
+                Front 9 par (holes 1-9 only - for "Front 9 Score" bets)
+                <input
+                  placeholder="e.g. 34"
+                  value={tm?.front9Par ?? ""}
+                  onChange={(e) => updateTourn({ front9Par: parseInt(e.target.value, 10) || undefined })}
+                  style={{
+                    width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                    color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                    padding: "8px 10px", borderRadius: 3,
+                  }}
+                />
+              </label>
+              <label style={{ flex: 1, fontSize: 12 }}>
+                Back 9 par (holes 10-18 only - for "Back 9 Score" bets)
+                <input
+                  placeholder="e.g. 36"
+                  value={tm?.back9Par ?? ""}
+                  onChange={(e) => updateTourn({ back9Par: parseInt(e.target.value, 10) || undefined })}
+                  style={{
+                    width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                    color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                    padding: "8px 10px", borderRadius: 3,
+                  }}
+                />
+              </label>
+            </div>
 
             <div style={{ borderTop: "1px solid var(--line)", marginTop: 14, paddingTop: 14 }}>
               <div className="subline" style={{ marginBottom: 8 }}>For the "upcoming this week" widget on the live board</div>

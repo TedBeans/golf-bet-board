@@ -1,16 +1,36 @@
 export const HOLES_IN_ROUND = 18;
+export const HOLES_IN_NINE = 9;
 
 export type ParsedBet = {
   type: "max" | "min" | "generic";
   label: string;
   target: number | null;
   targetDisplay: string;
+  segment?: "front9" | "back9"; // set only for a 9-hole-segment SCORE bet -
+                                 // holes 1-9 or 10-18 by literal hole number,
+                                 // never "whichever nine was played first"
 };
 
 export function parseBetType(text: string): ParsedBet {
   const t = (text || "").trim();
   let m: RegExpMatchArray | null;
 
+  if ((m = t.match(/^front 9:\s*(-?\d+|E)\s+or better$/i))) {
+    const val = /^E$/i.test(m[1]) ? 0 : parseInt(m[1], 10);
+    return { type: "max", label: "SCORE", segment: "front9", target: val, targetDisplay: "≤ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
+  }
+  if ((m = t.match(/^front 9:\s*(-?\d+|E)\s+or worse$/i))) {
+    const val = /^E$/i.test(m[1]) ? 0 : parseInt(m[1], 10);
+    return { type: "min", label: "SCORE", segment: "front9", target: val, targetDisplay: "≥ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
+  }
+  if ((m = t.match(/^back 9:\s*(-?\d+|E)\s+or better$/i))) {
+    const val = /^E$/i.test(m[1]) ? 0 : parseInt(m[1], 10);
+    return { type: "max", label: "SCORE", segment: "back9", target: val, targetDisplay: "≤ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
+  }
+  if ((m = t.match(/^back 9:\s*(-?\d+|E)\s+or worse$/i))) {
+    const val = /^E$/i.test(m[1]) ? 0 : parseInt(m[1], 10);
+    return { type: "min", label: "SCORE", segment: "back9", target: val, targetDisplay: "≥ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
+  }
   if ((m = t.match(/^(-?\d+|E)\s+or better$/i))) {
     const val = /^E$/i.test(m[1]) ? 0 : parseInt(m[1], 10);
     return { type: "max", label: "SCORE", target: val, targetDisplay: "≤ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
@@ -56,12 +76,13 @@ export function parseBetType(text: string): ParsedBet {
 
 export function trend(parsed: ParsedBet, stat: number | null, thru: number | null): "good" | "bad" | "neutral" {
   if (parsed.type === "generic" || stat === null || stat === undefined || isNaN(stat)) return "neutral";
+  const holesTotal = parsed.segment ? HOLES_IN_NINE : HOLES_IN_ROUND;
   if (parsed.type === "max") {
     return stat <= (parsed.target as number) ? "good" : "bad";
   }
   if (parsed.type === "min") {
     if (stat >= (parsed.target as number)) return "good";
-    if (thru !== null && thru !== undefined && !isNaN(thru) && thru >= HOLES_IN_ROUND) return "bad";
+    if (thru !== null && thru !== undefined && !isNaN(thru) && thru >= holesTotal) return "bad";
     return "neutral";
   }
   return "neutral";
@@ -121,7 +142,9 @@ export function trendClassName(
 
 // Turns the internal category name into the word used in the UI - shared by
 // the target column, the stat column, and the detail strip so they all agree.
-export function friendlyLabel(label: string): string {
+export function friendlyLabel(label: string, segment?: "front9" | "back9"): string {
+  if (label === "SCORE" && segment === "front9") return "Front 9";
+  if (label === "SCORE" && segment === "back9") return "Back 9";
   switch (label) {
     case "SCORE": return "Score";
     case "GIR": return "Greens";
@@ -151,17 +174,19 @@ export function autoGradeStatus(
   if (parsed.target === null || parsed.target === undefined) return null;
   if (thru === null || thru === undefined) return null;
 
+  const effectiveHolesTotal = parsed.segment ? HOLES_IN_NINE : holesTotal;
+
   // Round score can move either direction on any hole, so it's only safe to
-  // grade once the round is actually finished - a direct final comparison,
-  // not a worst/best-case bound.
+  // grade once the round (or the 9-hole segment) is actually finished - a
+  // direct final comparison, not a worst/best-case bound.
   if (parsed.label === "SCORE") {
-    if (thru < holesTotal) return null;
+    if (thru < effectiveHolesTotal) return null;
     if (parsed.type === "max") return stat <= parsed.target ? "hit" : "miss";
     if (parsed.type === "min") return stat >= parsed.target ? "hit" : "miss";
     return null;
   }
 
-  const remaining = holesTotal - thru;
+  const remaining = effectiveHolesTotal - thru;
   if (remaining < 0) return null;
   const worstCase = stat + remaining; // max the count could still reach
 
