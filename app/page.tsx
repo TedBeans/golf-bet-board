@@ -32,8 +32,7 @@ function legLiveDetail(bet: Bet): string {
     return `${bet.auto?.position ?? "—"} thru ${bet.auto?.thru ?? "—"}`;
   }
   if (p.label === "MAKE_CUT") {
-    const dg = bet.auto?.dgCutProb;
-    return `${bet.auto?.position ?? "—"} · ${formatScore(bet.auto?.scoreToPar ?? null)} thru ${bet.auto?.thru ?? "—"}${dg !== null && dg !== undefined ? ` · DG ${dg}%` : ""}`;
+    return `${bet.auto?.position ?? "—"} · ${formatScore(bet.auto?.scoreToPar ?? null)} thru ${bet.auto?.thru ?? "—"}`;
   }
   if (p.label === "H2H" || p.label === "TIE") {
     const subjectThru = bet.auto?.thru ?? null;
@@ -45,6 +44,17 @@ function legLiveDetail(bet: Bet): string {
   }
   const valueDisplay = p.label === "SCORE" || p.label === "WINNER_SCORE" ? formatScore(bet.stat) : bet.stat ?? "—";
   return `${valueDisplay} thru ${bet.thru ?? "—"}`;
+}
+
+// DataGolf make-cut % for a MAKE_CUT leg, rendered as its own column in the
+// middle of the leg row (previously tacked onto the end of legLiveDetail,
+// which left it stranded off in the far-right badge with a lot of dead
+// space between the player name and the badge).
+function legDgDetail(bet: Bet): string | null {
+  const p = parseBetType(bet.bet);
+  if (p.label !== "MAKE_CUT") return null;
+  const dg = bet.auto?.dgCutProb;
+  return dg !== null && dg !== undefined ? `DG ${dg}%` : null;
 }
 
 // Badge color for a live personal leg - directional (currently ahead/tied/
@@ -177,9 +187,13 @@ function LegRow({
           const t = smartTrend(parseBetType(ls.bet!.bet), ls.bet!.stat, ls.bet!.thru);
           return t === "good" ? "win" : t === "bad" ? "loss" : t === "warn" ? "live" : "tbd";
         })();
+    const dgDetail = legDgDetail(ls.bet);
     return (
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, fontSize: 11, marginBottom: 4 }}>
         <span style={{ color: "var(--cream-dim)" }}>{subjectSpan} · {betPhraseNode}</span>
+        {dgDetail && (
+          <span style={{ color: "var(--cream-dim)", whiteSpace: "nowrap" }}>{dgDetail}</span>
+        )}
         <span className={`tsum ${badgeClass}`}>
           LIVE | {legLiveDetail(ls.bet)}
         </span>

@@ -179,6 +179,7 @@ export async function fetchDataGolfDiagnostics(): Promise<{
   blobCount: number;
   blobLengths: number[];
   parseErrors: string[];
+  cutlineCandidates: CutlineCandidate[];
   rows: DataGolfPlayerRow[] | null;
 }> {
   const res = await fetch(DATAGOLF_URL, {
@@ -196,15 +197,20 @@ export async function fetchDataGolfDiagnostics(): Promise<{
   const blobLengths: number[] = [];
   const parseErrors: string[] = [];
   let rows: any[] | null = null;
+  const cutlineCandidates: CutlineCandidate[] = [];
 
+  let blobIndex = 0;
   while ((m = blobRegex.exec(html)) !== null) {
     blobLengths.push(m[1].length);
-    if (rows) continue; // keep scanning to report total blob count, but only need the first match
+    const thisBlobIndex = blobIndex++;
     try {
       const jsonText = unescapeJsStringLiteral(m[1]).replace(/\bNaN\b/g, "null");
       const parsed = JSON.parse(jsonText);
-      const found = findPredictionsArray(parsed);
-      if (found) rows = found;
+      if (!rows) {
+        const found = findPredictionsArray(parsed);
+        if (found) rows = found;
+      }
+      collectCutlineCandidates(parsed, `blob[${thisBlobIndex}]`, 0, cutlineCandidates);
     } catch (e: any) {
       parseErrors.push(e.message || String(e));
     }
@@ -217,6 +223,7 @@ export async function fetchDataGolfDiagnostics(): Promise<{
     blobCount: blobLengths.length,
     blobLengths,
     parseErrors,
+    cutlineCandidates,
     rows: rows
       ? rows.map((r: any) => {
           const { displayName, lastName } = toDisplayName(String(r.name || ""));
@@ -237,6 +244,47 @@ export async function fetchDataGolfDiagnostics(): Promise<{
         })
       : null,
   };
+}
+
+// The page's "CUTLINE PROBABILITIES" widget (e.g. "+1  32.2%", "+2  40.2%",
+// "+3  16.7%" - the odds the cutline itself lands at each score) is a
+// different, much smaller blob than the per-player predictions array above,
+// and its exact key shape hasn't been confirmed against live data yet - do
+// NOT guess a fingerprint and wire it into production. Instead this walks
+// every parsed blob looking for small arrays (a cutline distribution is
+// only a handful of entries - one per possible cutline score) whose items
+// are plain objects with a couple of numeric-ish fields, and reports them
+// for a human to eyeball via /api/debug-datagolf?diag=1. Once the real
+// shape is confirmed, replace this with a proper looksLikeCutlineRow()
+// fingerprint the same way findPredictionsArray/looksLikePredictionRow
+// works above.
+export type CutlineCandidate = { path: string; length: number; sample: any };
+
+function collectCutlineCandidates(node: any, path: string, depth: number, out: CutlineCandidate[]): void {
+  if (depth > 6 || node === null || node === undefined || out.length > 25) return;
+  if (Array.isArray(node)) {
+    if (
+      node.length > 0 &&
+      node.length <= 20 &&
+      typeof node[0] === "object" &&
+      node[0] !== null &&
+      !Array.isArray(node[0]) &&
+      !looksLikePredictionRow(node[0])
+    ) {
+      const keys = Object.keys(node[0]);
+      const numericish = keys.filter((k) => typeof node[0][k] === "number" || (typeof node[0][k] === "string" && /^-?\d/.test(node[0][k])));
+      if (keys.length <= 6 && numericish.length >= 1) {
+        out.push({ path, length: node.length, sample: node.slice(0, 8) });
+      }
+    }
+    node.forEach((item, i) => collectCutlineCandidates(item, `${path}[${i}]`, depth + 1, out));
+    return;
+  }
+  if (typeof node === "object") {
+    for (const key of Object.keys(node)) {
+      collectCutlineCandidates(node[key], path ? `${path}.${key}` : key, depth + 1, out);
+    }
+  }
 }
 
 function norm(s: string): string {
