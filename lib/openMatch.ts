@@ -103,35 +103,41 @@ export function computeOpenStats(
   let thisRoundThru = 0;
 
   for (const round of rounds) {
+    // Only trust this round's per-hole data at all if there's real
+    // evidence the player has actually started it: either it's a round
+    // strictly before their current one (definitely finished), or it's
+    // their current round AND they have a real current-hole value (meaning
+    // they've actually teed off). Without this, a player who hasn't teed
+    // off yet - currentHole still null - would fall through every check
+    // below and blindly trust whatever stray/placeholder value theopen.com
+    // happens to have sitting in hole 1's playerStrokes, producing
+    // impossible lines like "-3 thru 1" before they've hit a shot.
+    const hasStartedThisRound =
+      player.currentRound !== null &&
+      (round.id < player.currentRound || (round.id === player.currentRound && player.currentHole !== null));
+    if (!hasStartedThisRound) continue;
+
     // Only the round the player is CURRENTLY on has a "hole in progress" to
     // worry about - a fully-finished past round has no provisional data
-    // left, and a not-yet-started future round is all zeros anyway.
+    // left.
     const isLiveRound = player.currentRound !== null && round.id === player.currentRound;
-
-    // theopen.com's "current hole" field can itself lag behind the actual
-    // per-hole stroke data updating - if it does, gating on it forever
-    // would freeze thru at the same number indefinitely even as the
-    // player keeps playing. If any hole STRICTLY AFTER the reported
-    // "current" hole already has real strokes, that's proof the player
-    // has moved past it (you can't play hole 8 without finishing hole 7
-    // first) - so the "current hole" field is stale and shouldn't be
-    // trusted for this round; just count every hole with real strokes
-    // normally instead, same as before that field existed.
-    let trustCurrentHoleGate = true;
-    if (isLiveRound && player.currentHole !== null) {
-      const proofOfStaleness = (round.info || []).some(
-        (h) => h.holeId > (player.currentHole as number) && typeof h.playerStrokes === "number" && h.playerStrokes > 0
-      );
-      if (proofOfStaleness) trustCurrentHoleGate = false;
-    }
 
     for (const hole of round.info || []) {
       if (holeRange && (hole.holeId < holeRange[0] || hole.holeId > holeRange[1])) continue;
       // The hole currently in progress reports a live, still-changing
-      // stroke count as the player plays it - not a final score. Counting
-      // it early is exactly how a still-in-progress hole can transiently
-      // look like a completed eagle/albatross before it's actually done.
-      if (isLiveRound && trustCurrentHoleGate && player.currentHole !== null && hole.holeId >= player.currentHole) continue;
+      // stroke count as the player plays it - not a final score, and never
+      // trusted no matter what. Counting it early is exactly how a
+      // still-in-progress hole can transiently look like a completed
+      // eagle/albatross before it's actually done. This is an
+      // unconditional cutoff - deliberately not "self-correcting" against
+      // apparent evidence from later holes, since theopen.com's feed can
+      // show stray/placeholder values in holes that haven't really been
+      // played (same root cause as a not-yet-teed-off player showing
+      // strokes on hole 1) - trusting that "evidence" caused two real
+      // holes (in-progress + not-yet-played) to get counted as finished
+      // at once. Undercounting for one poll cycle until currentHole
+      // catches up is a far safer failure mode than fabricating a score.
+      if (isLiveRound && player.currentHole !== null && hole.holeId >= player.currentHole) continue;
       if (!hole.playerStrokes || hole.playerStrokes <= 0) continue; // not played yet
       const diff = hole.playerStrokes - hole.holePar;
       totalToPar += diff;
