@@ -76,7 +76,49 @@ function legStatusClass(bet: Bet): "win" | "loss" | "live" {
 
 // One leg row, shared between the regular Parlays section and the TedBeans
 // Plays parlays sub-section - both need identical live-status rendering.
-function LegRow({ ls }: { ls: LegStatus }) {
+type ScorecardModalState = { betId: string; player: string; loading: boolean; scorecard: any | null; position?: string | null; totalToPar?: number | null; message?: string } | null;
+
+function LegRow({
+  ls,
+  openScorecard,
+  scorecardModal,
+  setScorecardModal,
+}: {
+  ls: LegStatus;
+  openScorecard: (betId: string, tourn: string, round: string, player: string) => void;
+  scorecardModal: ScorecardModalState;
+  setScorecardModal: (v: ScorecardModalState) => void;
+}) {
+  // H2H/Tie legs know their own scope from the bet phrase itself - for a
+  // round-scoped matchup, that's more useful to click into than the leg's
+  // stored round label (which for a personal play is always the constant
+  // "TedBeans Plays" bucket, not a real round).
+  const parsedLegBet = parseBetType(ls.leg.bet);
+  const round = parsedLegBet.h2hScope === "round" && parsedLegBet.h2hRoundNum ? `Round ${parsedLegBet.h2hRoundNum}` : ls.leg.round;
+  const isOpen = scorecardModal?.betId === ls.leg.betId;
+
+  const playerSpan = (
+    <span style={{ position: "relative", display: "inline-block" }}>
+      <span
+        style={{ cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--cream-dim)" }}
+        onClick={() => openScorecard(ls.leg.betId, ls.leg.tournament, round, ls.leg.player)}
+      >
+        {ls.leg.player}
+      </span>
+      {isOpen && scorecardModal && (
+        <HoleScorecardModal
+          player={scorecardModal.player}
+          loading={scorecardModal.loading}
+          scorecard={scorecardModal.scorecard}
+          position={scorecardModal.position}
+          totalToPar={scorecardModal.totalToPar}
+          message={scorecardModal.message}
+          onClose={() => setScorecardModal(null)}
+        />
+      )}
+    </span>
+  );
+
   if (ls.status === "live" && ls.bet) {
     const badgeClass = ls.bet.personal
       ? legStatusClass(ls.bet)
@@ -86,7 +128,7 @@ function LegRow({ ls }: { ls: LegStatus }) {
         })();
     return (
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-        <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
+        <span style={{ color: "var(--cream-dim)" }}>{playerSpan} · {ls.leg.bet}</span>
         <span className={`tsum ${badgeClass}`}>
           LIVE | {legLiveDetail(ls.bet)}
         </span>
@@ -95,7 +137,7 @@ function LegRow({ ls }: { ls: LegStatus }) {
   }
   return (
     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-      <span style={{ color: "var(--cream-dim)" }}>{ls.leg.player} · {ls.leg.bet}</span>
+      <span style={{ color: "var(--cream-dim)" }}>{playerSpan} · {ls.leg.bet}</span>
       <span className={ls.status === "hit" ? "tsum win" : ls.status === "miss" ? "tsum loss" : "tsum tbd"}>
         {ls.status === "hit" ? "WIN" : ls.status === "miss" ? "LOSS" : "TBD"}
       </span>
@@ -589,7 +631,7 @@ export default function Page() {
                   </div>
                   <div style={{ marginTop: 8 }}>
                     {legStatuses.map((ls, i) => (
-                      <LegRow key={i} ls={ls} />
+                      <LegRow key={i} ls={ls} openScorecard={openScorecard} scorecardModal={scorecardModal} setScorecardModal={setScorecardModal} />
                     ))}
                   </div>
                 </div>
@@ -725,7 +767,7 @@ export default function Page() {
                       </div>
                       <div style={{ marginTop: 8 }}>
                         {legStatuses.map((ls, i) => (
-                          <LegRow key={i} ls={ls} />
+                          <LegRow key={i} ls={ls} openScorecard={openScorecard} scorecardModal={scorecardModal} setScorecardModal={setScorecardModal} />
                         ))}
                       </div>
                     </div>
