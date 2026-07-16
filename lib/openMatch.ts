@@ -173,6 +173,69 @@ export function extractOpenHoleScorecard(player: OpenPlayerRow, roundNumber: num
   return { firstNine, firstNineLabel: "OUT", secondNine, secondNineLabel: "IN" };
 }
 
+// theopen.com's `statistics` feed - confirmed shape (captured mid-Round 1):
+// { rounds: [ { id: 0|1|2.., fairwayHits: { average, stats: [{playerId, value}] },
+//              greensInRegulation: { average, stats: [{playerId, value}] }, ... } ] }
+// id: 0 is a "whichever round is currently live" pointer that duplicates
+// whatever the real round id already is - always use the explicit round id
+// (1, 2, 3, 4) to match the same convention the traditional/coursepars
+// feeds already use, never id 0. `value` is a percentage on a 0-100 scale
+// (confirmed: MacIntyre's greensInRegulation value of 72.22 matched the
+// site's own displayed "72.2%" exactly).
+function findOpenStatsRound(statsJson: any, roundNumber: number): any | null {
+  const rounds: any[] = statsJson?.rounds || [];
+  return rounds.find((r: any) => r.id === roundNumber) || null;
+}
+
+function findOpenStatValue(category: any, playerId: string): number | null {
+  const stats: any[] = category?.stats || [];
+  const entry = stats.find((s: any) => String(s.playerId) === String(playerId));
+  return entry && typeof entry.value === "number" ? entry.value : null;
+}
+
+// Converts the feed's percentages into actual counts, since that's what
+// bet grading needs (GIR bets are phrased as "12+ greens", not "80%+").
+// theopen.com only ever gives us the percentage, not the raw made/attempted
+// numbers, so the count is reconstructed as round(pct/100 * eligible holes)
+// - safe to round since the percentage itself was originally computed from
+// an integer count over an integer number of holes.
+export function computeOpenGirFairways(
+  player: OpenPlayerRow,
+  roundNumber: number,
+  statsJson: any
+): { gir: string | null; girCount: number | null; fairways: string | null; fairwaysCount: number | null } {
+  const stats = computeOpenStats(player, roundNumber);
+  const thru = stats.thru;
+  if (thru === null || thru === 0) return { gir: null, girCount: null, fairways: null, fairwaysCount: null };
+
+  const round = findOpenStatsRound(statsJson, roundNumber);
+  const girPct = round ? findOpenStatValue(round.greensInRegulation, player.id) : null;
+  const fairwayPct = round ? findOpenStatValue(round.fairwayHits, player.id) : null;
+
+  const girCount = girPct !== null ? Math.round((girPct / 100) * thru) : null;
+  const gir = girCount !== null ? `${girCount}/${thru}` : null;
+
+  // Fairways: no fairway to hit on a par 3, so the eligible denominator is
+  // holes completed minus however many of those were par 3s - not just
+  // thru itself. Uses the same per-hole data already pulled from the
+  // traditional feed, not a second fetch.
+  const playerRound = player.rounds.find((r) => r.id === roundNumber);
+  const completedPar3s = (playerRound?.info || []).filter(
+    (h) => typeof h.playerPar === "number" && h.playerPar > 0 && h.holePar === 3
+  ).length;
+  const fairwayEligible = thru - completedPar3s;
+
+  let fairwaysCount: number | null = null;
+  if (fairwayEligible > 0 && fairwayPct !== null) {
+    fairwaysCount = Math.round((fairwayPct / 100) * fairwayEligible);
+  } else if (fairwayEligible === 0) {
+    fairwaysCount = 0; // every hole played so far was a par 3 - nothing to grade yet, but not "no data" either
+  }
+  const fairways = fairwaysCount !== null ? `${fairwaysCount}/${fairwayEligible}` : null;
+
+  return { gir, girCount, fairways, fairwaysCount };
+}
+
 // Tournament leader (lowest total-to-par across all rounds played so far) -
 // for WINNER_SCORE bets, same role as pgaMatch.ts's findLeader.
 export function findOpenLeader(players: OpenPlayerRow[]): { player: OpenPlayerRow; totalToPar: number } | null {

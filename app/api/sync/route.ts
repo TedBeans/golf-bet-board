@@ -6,8 +6,8 @@ import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../../../lib/par
 import { fetchPgaLeaderboard, fetchPlayerScorecardStats, fetchPlayerHoleScores } from "../../../lib/pgatour";
 import { extractPlayers, findPlayerMatch, findLeader, PgaPlayerRow } from "../../../lib/pgaMatch";
 import { extractScorecardStats, roundNumberFromLabel, computeSegmentStats, computeFullRoundStats } from "../../../lib/pgaScorecard";
-import { fetchOpenLeaderboard } from "../../../lib/theopen";
-import { extractOpenPlayers, findOpenPlayerMatch, findOpenLeader, computeOpenStats, OpenPlayerRow } from "../../../lib/openMatch";
+import { fetchOpenLeaderboard, fetchOpenStatistics } from "../../../lib/theopen";
+import { extractOpenPlayers, findOpenPlayerMatch, findOpenLeader, computeOpenStats, computeOpenGirFairways, OpenPlayerRow } from "../../../lib/openMatch";
 import { parseBetType, autoGradeStatus, timeToMinutes, gradeMakeCut } from "../../../lib/betLogic";
 import { computePositions, PositionEntry } from "../../../lib/positions";
 import { nowInCentral } from "../../../lib/centralTime";
@@ -65,6 +65,10 @@ export async function GET() {
   const leaderboardCache = new Map<string, PgaPlayerRow[]>();
   const scorecardCache = new Map<string, any>();
   let openPlayersCache: OpenPlayerRow[] | null = null;
+  // Lazily fetched - only GIR bets need the statistics feed at all, so
+  // there's no reason to fetch it on every sync pass for tournaments/bets
+  // that never touch it.
+  let openStatsCache: any | null = null;
   // Field-wide position rankings for personal Winner/Top N bets - computed
   // once per tournament per sync pass (several personal bets often share
   // the same tournament), not once per bet.
@@ -369,12 +373,12 @@ export async function GET() {
       }
 
       if (tournamentMap.dataSource === "theopen") {
-        // theopen.com's own feed: everything (score, birdies, bogeys, pars)
-        // is derived directly from hole-by-hole strokes vs par - no second
-        // "scorecard stats" call needed, unlike the PGA Tour path below.
-        // GIR is NOT available this way (see lib/openMatch.ts) and simply
-        // stays null/unset for this data source until the statistics feed
-        // is confirmed to carry it per-player.
+        // theopen.com's own feed: score/birdies/bogeys/pars are derived
+        // directly from hole-by-hole strokes vs par - no second call
+        // needed. GIR/Fairways come from a separate `statistics` feed
+        // (confirmed shape - see computeOpenGirFairways in
+        // lib/openMatch.ts), fetched lazily below only when a GIR bet
+        // actually needs it.
         if (!openPlayersCache) {
           const raw = await fetchOpenLeaderboard();
           openPlayersCache = extractOpenPlayers(raw);
@@ -411,6 +415,19 @@ export async function GET() {
           parsed.segment === "front9" ? [1, 9] : parsed.segment === "back9" ? [10, 18] : undefined;
         const stats = computeOpenStats(row, roundNum, holeRange);
 
+        let girFairways: { gir: string | null; girCount: number | null; fairways: string | null; fairwaysCount: number | null } = {
+          gir: null,
+          girCount: null,
+          fairways: null,
+          fairwaysCount: null,
+        };
+        if (parsed.label === "GIR") {
+          if (!openStatsCache) {
+            openStatsCache = await fetchOpenStatistics();
+          }
+          girFairways = computeOpenGirFairways(row, roundNum, openStatsCache);
+        }
+
         bet.thru = stats.thru;
         bet.auto = {
           thru: stats.thru,
@@ -420,8 +437,8 @@ export async function GET() {
           pars: stats.pars,
           eagles: stats.eagles,
           doubleBogeys: stats.doubleBogeys,
-          gir: null, // not available from theopen.com's feed - see lib/openMatch.ts
-          fairways: null,
+          gir: girFairways.gir,
+          fairways: girFairways.fairways,
           updatedAt: new Date().toISOString(),
         };
 
@@ -433,10 +450,9 @@ export async function GET() {
           bet.stat = stats.bogeysOrWorse;
         } else if (parsed.label === "PARS") {
           bet.stat = stats.pars;
+        } else if (parsed.label === "GIR" && girFairways.girCount !== null) {
+          bet.stat = girFairways.girCount;
         }
-        // GIR bets: intentionally left ungraded on this data source - no
-        // auto stat available, so bet.stat stays whatever it was (null on
-        // a fresh bet), same as any other bet with autoEnabled turned off.
 
         if (bet.status === "live") {
           const graded = autoGradeStatus(parsed, bet.stat, bet.thru);
