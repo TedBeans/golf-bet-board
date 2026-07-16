@@ -569,10 +569,10 @@ export default function Page() {
                               <input
                                 disabled={!unlocked}
                                 className={`sc-input ${cls}`}
-                                type="number"
-                                step="1"
+                                type="text"
+                                inputMode="numeric"
                                 placeholder="—"
-                                value={b.stat === null || b.stat === undefined ? "" : b.stat}
+                                value={b.stat === null || b.stat === undefined ? "" : String(b.stat)}
                                 onChange={(e) =>
                                   updateBetManually(b.id, {
                                     stat: e.target.value === "" ? null : parseFloat(e.target.value),
@@ -586,12 +586,10 @@ export default function Page() {
                             <input
                               disabled={!unlocked}
                               className="sc-input thru-input"
-                              type="number"
-                              min={0}
-                              max={18}
-                              step="1"
+                              type="text"
+                              inputMode="numeric"
                               placeholder="—"
-                              value={b.thru === null || b.thru === undefined ? "" : b.thru}
+                              value={b.thru === null || b.thru === undefined ? "" : String(b.thru)}
                               onChange={(e) =>
                                 updateBetManually(b.id, {
                                   thru: e.target.value === "" ? null : parseInt(e.target.value, 10),

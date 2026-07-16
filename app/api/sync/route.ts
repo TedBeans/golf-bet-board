@@ -421,12 +421,14 @@ export async function GET() {
           fairways: null,
           fairwaysCount: null,
         };
-        if (parsed.label === "GIR") {
-          if (!openStatsCache) {
-            openStatsCache = await fetchOpenStatistics();
-          }
-          girFairways = computeOpenGirFairways(row, roundNum, openStatsCache);
+        // Fetched for every straight bet on a theopen.com tournament, not
+        // just GIR bets - it's useful context for any bet on that player's
+        // round, and the statistics feed itself is cached once per
+        // tournament per sync pass regardless of how many bets use it.
+        if (!openStatsCache) {
+          openStatsCache = await fetchOpenStatistics();
         }
+        girFairways = computeOpenGirFairways(row, roundNum, openStatsCache);
 
         bet.thru = stats.thru;
         bet.auto = {
