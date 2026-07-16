@@ -106,7 +106,7 @@ function BetDetailCard({ b, compact = false, mapping }: { b: Bet; compact?: bool
               <span className="detail-strip">
                 {parsed.label === "MAKE_CUT" ? (
                   <>
-                    Round 1 {formatScore(b.auto?.scoreToPar ?? null)} thru {b.auto?.thru ?? "—"}
+                    Position {b.auto?.position ?? "—"} · Round 1 {formatScore(b.auto?.scoreToPar ?? null)} thru {b.auto?.thru ?? "—"}
                     {" · "}
                     {cutLine !== undefined ? `Cut line ${formatScore(cutLine)}` : "cut line not set yet"}
                   </>

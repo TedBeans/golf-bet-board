@@ -247,6 +247,21 @@ export async function GET() {
         }
 
         if (parsed.label === "MAKE_CUT") {
+          // Position is informational only (not used for grading - see
+          // gradeMakeCut below), but useful context for how safely inside
+          // or outside the cut line someone currently sits.
+          let positions = positionsCache.get(bet.t);
+          if (!positions) {
+            const entries: PositionEntry[] = useOpen
+              ? openPlayers!.map((p) => {
+                  const s = computeOpenStats(p, null);
+                  return { id: p.id, totalToPar: s.holesPlayed > 0 ? s.totalToPar : null };
+                })
+              : pgaPlayers!.map((p) => ({ id: p.id, totalToPar: p.total }));
+            positions = computePositions(entries);
+            positionsCache.set(bet.t, positions);
+          }
+
           const r1 = useOpen
             ? await getOpenRoundStat(openPlayers!, bet.player, 1)
             : await getPgaRoundStat(tournamentId, pgaPlayers!, bet.player, 1);
@@ -266,6 +281,7 @@ export async function GET() {
             scoreToPar: r1.scoreToPar,
             birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
             updatedAt: new Date().toISOString(),
+            position: positions.get(r1.id) ?? null,
           };
 
           const graded = gradeMakeCut(

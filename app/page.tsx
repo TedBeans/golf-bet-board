@@ -31,6 +31,9 @@ function legLiveDetail(bet: Bet): string {
   if (p.label === "TOP_N" || p.label === "WINNER") {
     return `${bet.auto?.position ?? "—"} thru ${bet.auto?.thru ?? "—"}`;
   }
+  if (p.label === "MAKE_CUT") {
+    return `${bet.auto?.position ?? "—"} · ${formatScore(bet.auto?.scoreToPar ?? null)} thru ${bet.auto?.thru ?? "—"}`;
+  }
   if (p.label === "H2H" || p.label === "TIE") {
     const subjectThru = bet.auto?.thru ?? null;
     const opponentThru = bet.auto?.opponentThru ?? null;
@@ -671,7 +674,7 @@ export default function Page() {
                         <span className="detail-strip">
                           {parsed.label === "MAKE_CUT" ? (
                             <>
-                              Round 1 {formatScore(b.auto?.scoreToPar ?? null)} thru {b.auto?.thru ?? "—"}
+                              Position {b.auto?.position ?? "—"} · Round 1 {formatScore(b.auto?.scoreToPar ?? null)} thru {b.auto?.thru ?? "—"}
                               {" · "}
                               {cutLine !== undefined ? `Cut line ${formatScore(cutLine)}` : "cut line not set yet"}
                             </>

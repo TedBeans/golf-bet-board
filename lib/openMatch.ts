@@ -6,17 +6,28 @@ export type OpenPlayerRow = {
   lastName: string;
   displayName: string;
   rounds: OpenRound[];
+  currentRound: number | null; // which round this player is actively playing right now
+  currentHole: number | null; // which hole within currentRound is in progress - NOT yet
+                               // finished, so its playerStrokes (even if nonzero) is a live,
+                               // still-changing count as they play it, not a final score.
+                               // Without this, a hole in progress can transiently look like a
+                               // completed eagle/albatross before the player has even holed out.
 };
 
 export function extractOpenPlayers(traditionalJson: any): OpenPlayerRow[] {
   const rows: any[] = traditionalJson?.players || [];
-  return rows.map((r) => ({
-    id: String(r.id ?? ""),
-    firstName: r.firstName || "",
-    lastName: r.lastName || "",
-    displayName: `${r.firstName || ""} ${r.lastName || ""}`.trim(),
-    rounds: r.rounds || [],
-  }));
+  return rows.map((r) => {
+    const parsedHole = parseInt(r.hole, 10);
+    return {
+      id: String(r.id ?? ""),
+      firstName: r.firstName || "",
+      lastName: r.lastName || "",
+      displayName: `${r.firstName || ""} ${r.lastName || ""}`.trim(),
+      rounds: r.rounds || [],
+      currentRound: typeof r.currentRound === "number" ? r.currentRound : null,
+      currentHole: isNaN(parsedHole) ? null : parsedHole,
+    };
+  });
 }
 
 function norm(s: string): string {
@@ -92,8 +103,17 @@ export function computeOpenStats(
   let thisRoundThru = 0;
 
   for (const round of rounds) {
+    // Only the round the player is CURRENTLY on has a "hole in progress" to
+    // worry about - a fully-finished past round has no provisional data
+    // left, and a not-yet-started future round is all zeros anyway.
+    const isLiveRound = player.currentRound !== null && round.id === player.currentRound;
     for (const hole of round.info || []) {
       if (holeRange && (hole.holeId < holeRange[0] || hole.holeId > holeRange[1])) continue;
+      // The hole currently in progress reports a live, still-changing
+      // stroke count as the player plays it - not a final score. Counting
+      // it early is exactly how a still-in-progress hole can transiently
+      // look like a completed eagle/albatross before it's actually done.
+      if (isLiveRound && player.currentHole !== null && hole.holeId >= player.currentHole) continue;
       if (!hole.playerStrokes || hole.playerStrokes <= 0) continue; // not played yet
       const diff = hole.playerStrokes - hole.holePar;
       totalToPar += diff;
@@ -123,6 +143,45 @@ export function computeOpenStats(
     bogeysOrWorse: bogeys + doubleBogeys,
     holesPlayed,
   };
+}
+
+// Same HoleScore/HoleScorecard shape as lib/pgaScorecard.ts's extractHoleScores,
+// so HoleScorecardModal doesn't need to know which data source it came from -
+// used by /api/scorecard when a tournament's dataSource is "theopen" instead
+// of the PGA Tour default. Respects the same in-progress-hole rule as
+// computeOpenStats above: the hole currently being played never shows a
+// provisional score, even if playerStrokes has already ticked up.
+export type OpenHoleScore = { hole: number; par: number; score: number | null; status: string | null };
+export type OpenHoleScorecard = { firstNine: OpenHoleScore[]; firstNineLabel: string; secondNine: OpenHoleScore[]; secondNineLabel: string };
+
+function openHoleStatus(diff: number): string {
+  if (diff <= -2) return "EAGLE";
+  if (diff === -1) return "BIRDIE";
+  if (diff === 0) return "PAR";
+  if (diff === 1) return "BOGEY";
+  if (diff === 2) return "DOUBLE_BOGEY";
+  return "OTHER";
+}
+
+export function extractOpenHoleScorecard(player: OpenPlayerRow, roundNumber: number): OpenHoleScorecard | null {
+  const round = player.rounds.find((r) => r.id === roundNumber);
+  if (!round) return null;
+  const isLiveRound = player.currentRound !== null && round.id === player.currentRound;
+
+  const toHoleScore = (h: OpenHole): OpenHoleScore => {
+    const inProgress = isLiveRound && player.currentHole !== null && h.holeId >= player.currentHole;
+    const played = !inProgress && typeof h.playerStrokes === "number" && h.playerStrokes > 0;
+    if (!played) return { hole: h.holeId, par: h.holePar, score: null, status: null };
+    const diff = h.playerStrokes - h.holePar;
+    return { hole: h.holeId, par: h.holePar, score: h.playerStrokes, status: openHoleStatus(diff) };
+  };
+
+  const info = round.info || [];
+  const firstNine = info.filter((h) => h.holeId <= 9).map(toHoleScore);
+  const secondNine = info.filter((h) => h.holeId >= 10).map(toHoleScore);
+  if (firstNine.length === 0 && secondNine.length === 0) return null;
+
+  return { firstNine, firstNineLabel: "OUT", secondNine, secondNineLabel: "IN" };
 }
 
 // Tournament leader (lowest total-to-par across all rounds played so far) -
