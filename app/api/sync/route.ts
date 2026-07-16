@@ -199,7 +199,7 @@ export async function GET() {
       if (started && bet.status === "pending") {
         bet.status = "live";
         updatedCount += 1;
-      } else if (!started && bet.status === "live") {
+      } else if (!started && bet.status === "live" && !bet.personalManualLive) {
         bet.status = "pending";
         updatedCount += 1;
       }

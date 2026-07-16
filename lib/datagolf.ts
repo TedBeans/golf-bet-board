@@ -162,6 +162,79 @@ export async function fetchDataGolfPredictions(): Promise<DataGolfPlayerRow[]> {
   });
 }
 
+// Lower-level version that never throws and returns diagnostics instead -
+// used by the debug route so a failure actually shows *why* (blocked
+// request, unexpected status, zero JSON.parse(...) blobs found at all,
+// blobs found but none matching the expected row shape, etc) rather than
+// just "didn't work". fetchDataGolfPredictions above stays throw-on-failure
+// for the sync route, which only wants a clean null on any problem.
+export async function fetchDataGolfDiagnostics(): Promise<{
+  status: number;
+  htmlLength: number;
+  htmlSnippet: string;
+  blobCount: number;
+  blobLengths: number[];
+  parseErrors: string[];
+  rows: DataGolfPlayerRow[] | null;
+}> {
+  const res = await fetch(DATAGOLF_URL, {
+    method: "GET",
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      Accept: "text/html,application/xhtml+xml",
+    },
+    cache: "no-store",
+  });
+  const html = await res.text();
+
+  const blobRegex = /JSON\.parse\('((?:\\.|[^'\\])*)'\)/g;
+  let m: RegExpExecArray | null;
+  const blobLengths: number[] = [];
+  const parseErrors: string[] = [];
+  let rows: any[] | null = null;
+
+  while ((m = blobRegex.exec(html)) !== null) {
+    blobLengths.push(m[1].length);
+    if (rows) continue; // keep scanning to report total blob count, but only need the first match
+    try {
+      const jsonText = unescapeJsStringLiteral(m[1]);
+      const parsed = JSON.parse(jsonText);
+      const found = findPredictionsArray(parsed);
+      if (found) rows = found;
+    } catch (e: any) {
+      parseErrors.push(e.message || String(e));
+    }
+  }
+
+  return {
+    status: res.status,
+    htmlLength: html.length,
+    htmlSnippet: html.slice(0, 500),
+    blobCount: blobLengths.length,
+    blobLengths,
+    parseErrors,
+    rows: rows
+      ? rows.map((r: any) => {
+          const { displayName, lastName } = toDisplayName(String(r.name || ""));
+          return {
+            dgId: r.dg_id != null ? String(r.dg_id) : "",
+            rawName: String(r.name || ""),
+            displayName,
+            lastName,
+            currentPos: r.current_pos != null ? String(r.current_pos) : null,
+            currentScore: typeof r.current_score === "number" ? r.current_score : null,
+            thru: r.thru ?? null,
+            cutProb: pct(r.cut),
+            winProb: pct(r.win),
+            top5Prob: pct(r.top5),
+            top10Prob: pct(r.top10),
+            top20Prob: pct(r.top20),
+          };
+        })
+      : null,
+  };
+}
+
 function norm(s: string): string {
   return s.toLowerCase().replace(/\./g, "").trim();
 }

@@ -556,6 +556,27 @@ export default function AdminPage() {
     });
   }
 
+  // Bulk one-click fix for the known gap where personal plays need a
+  // REGULAR bet loaded for the same tournament before sync's own
+  // pending->live promotion ever fires (see lib/seed.ts's
+  // personalManualLive comment). Only touches bets currently "pending" -
+  // leaves anything already hit/miss/manually-live alone. Sets
+  // personalManualLive too, so the very next sync pass's demotion check
+  // doesn't just flip it straight back.
+  function forcePersonalTournamentLive(tourn: string) {
+    const updated = bets.map((b) =>
+      b.personal && b.t === tourn && b.status === "pending"
+        ? { ...b, status: "live" as const, personalManualLive: true }
+        : b
+    );
+    setBets(updated);
+    fetch("/api/bets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, bets: updated }),
+    });
+  }
+
   function reorderPersonalParlays(draggedId: string, targetId: string) {
     if (draggedId === targetId) return;
     const personalOnly = sortByPersonalOrder(liveParlays.filter((p) => p.personal));
@@ -948,7 +969,14 @@ export default function AdminPage() {
         }, {})
       ).map(([tourn, tournBets]) => (
         <div key={tourn} className="card" style={{ marginBottom: 14 }}>
-          <div className="player" style={{ fontSize: 13, marginBottom: 8 }}>{tourn}</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <div className="player" style={{ fontSize: 13 }}>{tourn}</div>
+            {tournBets.some((b) => b.status === "pending") && (
+              <button className="recap-btn" style={{ fontSize: 9, padding: "4px 8px" }} onClick={() => forcePersonalTournamentLive(tourn)}>
+                Force live (no regular bet loaded yet)
+              </button>
+            )}
+          </div>
           {sortByPersonalOrder(tournBets).map((b) => (
             <div
               key={b.id}

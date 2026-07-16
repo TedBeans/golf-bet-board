@@ -311,7 +311,14 @@ export default function Page() {
     if (!bets) return;
     const b = bets.find((x) => x.id === id);
     if (!b) return;
-    updateBet(id, { status: b.status === target ? "pending" : target });
+    const newStatus = b.status === target ? "pending" : target;
+    const patch: Partial<Bet> = { status: newStatus };
+    // See lib/seed.ts's personalManualLive comment - without this, a
+    // manual click on a personal play (with no regular bet loaded yet for
+    // that tournament) gets silently reverted by sync's demotion logic
+    // within the next ~45s-1min.
+    if (b.personal) patch.personalManualLive = newStatus !== "pending";
+    updateBet(id, patch);
   }
 
   if (bets === null) {

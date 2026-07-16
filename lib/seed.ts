@@ -51,6 +51,15 @@ export type Bet = {
                            // tournament - unset until you actually reorder something, at
                            // which point it "crystallizes" the current order (see admin's
                            // reorder handler); falls back to array order when unset
+  personalManualLive?: boolean; // personal plays only - set true when TedBeans manually forces
+                                 // a status via the board's WIN/IN PROGRESS/LOSS buttons (or
+                                 // admin's "Force live" bulk action). The sync route's
+                                 // pending<->live auto-promotion is driven entirely by whether
+                                 // any REGULAR bet in the same tournament has started - with no
+                                 // regular bet loaded yet, that gate never fires, and the
+                                 // demotion half would otherwise silently flip a manual click
+                                 // back to pending on the very next sync pass. This flag tells
+                                 // that demotion logic "this was chosen on purpose, leave it".
 };
 
 export const SEED: Bet[] = [
