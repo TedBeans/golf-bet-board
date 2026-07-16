@@ -5,7 +5,8 @@ import { fetchPgaLeaderboard, fetchPlayerHoleScores } from "../../../lib/pgatour
 import { extractPlayers, findPlayerMatch } from "../../../lib/pgaMatch";
 import { extractHoleScores, roundNumberFromLabel } from "../../../lib/pgaScorecard";
 import { fetchOpenLeaderboard } from "../../../lib/theopen";
-import { extractOpenPlayers, findOpenPlayerMatch, extractOpenHoleScorecard } from "../../../lib/openMatch";
+import { extractOpenPlayers, findOpenPlayerMatch, extractOpenHoleScorecard, computeOpenStats } from "../../../lib/openMatch";
+import { computePositions, PositionEntry } from "../../../lib/positions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -37,15 +38,30 @@ export async function GET(req: NextRequest) {
       if (!row) {
         return NextResponse.json({ error: `No match for ${player} on theopen.com's leaderboard` }, { status: 404 });
       }
+
+      // Same field-wide ranking already used for personal Winner/Top N bets
+      // - computed ourselves from cumulative score-to-par, ties handled the
+      // way a real leaderboard does.
+      const entries: PositionEntry[] = players.map((p) => {
+        const s = computeOpenStats(p, null);
+        return { id: p.id, totalToPar: s.holesPlayed > 0 ? s.totalToPar : null };
+      });
+      const positions = computePositions(entries);
+      const playerTotal = computeOpenStats(row, null);
+      const totalToPar = playerTotal.holesPlayed > 0 ? playerTotal.totalToPar : null;
+      const position = positions.get(row.id) ?? null;
+
       const scorecard = extractOpenHoleScorecard(row, roundNum);
       if (!scorecard) {
         return NextResponse.json({
           available: false,
           player: row.displayName,
+          position,
+          totalToPar,
           message: `No scorecard found for ${row.displayName} in ${round} yet.`,
         });
       }
-      return NextResponse.json({ available: true, player: row.displayName, scorecard });
+      return NextResponse.json({ available: true, player: row.displayName, position, totalToPar, scorecard });
     } catch (e: any) {
       return NextResponse.json({ error: e.message || "Failed to load scorecard" }, { status: 500 });
     }
@@ -64,6 +80,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: `No match for ${player} on the leaderboard` }, { status: 404 });
     }
 
+    const entries: PositionEntry[] = players.map((p) => ({ id: p.id, totalToPar: p.total }));
+    const positions = computePositions(entries);
+    const position = positions.get(row.id) ?? null;
+    const totalToPar = row.total;
+
     const holeJson = await fetchPlayerHoleScores(tournamentId, row.id);
     const scorecard = extractHoleScores(holeJson, roundNum);
 
@@ -71,11 +92,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         available: false,
         player: row.displayName,
+        position,
+        totalToPar,
         message: `No scorecard found for ${row.displayName} in ${round} yet.`,
       });
     }
 
-    return NextResponse.json({ available: true, player: row.displayName, scorecard });
+    return NextResponse.json({ available: true, player: row.displayName, position, totalToPar, scorecard });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Failed to load scorecard" }, { status: 500 });
   }

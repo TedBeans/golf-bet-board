@@ -22,6 +22,16 @@ function symbolClass(h: Hole): string {
   }
 }
 
+// Same to-par formatting used everywhere else on the board ("E" for even,
+// "+3" over, "-2" under) - kept local rather than importing from
+// lib/betLogic to avoid pulling that module's server-oriented dependencies
+// into this small client component.
+function formatToPar(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "—";
+  if (n === 0) return "E";
+  return n > 0 ? `+${n}` : `${n}`;
+}
+
 function nineTotal(holes: Hole[]): number | null {
   return holes.every((h) => h.score !== null) ? holes.reduce((s, h) => s + (h.score ?? 0), 0) : null;
 }
@@ -55,33 +65,51 @@ export default function HoleScorecardModal({
   player,
   loading,
   scorecard,
+  position,
+  totalToPar,
   message,
   onClose,
 }: {
   player: string;
   loading: boolean;
   scorecard: Scorecard | null;
+  position?: string | null;
+  totalToPar?: number | null;
   message?: string;
   onClose: () => void;
 }) {
+  const hasStandings = (position !== undefined && position !== null) || (totalToPar !== undefined && totalToPar !== null);
+  const scoreColor = totalToPar === null || totalToPar === undefined ? "var(--cream)" : totalToPar < 0 ? "var(--live)" : totalToPar > 0 ? "var(--clay)" : "var(--cream)";
+
   return (
     <div
       onClick={(e) => e.stopPropagation()}
       style={{
         position: "absolute", bottom: "calc(100% - 6px)", left: 28, zIndex: 20,
         background: "#0F1216", border: "1px solid var(--line)", borderRadius: 4,
-        padding: "8px 10px", minWidth: 260, boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
+        padding: "10px 12px", minWidth: 300, boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--cream-dim)" }}>{player}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: hasStandings ? 4 : 6 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--cream)" }}>{player}</span>
         <span onClick={onClose} style={{ fontSize: 10, color: "var(--cream-dim)", cursor: "pointer", opacity: 0.7 }}>close ✕</span>
       </div>
+
+      {hasStandings && (
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 20, fontWeight: 700, color: scoreColor }}>
+            {formatToPar(totalToPar)}
+          </span>
+          {position !== undefined && position !== null && (
+            <span style={{ fontSize: 12, color: "var(--cream-dim)" }}>Position {position}</span>
+          )}
+        </div>
+      )}
 
       {loading && <div style={{ fontSize: 11, color: "var(--cream-dim)" }}>Loading…</div>}
 
       {!loading && !scorecard && (
-        <div style={{ fontSize: 11, color: "var(--cream-dim)", maxWidth: 240, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 11, color: "var(--cream-dim)", maxWidth: 270, lineHeight: 1.4 }}>
           {message || "Scorecard not available."}
         </div>
       )}

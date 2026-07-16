@@ -55,6 +55,8 @@ function BetDetailCard({ b, compact = false, mapping }: { b: Bet; compact?: bool
                   player={b.player}
                   loading={scorecardState?.loading ?? false}
                   scorecard={scorecardState?.scorecard ?? null}
+                  position={scorecardState?.position}
+                  totalToPar={scorecardState?.totalToPar}
                   message={scorecardState?.message}
                   onClose={() => openScorecard(b.id, b.t, b.r, b.player)}
                 />
@@ -79,6 +81,8 @@ function BetDetailCard({ b, compact = false, mapping }: { b: Bet; compact?: bool
                   player={b.player}
                   loading={scorecardState?.loading ?? false}
                   scorecard={scorecardState?.scorecard ?? null}
+                  position={scorecardState?.position}
+                  totalToPar={scorecardState?.totalToPar}
                   message={scorecardState?.message}
                   onClose={() => openScorecard(b.id, b.t, b.r, b.player)}
                 />

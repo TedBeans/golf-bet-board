@@ -114,7 +114,7 @@ export default function Page() {
   const [mapping, setMapping] = useState<Mapping>(EMPTY_MAPPING);
   const [archive, setArchive] = useState<Bet[]>([]);
   const [liveParlays, setLiveParlays] = useState<Parlay[]>([]);
-  const [scorecardModal, setScorecardModal] = useState<{ betId: string; player: string; loading: boolean; scorecard: any | null; message?: string } | null>(null);
+  const [scorecardModal, setScorecardModal] = useState<{ betId: string; player: string; loading: boolean; scorecard: any | null; position?: string | null; totalToPar?: number | null; message?: string } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function openScorecard(betId: string, tourn: string, round: string, player: string) {
@@ -131,6 +131,8 @@ export default function Page() {
           player: d.player || player,
           loading: false,
           scorecard: d.scorecard || null,
+          position: d.position ?? null,
+          totalToPar: d.totalToPar ?? null,
           message: d.message || d.error,
         });
       })
@@ -414,6 +416,8 @@ export default function Page() {
                                   player={scorecardModal.player}
                                   loading={scorecardModal.loading}
                                   scorecard={scorecardModal.scorecard}
+                                  position={scorecardModal.position}
+                                  totalToPar={scorecardModal.totalToPar}
                                   message={scorecardModal.message}
                                   onClose={() => setScorecardModal(null)}
                                 />
@@ -635,6 +639,8 @@ export default function Page() {
                                 player={scorecardModal.player}
                                 loading={scorecardModal.loading}
                                 scorecard={scorecardModal.scorecard}
+                                position={scorecardModal.position}
+                                totalToPar={scorecardModal.totalToPar}
                                 message={scorecardModal.message}
                                 onClose={() => setScorecardModal(null)}
                               />
