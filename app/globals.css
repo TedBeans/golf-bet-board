@@ -18,6 +18,9 @@ body{
   font-family: 'JetBrains Mono', monospace;
   min-height:100vh;
   padding-bottom: 60px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 header{
   padding: 22px 16px 16px;

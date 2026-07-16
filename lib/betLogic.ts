@@ -123,23 +123,23 @@ export function trend(parsed: ParsedBet, stat: number | null, thru: number | nul
   return "neutral";
 }
 
-const COUNT_LABELS = ["GIR", "BIRDIES", "BOGEYS", "PARS"];
+const PACE_LABELS = ["GIR", "BIRDIES", "BOGEYS", "PARS", "SCORE"];
 
-// For count-based bets (greens/birdies/bogeys/pars), compares the pace
-// you're actually keeping (stat so far ÷ holes played) against the pace
-// you'd need to sustain to hit the target (target ÷ 18) - a 3-point
-// percentage buffer either side of that required pace gives green/yellow/
-// red instead of just green/red, so you get an early read well before the
-// round's worst/best-case bound would otherwise kick in. Round score and
-// the tournament-winner bet fall back to the simpler trend() above, since
-// "percent of holes" doesn't map cleanly onto a to-par number.
+// For count-based bets (greens/birdies/bogeys/pars) and round score, compares
+// the pace you're actually keeping (stat so far ÷ holes played) against the
+// pace you'd need to sustain to hit the target (target ÷ holes) - a 3-point
+// buffer either side of that required pace gives green/yellow/red instead of
+// just green/red, so you get an early read well before the round's worst/
+// best-case bound would otherwise kick in. The tournament-winner bet is the
+// one thing that still falls back to the simpler trend() below, since a
+// field-wide "winning score" has no fixed target of its own to pace against.
 export function smartTrend(
   parsed: ParsedBet,
   stat: number | null,
   thru: number | null,
   holesTotal = HOLES_IN_ROUND
 ): "good" | "warn" | "bad" | "neutral" {
-  if (!COUNT_LABELS.includes(parsed.label)) return trend(parsed, stat, thru);
+  if (!PACE_LABELS.includes(parsed.label)) return trend(parsed, stat, thru);
   if (parsed.type === "generic" || parsed.target === null || parsed.target === undefined) return "neutral";
   if (stat === null || stat === undefined || isNaN(stat)) return "neutral";
   if (thru === null || thru === undefined || isNaN(thru) || thru <= 0) return "neutral";
@@ -159,18 +159,21 @@ export function smartTrend(
   return "warn";
 }
 
-// Returns the actual CSS class to use for a stat value - the new green/
-// yellow/red pace scheme for count-based bets, or the existing gold/red/
-// cream scheme for score bets (unchanged, since "good" there doesn't mean
-// the same thing as an actual win).
+// Returns the actual CSS class to use for a stat value - one unified green/
+// yellow/red pace scheme (see smartTrend above) for every bet type that has
+// a fixed target to pace against. holesTotal is always recomputed here from
+// the bet's own segment (front9/back9 = 9 holes, else 18) rather than
+// trusting whatever a call site happened to pass in, so a Front 9 bet is
+// never accidentally paced against a full round.
 export function trendClassName(
   parsed: ParsedBet,
   stat: number | null,
   thru: number | null,
-  holesTotal = HOLES_IN_ROUND
+  holesTotal?: number
 ): string {
-  if (COUNT_LABELS.includes(parsed.label)) {
-    return `pace-${smartTrend(parsed, stat, thru, holesTotal)}`;
+  const effectiveHolesTotal = holesTotal ?? (parsed.segment ? HOLES_IN_NINE : HOLES_IN_ROUND);
+  if (PACE_LABELS.includes(parsed.label)) {
+    return `pace-${smartTrend(parsed, stat, thru, effectiveHolesTotal)}`;
   }
   return `trend-${trend(parsed, stat, thru)}`;
 }
