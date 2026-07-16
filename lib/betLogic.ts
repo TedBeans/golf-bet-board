@@ -50,27 +50,27 @@ export function parseBetType(text: string): ParsedBet {
     return { type: "generic", label: "MAKE_CUT", target: null, targetDisplay: "—" };
   }
 
-  if ((m = t.match(/^front 9:\s*(-?\d+|E)\s+or better$/i))) {
+  if ((m = t.match(/^front 9:\s*([+-]?\d+|E)\s+or better$/i))) {
     const val = /^E$/i.test(m[1]) ? 0 : parseInt(m[1], 10);
     return { type: "max", label: "SCORE", segment: "front9", target: val, targetDisplay: "≤ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
   }
-  if ((m = t.match(/^front 9:\s*(-?\d+|E)\s+or worse$/i))) {
+  if ((m = t.match(/^front 9:\s*([+-]?\d+|E)\s+or worse$/i))) {
     const val = /^E$/i.test(m[1]) ? 0 : parseInt(m[1], 10);
     return { type: "min", label: "SCORE", segment: "front9", target: val, targetDisplay: "≥ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
   }
-  if ((m = t.match(/^back 9:\s*(-?\d+|E)\s+or better$/i))) {
+  if ((m = t.match(/^back 9:\s*([+-]?\d+|E)\s+or better$/i))) {
     const val = /^E$/i.test(m[1]) ? 0 : parseInt(m[1], 10);
     return { type: "max", label: "SCORE", segment: "back9", target: val, targetDisplay: "≤ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
   }
-  if ((m = t.match(/^back 9:\s*(-?\d+|E)\s+or worse$/i))) {
+  if ((m = t.match(/^back 9:\s*([+-]?\d+|E)\s+or worse$/i))) {
     const val = /^E$/i.test(m[1]) ? 0 : parseInt(m[1], 10);
     return { type: "min", label: "SCORE", segment: "back9", target: val, targetDisplay: "≥ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
   }
-  if ((m = t.match(/^(-?\d+|E)\s+or better$/i))) {
+  if ((m = t.match(/^([+-]?\d+|E)\s+or better$/i))) {
     const val = /^E$/i.test(m[1]) ? 0 : parseInt(m[1], 10);
     return { type: "max", label: "SCORE", target: val, targetDisplay: "≤ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
   }
-  if ((m = t.match(/^(-?\d+|E)\s+or worse$/i))) {
+  if ((m = t.match(/^([+-]?\d+|E)\s+or worse$/i))) {
     const val = /^E$/i.test(m[1]) ? 0 : parseInt(m[1], 10);
     return { type: "min", label: "SCORE", target: val, targetDisplay: "≥ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
   }

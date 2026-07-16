@@ -122,13 +122,27 @@ export async function GET() {
 
     // Auto-promote TBD -> IN PROGRESS once its scheduled tee time (Central)
     // arrives - this is what actually opens the door to fetching for it.
-    // Personal plays skip this entirely: they're tournament-long, start out
-    // already "live" at creation (see lib/parsePersonal.ts), and have no
-    // single tee time to gate on.
     if (!bet.personal && bet.status === "pending") {
       const teeMinutes = timeToMinutes(bet.time);
       const dateReached = !bet.loadedDate || todayCentral >= bet.loadedDate;
       if (dateReached && nowMinutes >= teeMinutes) {
+        bet.status = "live";
+        updatedCount += 1;
+      }
+    }
+
+    // Personal plays have no single tee time of their own - instead, they
+    // promote the moment any REGULAR bet for the same tournament has
+    // itself already gone live (or further, hit/miss) this sync pass,
+    // which only happens once that bet's own tee time has actually passed.
+    // Until then they stay TBD and are skipped below (no fetch wasted on a
+    // tournament that hasn't teed off yet). This deliberately checks the
+    // other bets already in this array rather than tracking a separate
+    // "tournament start time" field - the tee times you paste in every
+    // night already are that signal.
+    if (bet.personal && bet.status === "pending") {
+      const started = bets.some((b) => b.t === bet.t && !b.personal && b.status !== "pending");
+      if (started) {
         bet.status = "live";
         updatedCount += 1;
       }

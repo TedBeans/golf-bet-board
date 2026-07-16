@@ -122,10 +122,13 @@ export function parsePersonalText(text: string, forDate: string | undefined): Pa
       bet: phrase,
       stat: null,
       thru: null,
-      // Tournament-long, not tied to one tee time - live immediately, no
-      // pending phase to promote out of (see the sync route's tee-time-gate
-      // bypass for bets with personal: true).
-      status: "live",
+      // Tournament-long, not tied to one tee time - promoted to live once
+      // any regular bet for the same tournament confirms play has actually
+      // started (see the sync route's personal-bet promotion check), not
+      // immediately at creation. This keeps the board honest (TBD, not "IN
+      // PROGRESS", before anything's actually happening) and skips fetching
+      // for these entirely until there's something worth fetching.
+      status: "pending",
       autoEnabled: true,
       auto: null,
       oddsLine: null,
