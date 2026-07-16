@@ -32,7 +32,8 @@ function legLiveDetail(bet: Bet): string {
     return `${bet.auto?.position ?? "—"} thru ${bet.auto?.thru ?? "—"}`;
   }
   if (p.label === "MAKE_CUT") {
-    return `${bet.auto?.position ?? "—"} · ${formatScore(bet.auto?.scoreToPar ?? null)} thru ${bet.auto?.thru ?? "—"}`;
+    const dg = bet.auto?.dgCutProb;
+    return `${bet.auto?.position ?? "—"} · ${formatScore(bet.auto?.scoreToPar ?? null)} thru ${bet.auto?.thru ?? "—"}${dg !== null && dg !== undefined ? ` · DG ${dg}%` : ""}`;
   }
   if (p.label === "H2H" || p.label === "TIE") {
     const subjectThru = bet.auto?.thru ?? null;
@@ -773,6 +774,9 @@ export default function Page() {
                               Position {b.auto?.position ?? "—"} · Round 1 {formatScore(b.auto?.scoreToPar ?? null)} thru {b.auto?.thru ?? "—"}
                               {" · "}
                               {cutLine !== undefined ? `Cut line ${formatScore(cutLine)}` : "cut line not set yet"}
+                              {b.auto?.dgCutProb !== null && b.auto?.dgCutProb !== undefined && (
+                                <>{" · "}DataGolf {b.auto.dgCutProb}% to make cut</>
+                              )}
                             </>
                           ) : parsed.label === "H2H" || parsed.label === "TIE" ? (
                             <>

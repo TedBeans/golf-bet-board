@@ -16,6 +16,11 @@ export type AutoStats = {
                              // computed ourselves (e.g. "T7"), ties handled via lib/positions.ts
   opponentScoreToPar?: number | null; // personal H2H bets only - the opponent's score for the same scope
   opponentThru?: number | null; // personal H2H bets only - opponent's holes completed for that scope
+  dgCutProb?: number | null; // personal MAKE_CUT bets only - DataGolf live model's real-time make-cut
+                             // probability (0-100%), purely informational context alongside
+                             // gradeMakeCut's own hit/miss logic - never used for grading itself.
+                             // null if DataGolf's page couldn't be fetched/parsed or the player
+                             // didn't match - non-fatal either way, see lib/datagolf.ts.
 };
 
 export type Bet = {

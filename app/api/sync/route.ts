@@ -9,6 +9,7 @@ import { extractScorecardStats, roundNumberFromLabel, computeSegmentStats, compu
 import { fetchOpenLeaderboard, fetchOpenStatistics } from "../../../lib/theopen";
 import { extractOpenPlayers, findOpenPlayerMatch, findOpenLeader, computeOpenStats, computeOpenGirFairways, OpenPlayerRow } from "../../../lib/openMatch";
 import { parseBetType, autoGradeStatus, timeToMinutes, gradeMakeCut } from "../../../lib/betLogic";
+import { fetchDataGolfPredictions, findDataGolfPlayerMatch, DataGolfPlayerRow } from "../../../lib/datagolf";
 import { computePositions, PositionEntry } from "../../../lib/positions";
 import { nowInCentral } from "../../../lib/centralTime";
 
@@ -69,6 +70,26 @@ export async function GET() {
   // there's no reason to fetch it on every sync pass for tournaments/bets
   // that never touch it.
   let openStatsCache: any | null = null;
+  // Lazily fetched, at most once per sync pass, regardless of how many
+  // personal MAKE_CUT bets need it. undefined = not attempted yet this
+  // pass; null = attempted and failed (page structure changed, request
+  // blocked, etc - treated as "no data available" for the rest of this
+  // pass rather than retried per-bet). Purely informational context
+  // alongside gradeMakeCut's own hit/miss logic below - a failure here
+  // never blocks or affects actual grading.
+  let dataGolfCache: DataGolfPlayerRow[] | null | undefined = undefined;
+  async function getDataGolfCutProb(playerName: string): Promise<number | null> {
+    if (dataGolfCache === undefined) {
+      try {
+        dataGolfCache = await fetchDataGolfPredictions();
+      } catch {
+        dataGolfCache = null;
+      }
+    }
+    if (!dataGolfCache) return null;
+    const match = findDataGolfPlayerMatch(playerName, dataGolfCache);
+    return match ? match.cutProb : null;
+  }
   // Field-wide position rankings for personal Winner/Top N bets - computed
   // once per tournament per sync pass (several personal bets often share
   // the same tournament), not once per bet.
@@ -278,6 +299,8 @@ export async function GET() {
             continue;
           }
 
+          const dgCutProb = await getDataGolfCutProb(bet.player);
+
           bet.thru = r1.thru;
           bet.stat = r1.scoreToPar;
           bet.auto = {
@@ -286,6 +309,7 @@ export async function GET() {
             birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
             updatedAt: new Date().toISOString(),
             position: positions.get(r1.id) ?? null,
+            dgCutProb,
           };
 
           const graded = gradeMakeCut(
