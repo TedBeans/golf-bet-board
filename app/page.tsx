@@ -54,7 +54,7 @@ function legDgDetail(bet: Bet): string | null {
   const p = parseBetType(bet.bet);
   if (p.label !== "MAKE_CUT") return null;
   const dg = bet.auto?.dgCutProb;
-  return dg !== null && dg !== undefined ? `DG ${dg}%` : null;
+  return dg !== null && dg !== undefined ? `${dg}%` : null;
 }
 
 // Badge color for a live personal leg - directional (currently ahead/tied/
@@ -241,11 +241,23 @@ function parlayHasMakeCutLeg(p: Parlay): boolean {
 function CutlineStrip({ probs }: { probs: { score: number; prob: number }[] }) {
   if (probs.length === 0) return null;
   return (
-    <div style={{ display: "flex", gap: 14, fontSize: 11, color: "var(--cream-dim)", margin: "8px 0 4px", flexWrap: "wrap" }}>
-      <span style={{ textTransform: "uppercase", letterSpacing: 0.5 }}>Cutline:</span>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        gap: 20,
+        margin: "4px 0 12px",
+        padding: "8px 12px",
+        border: "1px solid rgba(228,190,74,0.25)",
+        borderRadius: 6,
+        background: "rgba(228,190,74,0.06)",
+      }}
+    >
+      <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "var(--cream-dim)" }}>Cutline</span>
       {probs.map((c) => (
-        <span key={c.score}>
-          {formatScore(c.score)} <span style={{ color: "var(--cream)" }}>{c.prob}%</span>
+        <span key={c.score} style={{ fontSize: 14, fontWeight: 700, color: "var(--gold-bright)" }}>
+          {formatScore(c.score)} <span>{c.prob}%</span>
         </span>
       ))}
     </div>
