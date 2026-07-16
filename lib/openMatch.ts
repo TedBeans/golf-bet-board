@@ -6,28 +6,17 @@ export type OpenPlayerRow = {
   lastName: string;
   displayName: string;
   rounds: OpenRound[];
-  currentRound: number | null; // which round this player is actively playing right now
-  currentHole: number | null; // which hole within currentRound is in progress - NOT yet
-                               // finished, so its playerStrokes (even if nonzero) is a live,
-                               // still-changing count as they play it, not a final score.
-                               // Without this, a hole in progress can transiently look like a
-                               // completed eagle/albatross before the player has even holed out.
 };
 
 export function extractOpenPlayers(traditionalJson: any): OpenPlayerRow[] {
   const rows: any[] = traditionalJson?.players || [];
-  return rows.map((r) => {
-    const parsedHole = parseInt(r.hole, 10);
-    return {
-      id: String(r.id ?? ""),
-      firstName: r.firstName || "",
-      lastName: r.lastName || "",
-      displayName: `${r.firstName || ""} ${r.lastName || ""}`.trim(),
-      rounds: r.rounds || [],
-      currentRound: typeof r.currentRound === "number" ? r.currentRound : null,
-      currentHole: isNaN(parsedHole) ? null : parsedHole,
-    };
-  });
+  return rows.map((r) => ({
+    id: String(r.id ?? ""),
+    firstName: r.firstName || "",
+    lastName: r.lastName || "",
+    displayName: `${r.firstName || ""} ${r.lastName || ""}`.trim(),
+    rounds: r.rounds || [],
+  }));
 }
 
 function norm(s: string): string {
@@ -103,43 +92,22 @@ export function computeOpenStats(
   let thisRoundThru = 0;
 
   for (const round of rounds) {
-    // Only trust this round's per-hole data at all if there's real
-    // evidence the player has actually started it: either it's a round
-    // strictly before their current one (definitely finished), or it's
-    // their current round AND they have a real current-hole value (meaning
-    // they've actually teed off). Without this, a player who hasn't teed
-    // off yet - currentHole still null - would fall through every check
-    // below and blindly trust whatever stray/placeholder value theopen.com
-    // happens to have sitting in hole 1's playerStrokes, producing
-    // impossible lines like "-3 thru 1" before they've hit a shot.
-    const hasStartedThisRound =
-      player.currentRound !== null &&
-      (round.id < player.currentRound || (round.id === player.currentRound && player.currentHole !== null));
-    if (!hasStartedThisRound) continue;
-
-    // Only the round the player is CURRENTLY on has a "hole in progress" to
-    // worry about - a fully-finished past round has no provisional data
-    // left.
-    const isLiveRound = player.currentRound !== null && round.id === player.currentRound;
-
     for (const hole of round.info || []) {
       if (holeRange && (hole.holeId < holeRange[0] || hole.holeId > holeRange[1])) continue;
-      // The hole currently in progress reports a live, still-changing
-      // stroke count as the player plays it - not a final score, and never
-      // trusted no matter what. Counting it early is exactly how a
-      // still-in-progress hole can transiently look like a completed
-      // eagle/albatross before it's actually done. This is an
-      // unconditional cutoff - deliberately not "self-correcting" against
-      // apparent evidence from later holes, since theopen.com's feed can
-      // show stray/placeholder values in holes that haven't really been
-      // played (same root cause as a not-yet-teed-off player showing
-      // strokes on hole 1) - trusting that "evidence" caused two real
-      // holes (in-progress + not-yet-played) to get counted as finished
-      // at once. Undercounting for one poll cycle until currentHole
-      // catches up is a far safer failure mode than fabricating a score.
-      if (isLiveRound && player.currentHole !== null && hole.holeId >= player.currentHole) continue;
-      if (!hole.playerStrokes || hole.playerStrokes <= 0) continue; // not played yet
-      const diff = hole.playerStrokes - hole.holePar;
+      // playerPar is theopen.com's own per-hole "this is finalized" marker.
+      // Confirmed directly against the live feed: a hole currently being
+      // played shows playerStrokes ticking up shot by shot (e.g. 2 strokes
+      // in) while playerPar sits at 0 the whole time - it only gets set
+      // once the hole is actually closed out, at which point it matches
+      // playerStrokes exactly. That makes it a reliable per-hole signal on
+      // its own, unlike the top-level "current hole" field (which this
+      // replaces) - that field can lag behind real play by a hole or more,
+      // since it's a separate, less-frequently-updated value. Using
+      // playerPar here means "thru" never needs to wait on that lag at
+      // all, and still can't be fooled by a hole that's merely in
+      // progress, since playerPar itself won't be set until it's done.
+      if (!hole.playerPar || hole.playerPar <= 0) continue; // not finalized yet
+      const diff = hole.playerPar - hole.holePar;
       totalToPar += diff;
       holesPlayed += 1;
       if (roundNumber !== null && round.id === roundNumber) {
@@ -172,9 +140,8 @@ export function computeOpenStats(
 // Same HoleScore/HoleScorecard shape as lib/pgaScorecard.ts's extractHoleScores,
 // so HoleScorecardModal doesn't need to know which data source it came from -
 // used by /api/scorecard when a tournament's dataSource is "theopen" instead
-// of the PGA Tour default. Respects the same in-progress-hole rule as
-// computeOpenStats above: the hole currently being played never shows a
-// provisional score, even if playerStrokes has already ticked up.
+// of the PGA Tour default. Uses the same playerPar-based "is this hole
+// finalized" signal as computeOpenStats above.
 export type OpenHoleScore = { hole: number; par: number; score: number | null; status: string | null };
 export type OpenHoleScorecard = { firstNine: OpenHoleScore[]; firstNineLabel: string; secondNine: OpenHoleScore[]; secondNineLabel: string };
 
@@ -190,14 +157,12 @@ function openHoleStatus(diff: number): string {
 export function extractOpenHoleScorecard(player: OpenPlayerRow, roundNumber: number): OpenHoleScorecard | null {
   const round = player.rounds.find((r) => r.id === roundNumber);
   if (!round) return null;
-  const isLiveRound = player.currentRound !== null && round.id === player.currentRound;
 
   const toHoleScore = (h: OpenHole): OpenHoleScore => {
-    const inProgress = isLiveRound && player.currentHole !== null && h.holeId >= player.currentHole;
-    const played = !inProgress && typeof h.playerStrokes === "number" && h.playerStrokes > 0;
-    if (!played) return { hole: h.holeId, par: h.holePar, score: null, status: null };
-    const diff = h.playerStrokes - h.holePar;
-    return { hole: h.holeId, par: h.holePar, score: h.playerStrokes, status: openHoleStatus(diff) };
+    const finalized = typeof h.playerPar === "number" && h.playerPar > 0;
+    if (!finalized) return { hole: h.holeId, par: h.holePar, score: null, status: null };
+    const diff = h.playerPar - h.holePar;
+    return { hole: h.holeId, par: h.holePar, score: h.playerPar, status: openHoleStatus(diff) };
   };
 
   const info = round.info || [];
