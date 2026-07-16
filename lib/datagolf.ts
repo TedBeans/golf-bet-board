@@ -126,13 +126,17 @@ export async function fetchDataGolfPredictions(): Promise<DataGolfPlayerRow[]> {
 
   // Matches JSON.parse('...') where '...' can contain escaped chars
   // (including escaped quotes) but not a bare unescaped single quote.
-  const blobRegex = /JSON\.parse\('((?:\\.|[^'\\])*)'\)/g;
+  // Deliberately does NOT require the closing quote to be followed
+  // immediately by ')' - the real page wraps some blobs as
+  // JSON.parse('...'.replace(/\bNaN\b/g, "null")), so anything can follow
+  // the closing quote.
+  const blobRegex = /JSON\.parse\('((?:\\.|[^'\\])*)'/g;
   let m: RegExpExecArray | null;
   let rows: any[] | null = null;
 
   while ((m = blobRegex.exec(html)) !== null) {
     try {
-      const jsonText = unescapeJsStringLiteral(m[1]);
+      const jsonText = unescapeJsStringLiteral(m[1]).replace(/\bNaN\b/g, "null");
       const parsed = JSON.parse(jsonText);
       const found = findPredictionsArray(parsed);
       if (found) { rows = found; break; }
@@ -187,7 +191,7 @@ export async function fetchDataGolfDiagnostics(): Promise<{
   });
   const html = await res.text();
 
-  const blobRegex = /JSON\.parse\('((?:\\.|[^'\\])*)'\)/g;
+  const blobRegex = /JSON\.parse\('((?:\\.|[^'\\])*)'/g;
   let m: RegExpExecArray | null;
   const blobLengths: number[] = [];
   const parseErrors: string[] = [];
@@ -197,7 +201,7 @@ export async function fetchDataGolfDiagnostics(): Promise<{
     blobLengths.push(m[1].length);
     if (rows) continue; // keep scanning to report total blob count, but only need the first match
     try {
-      const jsonText = unescapeJsStringLiteral(m[1]);
+      const jsonText = unescapeJsStringLiteral(m[1]).replace(/\bNaN\b/g, "null");
       const parsed = JSON.parse(jsonText);
       const found = findPredictionsArray(parsed);
       if (found) rows = found;
