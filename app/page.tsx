@@ -80,11 +80,13 @@ type ScorecardModalState = { betId: string; player: string; loading: boolean; sc
 
 function LegRow({
   ls,
+  parlayId,
   openScorecard,
   scorecardModal,
   setScorecardModal,
 }: {
   ls: LegStatus;
+  parlayId: string;
   openScorecard: (betId: string, tourn: string, round: string, player: string) => void;
   scorecardModal: ScorecardModalState;
   setScorecardModal: (v: ScorecardModalState) => void;
@@ -95,17 +97,25 @@ function LegRow({
   // "TedBeans Plays" bucket, not a real round).
   const parsedLegBet = parseBetType(ls.leg.bet);
   const round = parsedLegBet.h2hScope === "round" && parsedLegBet.h2hRoundNum ? `Round ${parsedLegBet.h2hRoundNum}` : ls.leg.round;
-  const isOpen = scorecardModal?.betId === ls.leg.betId;
 
-  const playerSpan = (
+  // The same underlying bet can be a leg in more than one parlay (e.g. a
+  // Tournament H2H bet included in both a 2-way and a 7-way matchup
+  // parlay) - keying the popover on betId alone meant clicking one
+  // instance opened every instance of that same leg at once. Scoping the
+  // key to this specific parlay+leg+role keeps each clickable name
+  // independent, even when the underlying bet repeats elsewhere.
+  const subjectKey = `${parlayId}:${ls.leg.betId}:subject`;
+  const isSubjectOpen = scorecardModal?.betId === subjectKey;
+
+  const subjectSpan = (
     <span style={{ position: "relative", display: "inline-block" }}>
       <span
         style={{ cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--cream-dim)" }}
-        onClick={() => openScorecard(ls.leg.betId, ls.leg.tournament, round, ls.leg.player)}
+        onClick={() => openScorecard(subjectKey, ls.leg.tournament, round, ls.leg.player)}
       >
         {ls.leg.player}
       </span>
-      {isOpen && scorecardModal && (
+      {isSubjectOpen && scorecardModal && (
         <HoleScorecardModal
           player={scorecardModal.player}
           loading={scorecardModal.loading}
@@ -119,6 +129,46 @@ function LegRow({
     </span>
   );
 
+  // For H2H/Tie legs, rebuild the bet phrase from its parsed pieces so the
+  // opponent's name can be its own clickable span too, rather than being
+  // stuck inside a single plain-text string.
+  let betPhraseNode: React.ReactNode = ls.leg.bet;
+  if ((parsedLegBet.label === "H2H" || parsedLegBet.label === "TIE") && parsedLegBet.h2hOpponent) {
+    const verb = parsedLegBet.label === "H2H" ? "H2H vs" : "Tie vs";
+    const scopeText = parsedLegBet.h2hScope === "round" ? `(Round ${parsedLegBet.h2hRoundNum})` : "(Tournament)";
+    const opponentName = parsedLegBet.h2hOpponent;
+    const opponentKey = `${parlayId}:${ls.leg.betId}:opponent`;
+    const isOpponentOpen = scorecardModal?.betId === opponentKey;
+
+    const opponentSpan = (
+      <span style={{ position: "relative", display: "inline-block" }}>
+        <span
+          style={{ cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--cream-dim)" }}
+          onClick={() => openScorecard(opponentKey, ls.leg.tournament, round, opponentName)}
+        >
+          {opponentName}
+        </span>
+        {isOpponentOpen && scorecardModal && (
+          <HoleScorecardModal
+            player={scorecardModal.player}
+            loading={scorecardModal.loading}
+            scorecard={scorecardModal.scorecard}
+            position={scorecardModal.position}
+            totalToPar={scorecardModal.totalToPar}
+            message={scorecardModal.message}
+            onClose={() => setScorecardModal(null)}
+          />
+        )}
+      </span>
+    );
+
+    betPhraseNode = (
+      <>
+        {verb} {opponentSpan} {scopeText}
+      </>
+    );
+  }
+
   if (ls.status === "live" && ls.bet) {
     const badgeClass = ls.bet.personal
       ? legStatusClass(ls.bet)
@@ -128,7 +178,7 @@ function LegRow({
         })();
     return (
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-        <span style={{ color: "var(--cream-dim)" }}>{playerSpan} · {ls.leg.bet}</span>
+        <span style={{ color: "var(--cream-dim)" }}>{subjectSpan} · {betPhraseNode}</span>
         <span className={`tsum ${badgeClass}`}>
           LIVE | {legLiveDetail(ls.bet)}
         </span>
@@ -137,7 +187,7 @@ function LegRow({
   }
   return (
     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-      <span style={{ color: "var(--cream-dim)" }}>{playerSpan} · {ls.leg.bet}</span>
+      <span style={{ color: "var(--cream-dim)" }}>{subjectSpan} · {betPhraseNode}</span>
       <span className={ls.status === "hit" ? "tsum win" : ls.status === "miss" ? "tsum loss" : "tsum tbd"}>
         {ls.status === "hit" ? "WIN" : ls.status === "miss" ? "LOSS" : "TBD"}
       </span>
@@ -631,7 +681,7 @@ export default function Page() {
                   </div>
                   <div style={{ marginTop: 8 }}>
                     {legStatuses.map((ls, i) => (
-                      <LegRow key={i} ls={ls} openScorecard={openScorecard} scorecardModal={scorecardModal} setScorecardModal={setScorecardModal} />
+                      <LegRow key={i} ls={ls} parlayId={p.id} openScorecard={openScorecard} scorecardModal={scorecardModal} setScorecardModal={setScorecardModal} />
                     ))}
                   </div>
                 </div>
@@ -767,7 +817,7 @@ export default function Page() {
                       </div>
                       <div style={{ marginTop: 8 }}>
                         {legStatuses.map((ls, i) => (
-                          <LegRow key={i} ls={ls} openScorecard={openScorecard} scorecardModal={scorecardModal} setScorecardModal={setScorecardModal} />
+                          <LegRow key={i} ls={ls} parlayId={p.id} openScorecard={openScorecard} scorecardModal={scorecardModal} setScorecardModal={setScorecardModal} />
                         ))}
                       </div>
                     </div>
