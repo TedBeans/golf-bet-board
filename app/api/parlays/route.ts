@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { redis, PARLAYS_KEY, PARLAY_ARCHIVE_KEY, BETS_KEY, ARCHIVE_KEY } from "../../../lib/redis";
+import { redis, PARLAYS_KEY, PARLAY_ARCHIVE_KEY, BETS_KEY, ARCHIVE_KEY, DG_CUTLINE_KEY } from "../../../lib/redis";
 import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../../../lib/parlay";
 import { Bet } from "../../../lib/seed";
+import { CutlineProb } from "../../../lib/datagolf";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
 export async function GET() {
-  const parlays = (await redis.get<Parlay[]>(PARLAYS_KEY)) || [];
-  return NextResponse.json({ parlays });
+  const [parlays, cutlineProbs] = await Promise.all([
+    redis.get<Parlay[]>(PARLAYS_KEY),
+    redis.get<CutlineProb[]>(DG_CUTLINE_KEY),
+  ]);
+  return NextResponse.json({ parlays: parlays || [], cutlineProbs: cutlineProbs || [] });
 }
 
 export async function POST(req: NextRequest) {

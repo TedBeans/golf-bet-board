@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { redis, BETS_KEY, MAPPING_KEY, SYNC_LOCK_KEY, ARCHIVE_KEY, PARLAYS_KEY, PARLAY_ARCHIVE_KEY } from "../../../lib/redis";
+import { redis, BETS_KEY, MAPPING_KEY, SYNC_LOCK_KEY, ARCHIVE_KEY, PARLAYS_KEY, PARLAY_ARCHIVE_KEY, DG_CUTLINE_KEY } from "../../../lib/redis";
 import { Bet } from "../../../lib/seed";
 import { Mapping } from "../../../lib/mapping";
 import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../../../lib/parlay";
@@ -9,7 +9,7 @@ import { extractScorecardStats, roundNumberFromLabel, computeSegmentStats, compu
 import { fetchOpenLeaderboard, fetchOpenStatistics } from "../../../lib/theopen";
 import { extractOpenPlayers, findOpenPlayerMatch, findOpenLeader, computeOpenStats, computeOpenGirFairways, OpenPlayerRow } from "../../../lib/openMatch";
 import { parseBetType, autoGradeStatus, timeToMinutes, gradeMakeCut } from "../../../lib/betLogic";
-import { fetchDataGolfPredictions, findDataGolfPlayerMatch, DataGolfPlayerRow } from "../../../lib/datagolf";
+import { fetchDataGolfData, findDataGolfPlayerMatch, DataGolfPlayerRow } from "../../../lib/datagolf";
 import { computePositions, PositionEntry } from "../../../lib/positions";
 import { nowInCentral } from "../../../lib/centralTime";
 
@@ -81,7 +81,16 @@ export async function GET() {
   async function getDataGolfCutProb(playerName: string): Promise<number | null> {
     if (dataGolfCache === undefined) {
       try {
-        dataGolfCache = await fetchDataGolfPredictions();
+        const data = await fetchDataGolfData();
+        dataGolfCache = data.players;
+        // Persisted separately from the in-memory cache so /api/parlays can
+        // serve the last-known distribution even between sync passes - a
+        // fetch failure just leaves the previously-cached value in place
+        // rather than wiping it out (same "fail silently, keep last good
+        // value" approach as dgCutProb on individual bets).
+        if (data.cutlineProbs.length > 0) {
+          await redis.set(DG_CUTLINE_KEY, data.cutlineProbs);
+        }
       } catch {
         dataGolfCache = null;
       }

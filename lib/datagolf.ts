@@ -106,6 +106,118 @@ function pct(v: any): number | null {
   return typeof v === "number" && !isNaN(v) ? Math.round(v * 1000) / 10 : null; // 0-1 -> 0-100, 1dp
 }
 
+function mapPredictionRows(rows: any[]): DataGolfPlayerRow[] {
+  return rows.map((r: any) => {
+    const { displayName, lastName } = toDisplayName(String(r.name || ""));
+    return {
+      dgId: r.dg_id != null ? String(r.dg_id) : "",
+      rawName: String(r.name || ""),
+      displayName,
+      lastName,
+      currentPos: r.current_pos != null ? String(r.current_pos) : null,
+      currentScore: typeof r.current_score === "number" ? r.current_score : null,
+      thru: r.thru ?? null,
+      cutProb: pct(r.cut),
+      winProb: pct(r.win),
+      top5Prob: pct(r.top5),
+      top10Prob: pct(r.top10),
+      top20Prob: pct(r.top20),
+    };
+  });
+}
+
+// The aggregate "CUTLINE PROBABILITIES" distribution (odds the cutline
+// itself lands at +1, +2, +3, etc) - confirmed against live data
+// (2026-07-16, Genesis Scottish Open) to live at `cuts` in the same large
+// blob as the per-player predictions array, shaped as
+// `{ Score: number, prob: number (0-1), notables: "<html string>" }[]`.
+// We only want Score + prob; `notables` is a small HTML fragment naming a
+// few players near that cutline and is deliberately dropped here per
+// Teddy's ask - just the numbers/percentages, not the player names.
+export type CutlineProb = { score: number; prob: number }; // prob is 0-100, 1dp
+
+function looksLikeCutlineRow(row: any): boolean {
+  return row && typeof row === "object" && "Score" in row && "prob" in row;
+}
+
+function findCutlineArray(node: any, depth = 0): any[] | null {
+  if (depth > 6 || node === null || node === undefined) return null;
+  if (Array.isArray(node)) {
+    if (node.length > 0 && looksLikeCutlineRow(node[0])) return node;
+    for (const item of node) {
+      const found = findCutlineArray(item, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof node === "object") {
+    for (const key of Object.keys(node)) {
+      const found = findCutlineArray(node[key], depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function mapCutlineRows(rows: any[]): CutlineProb[] {
+  return rows
+    .map((r: any) => ({ score: Number(r.Score), prob: pct(r.prob) }))
+    .filter((c): c is CutlineProb => Number.isFinite(c.score) && c.prob !== null)
+    .sort((a, b) => a.score - b.score);
+}
+
+export type DataGolfData = {
+  players: DataGolfPlayerRow[];
+  cutlineProbs: CutlineProb[];
+};
+
+// Fetches the live-model page once and extracts both the per-player
+// predictions array and the aggregate cutline distribution from it -
+// avoids a second network round-trip now that both live in the same page.
+// Throws only if the per-player array (the part grading actually depends
+// on) can't be found; cutlineProbs comes back as [] rather than failing
+// the whole call if just that piece is missing (a page-structure change
+// that drops one widget shouldn't take down the other).
+export async function fetchDataGolfData(): Promise<DataGolfData> {
+  const res = await fetch(DATAGOLF_URL, {
+    method: "GET",
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      Accept: "text/html,application/xhtml+xml",
+    },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`datagolf.com fetch failed (${res.status})`);
+  const html = await res.text();
+
+  const blobRegex = /JSON\.parse\('((?:\\.|[^'\\])*)'/g;
+  let m: RegExpExecArray | null;
+  let players: DataGolfPlayerRow[] | null = null;
+  let cutlineProbs: CutlineProb[] = [];
+
+  while ((m = blobRegex.exec(html)) !== null) {
+    try {
+      const jsonText = unescapeJsStringLiteral(m[1]).replace(/\bNaN\b/g, "null");
+      const parsed = JSON.parse(jsonText);
+      if (!players) {
+        const foundPlayers = findPredictionsArray(parsed);
+        if (foundPlayers) players = mapPredictionRows(foundPlayers);
+      }
+      if (cutlineProbs.length === 0) {
+        const foundCutline = findCutlineArray(parsed);
+        if (foundCutline) cutlineProbs = mapCutlineRows(foundCutline);
+      }
+      if (players && cutlineProbs.length > 0) break;
+    } catch {
+      // this particular blob wasn't valid/relevant JSON - keep scanning
+    }
+  }
+
+  if (!players) throw new Error("Could not locate DataGolf predictions data in page HTML - page structure may have changed");
+
+  return { players, cutlineProbs };
+}
+
 // Fetches the live-model page and extracts every player's current
 // prediction row. Throws if the page structure has changed enough that no
 // blob matching the expected shape can be found - callers should treat
@@ -147,23 +259,7 @@ export async function fetchDataGolfPredictions(): Promise<DataGolfPlayerRow[]> {
 
   if (!rows) throw new Error("Could not locate DataGolf predictions data in page HTML - page structure may have changed");
 
-  return rows.map((r: any) => {
-    const { displayName, lastName } = toDisplayName(String(r.name || ""));
-    return {
-      dgId: r.dg_id != null ? String(r.dg_id) : "",
-      rawName: String(r.name || ""),
-      displayName,
-      lastName,
-      currentPos: r.current_pos != null ? String(r.current_pos) : null,
-      currentScore: typeof r.current_score === "number" ? r.current_score : null,
-      thru: r.thru ?? null,
-      cutProb: pct(r.cut),
-      winProb: pct(r.win),
-      top5Prob: pct(r.top5),
-      top10Prob: pct(r.top10),
-      top20Prob: pct(r.top20),
-    };
-  });
+  return mapPredictionRows(rows);
 }
 
 // Lower-level version that never throws and returns diagnostics instead -

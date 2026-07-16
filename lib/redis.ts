@@ -19,3 +19,4 @@ export const ARCHIVE_KEY = "golf-bet-board:archive";
 export const SETTINGS_KEY = "golf-bet-board:settings";
 export const PARLAYS_KEY = "golf-bet-board:parlays";
 export const PARLAY_ARCHIVE_KEY = "golf-bet-board:parlay-archive";
+export const DG_CUTLINE_KEY = "golf-bet-board:dg-cutline-probs";

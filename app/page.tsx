@@ -189,12 +189,12 @@ function LegRow({
         })();
     const dgDetail = legDgDetail(ls.bet);
     return (
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, fontSize: 11, marginBottom: 4 }}>
-        <span style={{ color: "var(--cream-dim)" }}>{subjectSpan} · {betPhraseNode}</span>
+      <div style={{ display: "grid", gridTemplateColumns: dgDetail ? "1fr 84px 190px" : "1fr 190px", alignItems: "baseline", columnGap: 8, fontSize: 11, marginBottom: 4 }}>
+        <span style={{ color: "var(--cream-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subjectSpan} · {betPhraseNode}</span>
         {dgDetail && (
           <span style={{ color: "var(--cream-dim)", whiteSpace: "nowrap" }}>{dgDetail}</span>
         )}
-        <span className={`tsum ${badgeClass}`}>
+        <span className={`tsum ${badgeClass}`} style={{ textAlign: "right", whiteSpace: "nowrap" }}>
           LIVE | {legLiveDetail(ls.bet)}
         </span>
       </div>
@@ -210,6 +210,28 @@ function LegRow({
   );
 }
 
+function parlayHasMakeCutLeg(p: Parlay): boolean {
+  return p.legs.some((leg) => parseBetType(leg.bet).label === "MAKE_CUT");
+}
+
+// Aggregate cutline distribution (DataGolf's "odds the cutline lands at
+// +1/+2/+3...") shown once at the top of a Make Cut parlay card - numbers
+// and percentages only, no player names (that's covered per-leg already
+// via legDgDetail).
+function CutlineStrip({ probs }: { probs: { score: number; prob: number }[] }) {
+  if (probs.length === 0) return null;
+  return (
+    <div style={{ display: "flex", gap: 14, fontSize: 11, color: "var(--cream-dim)", margin: "8px 0 4px", flexWrap: "wrap" }}>
+      <span style={{ textTransform: "uppercase", letterSpacing: 0.5 }}>Cutline:</span>
+      {probs.map((c) => (
+        <span key={c.score}>
+          {formatScore(c.score)} <span style={{ color: "var(--cream)" }}>{c.prob}%</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function Page() {
   const [bets, setBets] = useState<Bet[] | null>(null);
   const [passcode, setPasscode] = useState("");
@@ -221,6 +243,7 @@ export default function Page() {
   const [mapping, setMapping] = useState<Mapping>(EMPTY_MAPPING);
   const [archive, setArchive] = useState<Bet[]>([]);
   const [liveParlays, setLiveParlays] = useState<Parlay[]>([]);
+  const [cutlineProbs, setCutlineProbs] = useState<{ score: number; prob: number }[]>([]);
   const [scorecardModal, setScorecardModal] = useState<{ betId: string; player: string; loading: boolean; scorecard: any | null; position?: string | null; totalToPar?: number | null; message?: string } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -270,7 +293,10 @@ export default function Page() {
 
   function loadParlaysAndArchive() {
     fetch("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
-    fetch("/api/parlays").then((r) => r.json()).then((d) => setLiveParlays(d.parlays || []));
+    fetch("/api/parlays").then((r) => r.json()).then((d) => {
+      setLiveParlays(d.parlays || []);
+      setCutlineProbs(d.cutlineProbs || []);
+    });
   }
 
   useEffect(() => {
@@ -700,6 +726,7 @@ export default function Page() {
                     </span>
                   </div>
                   <div style={{ marginTop: 8 }}>
+                    {parlayHasMakeCutLeg(p) && <CutlineStrip probs={cutlineProbs} />}
                     {legStatuses.map((ls, i) => (
                       <LegRow key={i} ls={ls} parlayId={p.id} openScorecard={openScorecard} scorecardModal={scorecardModal} setScorecardModal={setScorecardModal} />
                     ))}
@@ -839,6 +866,7 @@ export default function Page() {
                         </span>
                       </div>
                       <div style={{ marginTop: 8 }}>
+                        {parlayHasMakeCutLeg(p) && <CutlineStrip probs={cutlineProbs} />}
                         {legStatuses.map((ls, i) => (
                           <LegRow key={i} ls={ls} parlayId={p.id} openScorecard={openScorecard} scorecardModal={scorecardModal} setScorecardModal={setScorecardModal} />
                         ))}
