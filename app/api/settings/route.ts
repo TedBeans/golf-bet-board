@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { redis, SETTINGS_KEY } from "../../../lib/redis";
 import { Settings, DEFAULT_SETTINGS } from "../../../lib/settings";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 export async function GET() {
   const settings = (await redis.get<Settings>(SETTINGS_KEY)) || DEFAULT_SETTINGS;
   return NextResponse.json({ settings });

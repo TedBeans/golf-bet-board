@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { redis, MAPPING_KEY } from "../../../lib/redis";
 import { Mapping, EMPTY_MAPPING } from "../../../lib/mapping";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 export async function GET() {
   const mapping = (await redis.get<Mapping>(MAPPING_KEY)) || EMPTY_MAPPING;
   return NextResponse.json({ mapping });

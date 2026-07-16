@@ -3,6 +3,10 @@ import { redis, PARLAYS_KEY, PARLAY_ARCHIVE_KEY, BETS_KEY, ARCHIVE_KEY } from ".
 import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../../../lib/parlay";
 import { Bet } from "../../../lib/seed";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 export async function GET() {
   const parlays = (await redis.get<Parlay[]>(PARLAYS_KEY)) || [];
   return NextResponse.json({ parlays });

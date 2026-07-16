@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { redis, BETS_KEY } from "../../../lib/redis";
 import { SEED, Bet } from "../../../lib/seed";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 export async function GET() {
   let bets = await redis.get<Bet[]>(BETS_KEY);
   if (!bets) {

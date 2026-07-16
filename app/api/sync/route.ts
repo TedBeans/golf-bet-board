@@ -14,6 +14,27 @@ import { nowInCentral } from "../../../lib/centralTime";
 
 const SYNC_LOCK_MS = 45000;
 
+// No searchParams/cookies/headers used here, which means Next.js could
+// otherwise treat this as a static candidate and Vercel's edge could cache
+// the response - exactly the kind of silent staleness that's invisible
+// until you compare two fetches mid-round and get different answers for
+// the same URL. Force it dynamic and uncacheable at every layer: this is
+// the actual grading engine, not just a debug route.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
+// Belt-and-suspenders: the exports above stop Next.js/its own fetch cache
+// from serving anything stale, but an explicit Cache-Control header is
+// what a CDN edge layer in front of the function actually respects -
+// route-level dynamic/fetchCache exports don't necessarily reach that far.
+function noCacheJson(body: any, init?: { status?: number }) {
+  return NextResponse.json(body, {
+    ...init,
+    headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+  });
+}
+
 // Triggered by the browser (not a server cron - see README) roughly once a
 // minute while the board is open. No passcode required: this route only
 // recomputes values from the tournament mapping already saved server-side,
@@ -27,7 +48,7 @@ export async function GET() {
   const now = Date.now();
   const lastSync = await redis.get<number>(SYNC_LOCK_KEY);
   if (lastSync && now - lastSync < SYNC_LOCK_MS) {
-    return NextResponse.json({ ok: true, updated: 0, errors: [], skipped: true });
+    return noCacheJson({ ok: true, updated: 0, errors: [], skipped: true });
   }
   await redis.set(SYNC_LOCK_KEY, now);
 
@@ -37,7 +58,7 @@ export async function GET() {
   ]);
 
   if (!bets || !mapping) {
-    return NextResponse.json({ ok: true, updated: 0, errors: ["Nothing to sync yet"] });
+    return noCacheJson({ ok: true, updated: 0, errors: ["Nothing to sync yet"] });
   }
 
   const errors: string[] = [];
@@ -603,5 +624,5 @@ export async function GET() {
     await redis.set(PARLAYS_KEY, stillOpen);
   }
 
-  return NextResponse.json({ ok: true, updated: updatedCount, archived: archivedCount, errors });
+  return noCacheJson({ ok: true, updated: updatedCount, archived: archivedCount, errors });
 }

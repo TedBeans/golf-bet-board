@@ -536,9 +536,13 @@ export default function Page() {
                                 Birdies {b.auto.birdies ?? "—"}
                               </span>
                               {" · "}
+                              <span>Eagles {b.auto.eagles ?? "—"}</span>
+                              {" · "}
                               <span className={parsed.label === "BOGEYS" ? "detail-hi" : ""}>
                                 Bogeys {b.auto.bogeys ?? "—"}
                               </span>
+                              {" · "}
+                              <span>Doubles+ {b.auto.doubleBogeys ?? "—"}</span>
                               {" · "}
                               <span>Pars {b.auto.pars ?? "—"}</span>
                             </span>
