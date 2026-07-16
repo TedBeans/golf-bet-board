@@ -79,7 +79,7 @@ export default function HoleScorecardModal({
   onClose: () => void;
 }) {
   const hasStandings = (position !== undefined && position !== null) || (totalToPar !== undefined && totalToPar !== null);
-  const scoreColor = totalToPar === null || totalToPar === undefined ? "var(--cream)" : totalToPar < 0 ? "var(--live)" : totalToPar > 0 ? "var(--clay)" : "var(--cream)";
+  const scoreColor = totalToPar === null || totalToPar === undefined ? "var(--cream)" : totalToPar < 0 ? "var(--clay)" : totalToPar > 0 ? "var(--steel)" : "var(--cream)";
 
   return (
     <div

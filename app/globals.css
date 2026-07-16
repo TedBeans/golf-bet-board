@@ -6,6 +6,9 @@
   --gold-bright: #E4BE4A;
   --clay: #C06A4C;
   --live: #4CAF6E;
+  --steel: #7A8087; /* over-par grey for scorecards - matches theopen.com's own
+                        red-for-under/grey-for-over convention (the R&A/European
+                        broadcast standard), opposite of the US "red = bad" instinct */
   --line: rgba(241,236,221,0.12);
   --line-soft: rgba(241,236,221,0.07);
 }
@@ -237,10 +240,10 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
   color: var(--cream-dim);
 }
 .golf-sym.par{ border-radius: 0; }
-.golf-sym.birdie{ color: var(--live); border: 1px solid var(--live); border-radius: 50%; }
-.golf-sym.eagle{ color: var(--live); border: 1px solid var(--live); border-radius: 50%; outline: 1px solid var(--live); outline-offset: 2px; }
-.golf-sym.bogey{ color: var(--clay); border: 1px solid var(--clay); border-radius: 2px; }
-.golf-sym.double{ color: var(--clay); border: 1px solid var(--clay); border-radius: 2px; outline: 1px solid var(--clay); outline-offset: 2px; }
+.golf-sym.birdie{ color: var(--clay); border: 1px solid var(--clay); border-radius: 50%; }
+.golf-sym.eagle{ color: var(--clay); border: 1px solid var(--clay); border-radius: 50%; outline: 1px solid var(--clay); outline-offset: 2px; }
+.golf-sym.bogey{ color: var(--steel); border: 1px solid var(--steel); border-radius: 2px; }
+.golf-sym.double{ color: var(--steel); border: 1px solid var(--steel); border-radius: 2px; outline: 1px solid var(--steel); outline-offset: 2px; }
 .thru-input{ font-size:15px; font-weight:600; }
 
 .auto-row{
