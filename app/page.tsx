@@ -188,11 +188,12 @@ function LegRow({
           return t === "good" ? "win" : t === "bad" ? "loss" : t === "warn" ? "live" : "tbd";
         })();
     const dgDetail = legDgDetail(ls.bet);
+    const dgValue = ls.bet.auto?.dgCutProb;
     return (
       <div style={{ display: "grid", gridTemplateColumns: dgDetail ? "1fr 84px 190px" : "1fr 190px", alignItems: "baseline", columnGap: 8, fontSize: 11, marginBottom: 4 }}>
         <span style={{ color: "var(--cream-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subjectSpan} · {betPhraseNode}</span>
         {dgDetail && (
-          <span style={{ color: "var(--cream-dim)", whiteSpace: "nowrap" }}>{dgDetail}</span>
+          <span style={{ color: dgValue !== null && dgValue !== undefined ? dgColor(dgValue) : "var(--cream-dim)", whiteSpace: "nowrap" }}>{dgDetail}</span>
         )}
         <span className={`tsum ${badgeClass}`} style={{ textAlign: "right", whiteSpace: "nowrap" }}>
           LIVE | {legLiveDetail(ls.bet)}
@@ -208,6 +209,25 @@ function LegRow({
       </span>
     </div>
   );
+}
+
+// Red (0%) -> yellow (50%) -> green (100%) interpolation for DataGolf
+// make-cut %, reusing the same three colors already used for
+// loss/live/win badges elsewhere so it reads consistently with the rest
+// of the board's palette.
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+function dgColor(pct: number): string {
+  const CLAY: [number, number, number] = [192, 106, 76]; // var(--clay), 0%
+  const GOLD: [number, number, number] = [228, 190, 74]; // var(--gold-bright), 50%
+  const LIVE: [number, number, number] = [76, 175, 110]; // var(--live), 100%
+  const p = Math.max(0, Math.min(100, pct)) / 100;
+  const [c1, c2, t] = p <= 0.5 ? [CLAY, GOLD, p / 0.5] : [GOLD, LIVE, (p - 0.5) / 0.5];
+  const r = Math.round(lerp(c1[0], c2[0], t as number));
+  const g = Math.round(lerp(c1[1], c2[1], t as number));
+  const b = Math.round(lerp(c1[2], c2[2], t as number));
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 function parlayHasMakeCutLeg(p: Parlay): boolean {
