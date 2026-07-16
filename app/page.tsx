@@ -191,7 +191,7 @@ function LegRow({
     const dgValue = ls.bet.auto?.dgCutProb;
     return (
       <div style={{ display: "grid", gridTemplateColumns: dgDetail ? "1fr 84px 190px" : "1fr 190px", alignItems: "baseline", columnGap: 8, fontSize: 11, marginBottom: 4 }}>
-        <span style={{ color: "var(--cream-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subjectSpan} · {betPhraseNode}</span>
+        <span style={{ color: "var(--cream-dim)" }}>{subjectSpan} · {betPhraseNode}</span>
         {dgDetail && (
           <span style={{ color: dgValue !== null && dgValue !== undefined ? dgColor(dgValue) : "var(--cream-dim)", whiteSpace: "nowrap" }}>{dgDetail}</span>
         )}
