@@ -140,10 +140,21 @@ export async function GET() {
     // other bets already in this array rather than tracking a separate
     // "tournament start time" field - the tee times you paste in every
     // night already are that signal.
-    if (bet.personal && bet.status === "pending") {
+    //
+    // This also self-corrects the other direction: a personal bet already
+    // sitting at "live" (from before this gate existed, or from manually
+    // clicking IN PROGRESS) gets reset to TBD if the tournament genuinely
+    // hasn't started yet. That's a one-time fix for anything created before
+    // this logic shipped - but it means a deliberate early "IN PROGRESS"
+    // click won't stick until the real gate fires either. Never touches a
+    // bet you've already settled by hand (hit/miss), only pending/live.
+    if (bet.personal && (bet.status === "pending" || bet.status === "live")) {
       const started = bets.some((b) => b.t === bet.t && !b.personal && b.status !== "pending");
-      if (started) {
+      if (started && bet.status === "pending") {
         bet.status = "live";
+        updatedCount += 1;
+      } else if (!started && bet.status === "live") {
+        bet.status = "pending";
         updatedCount += 1;
       }
     }
