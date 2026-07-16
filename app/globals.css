@@ -218,20 +218,27 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
   font-family:'Oswald',sans-serif; font-size:8.5px; letter-spacing:0.1em;
   color: var(--cream-dim); text-transform:uppercase;
 }
-.sc-target{ font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color: var(--cream-dim); }
+.sc-target{ font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color: var(--cream); }
 .sc-input{
   width:100%; background:transparent; border:none; text-align:center;
   font-family:'JetBrains Mono',monospace; font-weight:700; font-size:18px; color:var(--cream);
-  padding:0;
+  padding:0; -webkit-text-fill-color: currentColor; opacity:1;
 }
+.sc-input:disabled{ -webkit-text-fill-color: currentColor; opacity:1; color: inherit; }
 .sc-input:focus{ outline:none; }
 .sc-input::-webkit-inner-spin-button, .sc-input::-webkit-outer-spin-button{ -webkit-appearance:none; margin:0; }
-.trend-good{ color: var(--gold-bright) !important; }
-.trend-bad{ color: var(--clay) !important; }
+/* Small bold colored text has far less visual mass than a solid-filled
+   button of the same color, so identical hex values read as noticeably
+   less vivid - especially on mobile. The glow compensates for that
+   without changing the actual color values, so it stays visually
+   consistent with everywhere else those colors are used (WIN/LOSS pills,
+   badges, etc). */
+.trend-good{ color: var(--gold-bright) !important; text-shadow: 0 0 8px rgba(228,190,74,0.5); }
+.trend-bad{ color: var(--clay) !important; text-shadow: 0 0 8px rgba(192,106,76,0.5); }
 .trend-neutral{ color: var(--cream) !important; }
-.pace-good{ color: var(--live) !important; }
-.pace-warn{ color: var(--gold-bright) !important; }
-.pace-bad{ color: var(--clay) !important; }
+.pace-good{ color: var(--live) !important; text-shadow: 0 0 8px rgba(76,175,110,0.55); }
+.pace-warn{ color: var(--gold-bright) !important; text-shadow: 0 0 8px rgba(228,190,74,0.5); }
+.pace-bad{ color: var(--clay) !important; text-shadow: 0 0 8px rgba(192,106,76,0.5); }
 .pace-neutral{ color: var(--cream) !important; }
 
 .golf-sym{
