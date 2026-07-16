@@ -316,3 +316,30 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
 .empty{ text-align:center; color:var(--cream-dim); font-size:12px; padding:30px 0; }
 .loading{ text-align:center; color:var(--cream-dim); font-size:12px; padding:40px 0; }
 .saving{ font-size:9px; color: var(--cream-dim); letter-spacing:0.08em; text-transform:uppercase; margin-left:6px;}
+
+/* Parlay leg row: player/bet-phrase, optional DG make-cut %, live status
+   badge. Fixed-width dg/badge columns keep everything aligned across rows
+   regardless of how long each player's name/bet-phrase is. */
+.leg-row{
+  display:grid; grid-template-columns: 1fr 84px 190px; grid-template-areas: "name dg badge";
+  align-items:baseline; column-gap:8px; font-size:11px; margin-bottom:4px;
+}
+.leg-row.no-dg{ grid-template-columns: 1fr 190px; grid-template-areas: "name badge"; }
+.leg-row .leg-name{ grid-area:name; color:var(--cream-dim); }
+.leg-row .leg-dg{ grid-area:dg; white-space:nowrap; }
+.leg-row .leg-badge{ grid-area:badge; text-align:right; white-space:nowrap; }
+
+/* On narrow screens, three fixed-width columns don't leave enough room for
+   the name/bet-phrase, which used to wrap and overlap the row below it.
+   Reflow to two rows instead: name gets the full width on top, dg% and the
+   live badge sit side by side underneath it. */
+@media (max-width: 640px){
+  .leg-row, .leg-row.no-dg{
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "name name" "dg badge";
+    row-gap:2px; margin-bottom:8px;
+  }
+  .leg-row .leg-name{ white-space:normal; }
+  .leg-row .leg-dg{ justify-self:start; }
+  .leg-row .leg-badge{ justify-self:end; }
+}
