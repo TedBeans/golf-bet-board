@@ -21,6 +21,10 @@ export type AutoStats = {
                              // gradeMakeCut's own hit/miss logic - never used for grading itself.
                              // null if DataGolf's page couldn't be fetched/parsed or the player
                              // didn't match - non-fatal either way, see lib/datagolf.ts.
+  currentRound?: number | null; // personal MAKE_CUT bets only - which round (1 or 2) thru/scoreToPar
+                                 // above actually belong to. Round 1 until it's fully finished
+                                 // (thru === 18), then Round 2 - prevents thru/scoreToPar from
+                                 // staying frozen on a completed Round 1 once Round 2 has started.
 };
 
 export type Bet = {

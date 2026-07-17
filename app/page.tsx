@@ -32,7 +32,8 @@ function legLiveDetail(bet: Bet): string {
     return `${bet.auto?.position ?? "—"} thru ${bet.auto?.thru ?? "—"}`;
   }
   if (p.label === "MAKE_CUT") {
-    return `${bet.auto?.position ?? "—"} · ${formatScore(bet.auto?.scoreToPar ?? null)} thru ${bet.auto?.thru ?? "—"}`;
+    const rd = bet.auto?.currentRound;
+    return `${bet.auto?.position ?? "—"} · ${formatScore(bet.auto?.scoreToPar ?? null)} thru ${bet.auto?.thru ?? "—"}${rd ? ` (R${rd})` : ""}`;
   }
   if (p.label === "H2H" || p.label === "TIE") {
     const subjectThru = bet.auto?.thru ?? null;
@@ -106,8 +107,20 @@ function LegRow({
   // round-scoped matchup, that's more useful to click into than the leg's
   // stored round label (which for a personal play is always the constant
   // "TedBeans Plays" bucket, not a real round).
+  //
+  // Personal MAKE_CUT bets are similar but tracked differently: bet.r stays
+  // on that same constant (it doubles as a grouping/archiving key elsewhere
+  // - see admin's archived-rounds view - so it's deliberately never
+  // overwritten), but sync now stamps the round that's actually live onto
+  // bet.auto.currentRound. Without this, clicking a name always opened
+  // Round 1's scorecard even once Round 2 was underway.
   const parsedLegBet = parseBetType(ls.leg.bet);
-  const round = parsedLegBet.h2hScope === "round" && parsedLegBet.h2hRoundNum ? `Round ${parsedLegBet.h2hRoundNum}` : ls.leg.round;
+  const round =
+    parsedLegBet.h2hScope === "round" && parsedLegBet.h2hRoundNum
+      ? `Round ${parsedLegBet.h2hRoundNum}`
+      : parsedLegBet.label === "MAKE_CUT" && ls.bet?.auto?.currentRound
+      ? `Round ${ls.bet.auto.currentRound}`
+      : ls.leg.round;
 
   // The same underlying bet can be a leg in more than one parlay (e.g. a
   // Tournament H2H bet included in both a 2-way and a 7-way matchup
@@ -798,7 +811,11 @@ export default function Page() {
                                 openScorecard(
                                   b.id,
                                   tourn,
-                                  parsed.h2hScope === "round" && parsed.h2hRoundNum ? `Round ${parsed.h2hRoundNum}` : b.r,
+                                  parsed.h2hScope === "round" && parsed.h2hRoundNum
+                                    ? `Round ${parsed.h2hRoundNum}`
+                                    : parsed.label === "MAKE_CUT" && b.auto?.currentRound
+                                    ? `Round ${b.auto.currentRound}`
+                                    : b.r,
                                   b.player
                                 )
                               }
@@ -851,7 +868,7 @@ export default function Page() {
                         <span className="detail-strip">
                           {parsed.label === "MAKE_CUT" ? (
                             <>
-                              Position {b.auto?.position ?? "—"} · Round 1 {formatScore(b.auto?.scoreToPar ?? null)} thru {b.auto?.thru ?? "—"}
+                              Position {b.auto?.position ?? "—"} · Round {b.auto?.currentRound ?? 1} {formatScore(b.auto?.scoreToPar ?? null)} thru {b.auto?.thru ?? "—"}
                               {" · "}
                               {cutLine !== undefined ? `Cut line ${formatScore(cutLine)}` : "cut line not set yet"}
                               {b.auto?.dgCutProb !== null && b.auto?.dgCutProb !== undefined && (

@@ -310,15 +310,28 @@ export async function GET() {
 
           const dgCutProb = await getDataGolfCutProb(bet.player);
 
-          bet.thru = r1.thru;
-          bet.stat = r1.scoreToPar;
+          // Once Round 1 is fully complete, the more useful "current" line
+          // is Round 2's progress - not Round 1's frozen final line. This
+          // used to always show r1 regardless of r2, which is how you'd
+          // get something like "thru 24" (an 18+6 mashup baked into a
+          // single stat that was actually still just Round 1's numbers)
+          // once Round 2 got underway, and also why the scorecard popover
+          // (which reads bet.r) kept opening Round 1's card even mid Round
+          // 2.
+          const roundOneFinished = r1.thru === 18;
+          const activeRound = roundOneFinished && r2 ? 2 : 1;
+          const active = activeRound === 2 ? r2! : r1;
+
+          bet.thru = active.thru;
+          bet.stat = active.scoreToPar;
           bet.auto = {
-            thru: r1.thru,
-            scoreToPar: r1.scoreToPar,
+            thru: active.thru,
+            scoreToPar: active.scoreToPar,
             birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
             updatedAt: new Date().toISOString(),
-            position: positions.get(r1.id) ?? null,
+            position: positions.get(active.id) ?? null,
             dgCutProb,
+            currentRound: activeRound,
           };
 
           const graded = gradeMakeCut(
