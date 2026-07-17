@@ -32,7 +32,7 @@ function BetDetailCard({ b, compact = false, mapping }: { b: Bet; compact?: bool
   const parsed = parseBetType(b.bet);
   const cls = trendClassName(parsed, b.stat, b.thru);
   const unitResult = computeUnitResult(b.oddsPrice, b.oddsUnits, b.status);
-  const { openKey, state: scorecardState, open: openScorecard } = useScorecardPopover();
+  const { openKey, state: scorecardState, open: openScorecard, openTournament, openRound } = useScorecardPopover();
   const isOpen = openKey === b.id;
   const isPersonal = !!b.personal;
   const cutLine = mapping?.tournaments[b.t]?.cutLine;
@@ -53,6 +53,8 @@ function BetDetailCard({ b, compact = false, mapping }: { b: Bet; compact?: bool
               {isOpen && (
                 <HoleScorecardModal
                   player={b.player}
+                  tournament={openTournament}
+                  initialRound={openRound}
                   loading={scorecardState?.loading ?? false}
                   scorecard={scorecardState?.scorecard ?? null}
                   position={scorecardState?.position}
@@ -79,6 +81,8 @@ function BetDetailCard({ b, compact = false, mapping }: { b: Bet; compact?: bool
               {isOpen && (
                 <HoleScorecardModal
                   player={b.player}
+                  tournament={openTournament}
+                  initialRound={openRound}
                   loading={scorecardState?.loading ?? false}
                   scorecard={scorecardState?.scorecard ?? null}
                   position={scorecardState?.position}

@@ -16,7 +16,7 @@ import HoleScorecardModal from "../HoleScorecardModal";
 import { useScorecardPopover } from "../useScorecardPopover";
 
 function ArchivedRoundBets({ bets }: { bets: Bet[] }) {
-  const { openKey, state, open } = useScorecardPopover();
+  const { openKey, state, open, openTournament, openRound } = useScorecardPopover();
   return (
     <div style={{ marginTop: 8 }}>
       {bets.map((b) => (
@@ -33,6 +33,8 @@ function ArchivedRoundBets({ bets }: { bets: Bet[] }) {
             {openKey === b.id && (
               <HoleScorecardModal
                 player={b.player}
+                tournament={openTournament}
+                initialRound={openRound}
                 loading={state?.loading ?? false}
                 scorecard={state?.scorecard ?? null}
                 message={state?.message}

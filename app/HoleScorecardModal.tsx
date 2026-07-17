@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 type Hole = { hole: number; par: number; score: number | null; status?: string | null };
 type Scorecard = { firstNine: Hole[]; firstNineLabel: string; secondNine: Hole[]; secondNineLabel: string };
 
@@ -36,6 +38,14 @@ function nineTotal(holes: Hole[]): number | null {
   return holes.every((h) => h.score !== null) ? holes.reduce((s, h) => s + (h.score ?? 0), 0) : null;
 }
 
+// Pulls the leading digit out of a round label ("Round 2" -> 2). Falls
+// back to 1 for anything that doesn't have a digit in it (e.g. personal
+// plays' constant "TedBeans Plays" label, before currentRound is known).
+function roundNumFromLabel(label: string): number {
+  const m = (label || "").match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : 1;
+}
+
 function NineRow({ holes, label }: { holes: Hole[]; label: string }) {
   const cols = holes.length + 1;
   const total = nineTotal(holes);
@@ -63,6 +73,8 @@ function NineRow({ holes, label }: { holes: Hole[]; label: string }) {
 
 export default function HoleScorecardModal({
   player,
+  tournament,
+  initialRound,
   loading,
   scorecard,
   position,
@@ -71,6 +83,8 @@ export default function HoleScorecardModal({
   onClose,
 }: {
   player: string;
+  tournament: string;
+  initialRound: string;
   loading: boolean;
   scorecard: Scorecard | null;
   position?: string | null;
@@ -81,6 +95,40 @@ export default function HoleScorecardModal({
   const hasStandings = (position !== undefined && position !== null) || (totalToPar !== undefined && totalToPar !== null);
   const scoreColor = totalToPar === null || totalToPar === undefined ? "var(--cream)" : totalToPar < 0 ? "var(--clay)" : totalToPar > 0 ? "var(--steel)" : "var(--cream)";
 
+  const initialRoundNum = roundNumFromLabel(initialRound);
+  const [selectedRoundNum, setSelectedRoundNum] = useState(initialRoundNum);
+  // Only set once a different round tab has actually been clicked - while
+  // null, the modal just shows whatever the parent already fetched
+  // (scorecard/loading/message props), avoiding a redundant refetch of the
+  // round it opened with.
+  const [override, setOverride] = useState<{ loading: boolean; scorecard: Scorecard | null; message?: string } | null>(null);
+
+  // A fresh player/tournament/round was opened (not just a tab click on the
+  // same popover) - reset back to that bet's own current round rather than
+  // keeping whatever round a previously-viewed player happened to be left
+  // on.
+  useEffect(() => {
+    setSelectedRoundNum(roundNumFromLabel(initialRound));
+    setOverride(null);
+  }, [player, tournament, initialRound]);
+
+  function selectRound(n: number) {
+    setSelectedRoundNum(n);
+    if (n === initialRoundNum) {
+      setOverride(null);
+      return;
+    }
+    setOverride({ loading: true, scorecard: null });
+    fetch(`/api/scorecard?tournament=${encodeURIComponent(tournament)}&round=${encodeURIComponent(`Round ${n}`)}&player=${encodeURIComponent(player)}`)
+      .then((r) => r.json())
+      .then((d) => setOverride({ loading: false, scorecard: d.scorecard || null, message: d.message || d.error }))
+      .catch(() => setOverride({ loading: false, scorecard: null, message: "Couldn't load scorecard." }));
+  }
+
+  const activeLoading = override ? override.loading : loading;
+  const activeScorecard = override ? override.scorecard : scorecard;
+  const activeMessage = override ? override.message : message;
+
   return (
     <div
       onClick={(e) => e.stopPropagation()}
@@ -90,9 +138,31 @@ export default function HoleScorecardModal({
         padding: "10px 12px", minWidth: 300, boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: hasStandings ? 4 : 6 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--cream)" }}>{player}</span>
-        <span onClick={onClose} style={{ fontSize: 10, color: "var(--cream-dim)", cursor: "pointer", opacity: 0.7 }}>close ✕</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: hasStandings ? 4 : 6, gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--cream)", whiteSpace: "nowrap" }}>{player}</span>
+          <div style={{ display: "flex", gap: 3 }}>
+            {[1, 2, 3, 4].map((n) => {
+              const active = n === selectedRoundNum;
+              return (
+                <button
+                  key={n}
+                  onClick={() => selectRound(n)}
+                  style={{
+                    fontFamily: "'Oswald',sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
+                    padding: "2px 6px", borderRadius: 3, cursor: "pointer",
+                    border: `1px solid ${active ? "var(--gold-bright)" : "var(--line)"}`,
+                    background: active ? "rgba(228,190,74,0.12)" : "transparent",
+                    color: active ? "var(--gold-bright)" : "var(--cream-dim)",
+                  }}
+                >
+                  R{n}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <span onClick={onClose} style={{ fontSize: 10, color: "var(--cream-dim)", cursor: "pointer", opacity: 0.7, whiteSpace: "nowrap" }}>close ✕</span>
       </div>
 
       {hasStandings && (
@@ -106,19 +176,19 @@ export default function HoleScorecardModal({
         </div>
       )}
 
-      {loading && <div style={{ fontSize: 11, color: "var(--cream-dim)" }}>Loading…</div>}
+      {activeLoading && <div style={{ fontSize: 11, color: "var(--cream-dim)" }}>Loading…</div>}
 
-      {!loading && !scorecard && (
+      {!activeLoading && !activeScorecard && (
         <div style={{ fontSize: 11, color: "var(--cream-dim)", maxWidth: 270, lineHeight: 1.4 }}>
-          {message || "Scorecard not available."}
+          {activeMessage || "Scorecard not available."}
         </div>
       )}
 
-      {!loading && scorecard && (
+      {!activeLoading && activeScorecard && (
         <div>
-          <NineRow holes={scorecard.firstNine} label={scorecard.firstNineLabel} />
+          <NineRow holes={activeScorecard.firstNine} label={activeScorecard.firstNineLabel} />
           <div style={{ height: 6 }} />
-          <NineRow holes={scorecard.secondNine} label={scorecard.secondNineLabel} />
+          <NineRow holes={activeScorecard.secondNine} label={activeScorecard.secondNineLabel} />
         </div>
       )}
     </div>

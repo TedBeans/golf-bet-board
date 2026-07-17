@@ -88,7 +88,7 @@ function legStatusClass(bet: Bet): "win" | "loss" | "live" {
 
 // One leg row, shared between the regular Parlays section and the TedBeans
 // Plays parlays sub-section - both need identical live-status rendering.
-type ScorecardModalState = { betId: string; player: string; loading: boolean; scorecard: any | null; position?: string | null; totalToPar?: number | null; message?: string } | null;
+type ScorecardModalState = { betId: string; tournament: string; round: string; player: string; loading: boolean; scorecard: any | null; position?: string | null; totalToPar?: number | null; message?: string } | null;
 
 function LegRow({
   ls,
@@ -142,6 +142,8 @@ function LegRow({
       {isSubjectOpen && scorecardModal && (
         <HoleScorecardModal
           player={scorecardModal.player}
+          tournament={scorecardModal.tournament}
+          initialRound={scorecardModal.round}
           loading={scorecardModal.loading}
           scorecard={scorecardModal.scorecard}
           position={scorecardModal.position}
@@ -175,6 +177,8 @@ function LegRow({
         {isOpponentOpen && scorecardModal && (
           <HoleScorecardModal
             player={scorecardModal.player}
+            tournament={scorecardModal.tournament}
+            initialRound={scorecardModal.round}
             loading={scorecardModal.loading}
             scorecard={scorecardModal.scorecard}
             position={scorecardModal.position}
@@ -289,7 +293,7 @@ export default function Page() {
   const [archive, setArchive] = useState<Bet[]>([]);
   const [liveParlays, setLiveParlays] = useState<Parlay[]>([]);
   const [cutlineProbs, setCutlineProbs] = useState<{ score: number; prob: number }[]>([]);
-  const [scorecardModal, setScorecardModal] = useState<{ betId: string; player: string; loading: boolean; scorecard: any | null; position?: string | null; totalToPar?: number | null; message?: string } | null>(null);
+  const [scorecardModal, setScorecardModal] = useState<{ betId: string; tournament: string; round: string; player: string; loading: boolean; scorecard: any | null; position?: string | null; totalToPar?: number | null; message?: string } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function openScorecard(betId: string, tourn: string, round: string, player: string) {
@@ -297,12 +301,14 @@ export default function Page() {
       setScorecardModal(null);
       return;
     }
-    setScorecardModal({ betId, player, loading: true, scorecard: null });
+    setScorecardModal({ betId, tournament: tourn, round, player, loading: true, scorecard: null });
     fetch(`/api/scorecard?tournament=${encodeURIComponent(tourn)}&round=${encodeURIComponent(round)}&player=${encodeURIComponent(player)}`)
       .then((r) => r.json())
       .then((d) => {
         setScorecardModal({
           betId,
+          tournament: tourn,
+          round,
           player: d.player || player,
           loading: false,
           scorecard: d.scorecard || null,
@@ -311,7 +317,7 @@ export default function Page() {
           message: d.message || d.error,
         });
       })
-      .catch(() => setScorecardModal({ betId, player, loading: false, scorecard: null, message: "Couldn't load scorecard." }));
+      .catch(() => setScorecardModal({ betId, tournament: tourn, round, player, loading: false, scorecard: null, message: "Couldn't load scorecard." }));
   }
 
   function loadBets() {
@@ -599,6 +605,8 @@ export default function Page() {
                               {scorecardModal?.betId === b.id && (
                                 <HoleScorecardModal
                                   player={scorecardModal.player}
+                                  tournament={scorecardModal.tournament}
+                                  initialRound={scorecardModal.round}
                                   loading={scorecardModal.loading}
                                   scorecard={scorecardModal.scorecard}
                                   position={scorecardModal.position}
@@ -825,6 +833,8 @@ export default function Page() {
                             {scorecardModal?.betId === b.id && (
                               <HoleScorecardModal
                                 player={scorecardModal.player}
+                                tournament={scorecardModal.tournament}
+                                initialRound={scorecardModal.round}
                                 loading={scorecardModal.loading}
                                 scorecard={scorecardModal.scorecard}
                                 position={scorecardModal.position}
