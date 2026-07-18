@@ -55,7 +55,7 @@ function NineRow({ holes, label }: { holes: Hole[]; label: string }) {
         {holes.map((h) => (
           <div key={h.hole} style={{ textAlign: "center", fontSize: 9, color: "var(--cream-dim)", opacity: 0.7 }}>{h.hole}</div>
         ))}
-        <div />
+        <div style={{ textAlign: "center", fontSize: 9, color: "var(--cream-dim)", opacity: 0.7, whiteSpace: "nowrap" }}>{label}</div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, alignItems: "center" }}>
         {holes.map((h) => (
@@ -63,8 +63,8 @@ function NineRow({ holes, label }: { holes: Hole[]; label: string }) {
             <span className={`golf-sym ${symbolClass(h)}`}>{h.score ?? "—"}</span>
           </div>
         ))}
-        <div style={{ textAlign: "center", fontSize: 11, color: "var(--cream-dim)" }}>
-          {label} {total ?? "—"}
+        <div style={{ textAlign: "center", fontSize: 11, color: "var(--cream-dim)", whiteSpace: "nowrap" }}>
+          {total ?? "—"}
         </div>
       </div>
     </>

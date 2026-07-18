@@ -485,19 +485,21 @@ export default function RecapPage() {
               const isOpen = expandedTourn === t;
               return (
                 <div key={t} className="tourn" style={{ marginBottom: 14 }}>
-                  <div className="tourn-head" style={{ cursor: "pointer" }} onClick={() => setExpandedTourn(isOpen ? null : t)}>
-                    <div className="tourn-title-row">
-                      <h2>{t}</h2>
-                      {mapping.tournaments[t]?.dateRange && (
-                        <span className="subline" style={{ marginTop: 0, textTransform: "none", letterSpacing: 0 }}>
-                          {mapping.tournaments[t]?.dateRange}
-                        </span>
-                      )}
-                    </div>
-                    <div className="tourn-summary">
-                      <span className="tsum win">{agg.wins}W</span>
-                      <span className="tsum loss">{agg.losses}L</span>
-                      <span className={agg.units >= 0 ? "tsum win" : "tsum loss"}>{formatUnits(agg.units)}</span>
+                  <div
+                    className="tourn-head"
+                    style={{ cursor: "pointer", flexDirection: "column", alignItems: "stretch", gap: 4 }}
+                    onClick={() => setExpandedTourn(isOpen ? null : t)}
+                  >
+                    <h2 style={{ margin: 0 }}>{t}</h2>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+                      <span className="subline" style={{ marginTop: 0, textTransform: "none", letterSpacing: 0 }}>
+                        {mapping.tournaments[t]?.dateRange || ""}
+                      </span>
+                      <div className="tourn-summary">
+                        <span className="tsum win">{agg.wins}W</span>
+                        <span className="tsum loss">{agg.losses}L</span>
+                        <span className={agg.units >= 0 ? "tsum win" : "tsum loss"}>{formatUnits(agg.units)}</span>
+                      </div>
                     </div>
                   </div>
                   {isOpen && Object.keys(rounds).map((r) => {
