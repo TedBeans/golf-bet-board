@@ -23,6 +23,11 @@ export type Parlay = {
                        // sub-section rather than the regular Parlays section/recap tab
   personalOrder?: number; // drag-and-drop display order among personal parlays - same
                            // "crystallizes on first reorder" convention as Bet.personalOrder
+  manualStatus?: "hit" | "miss"; // admin-only manual override (e.g. a parlay that's clearly lost
+                                  // but its legs haven't all individually resolved yet, or a stale
+                                  // parlay Teddy just wants off the live board) - once set, sync
+                                  // stops re-deriving status from the legs and leaves this alone,
+                                  // same "manual click wins" convention as personalManualLive on Bet.
 };
 
 export type LegStatus = { leg: ParlayLegRef; status: Bet["status"] | "unknown"; bet: Bet | null };

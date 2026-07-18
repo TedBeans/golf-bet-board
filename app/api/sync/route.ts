@@ -689,8 +689,12 @@ export async function GET() {
     const stillOpen: Parlay[] = [];
     const nowDecided: Parlay[] = [];
     for (const p of liveParlays) {
-      const legStatuses = resolveLegStatuses(p.legs, finalBets, archiveForLegs);
-      p.status = deriveParlayStatus(legStatuses);
+      if (p.manualStatus) {
+        p.status = p.manualStatus;
+      } else {
+        const legStatuses = resolveLegStatuses(p.legs, finalBets, archiveForLegs);
+        p.status = deriveParlayStatus(legStatuses);
+      }
       if (p.status === "hit" || p.status === "miss") {
         nowDecided.push({ ...p, archivedAt: new Date().toISOString() });
       } else {

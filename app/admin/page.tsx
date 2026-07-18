@@ -92,6 +92,13 @@ export default function AdminPage() {
   const [renameValue, setRenameValue] = useState("");
 
   const [selectedLegIds, setSelectedLegIds] = useState<Set<string>>(new Set());
+  // Groups (tournament+round) the user has manually clicked open/closed,
+  // overriding the default of "already fully decided (WIN/LOSS) groups
+  // start collapsed, anything still live/pending starts open" - otherwise
+  // every round ever loaded piles up in this list forever (see the parlay
+  // builder screen before this: a dozen fully-settled rounds from days ago
+  // sitting open above the one round you actually want to pick legs from).
+  const [builderGroupOverrides, setBuilderGroupOverrides] = useState<Set<string>>(new Set());
   const [parlayLabel, setParlayLabel] = useState("");
   const [parlayOdds, setParlayOdds] = useState("");
   const [parlayWagerDollars, setParlayWagerDollars] = useState("");
@@ -297,6 +304,26 @@ export default function AdminPage() {
         setTimeout(() => setParlayMsg(""), 3000);
       }
       setRenamingId(null);
+    });
+  }
+
+  // Manually forces a still-live parlay to WIN or LOSS and moves it into
+  // the archive immediately - for when Teddy already knows the outcome
+  // (or just wants a stale one off the live board) rather than waiting for
+  // every leg to individually resolve on its own.
+  function settleParlay(parlay: Parlay, result: "hit" | "miss") {
+    fetch("/api/parlays", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, parlayId: parlay.id, manualStatus: result }),
+    }).then((r) => r.json()).then((d) => {
+      if (d.ok) {
+        setLiveParlays((prev) => prev.filter((p) => p.id !== parlay.id));
+        setParlayArchiveList((prev) => [...prev, d.parlay]);
+      } else {
+        setParlayMsg(d.error || "Couldn't settle parlay.");
+        setTimeout(() => setParlayMsg(""), 3000);
+      }
     });
   }
 
@@ -1492,35 +1519,76 @@ export default function AdminPage() {
 
       {pickableBets.length === 0 && <div className="subline">No bets loaded yet to build a parlay from.</div>}
 
-      {Object.entries(
-        pickableBets.reduce((acc: Record<string, Bet[]>, b) => {
-          const key = `${b.t} · ${b.r}`;
-          (acc[key] = acc[key] || []).push(b);
-          return acc;
-        }, {})
-      ).map(([group, groupBets]) => (
-        <div key={group} className="card" style={{ marginBottom: 10 }}>
-          <div className="player" style={{ fontSize: 13, marginBottom: 8 }}>{group}</div>
-          {groupBets.map((b) => (
-            <label key={b.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, fontSize: 12, cursor: "pointer" }}>
-              <input type="checkbox" checked={selectedLegIds.has(b.id)} onChange={() => toggleLeg(b.id)} />
-              <span style={{ color: "var(--cream)" }}>{b.player}</span>
-              <span style={{ color: "var(--cream-dim)" }}>{b.bet}</span>
-              {b.personal && (
-                <span style={{ fontSize: 9, color: "var(--gold-bright)", border: "1px solid var(--gold-bright)", borderRadius: 3, padding: "1px 5px" }}>
-                  TedBeans
-                </span>
-              )}
-              <span
-                className={`tsum ${b.status === "hit" ? "win" : b.status === "miss" ? "loss" : b.status === "live" ? "live" : "tbd"}`}
-                style={{ marginLeft: "auto" }}
-              >
-                {b.status === "hit" ? "WIN" : b.status === "miss" ? "LOSS" : b.status === "live" ? "LIVE" : "TBD"}
-              </span>
-            </label>
-          ))}
-        </div>
-      ))}
+      {(() => {
+        const groupEntries = Object.entries(
+          pickableBets.reduce((acc: Record<string, Bet[]>, b) => {
+            const key = `${b.t} · ${b.r}`;
+            (acc[key] = acc[key] || []).push(b);
+            return acc;
+          }, {})
+        ).map(([group, groupBets]) => {
+          const allDecided = groupBets.every((b) => b.status === "hit" || b.status === "miss");
+          const latestDate = groupBets.reduce((max, b) => (b.loadedDate && b.loadedDate > max ? b.loadedDate : max), "");
+          return { group, groupBets, allDecided, latestDate };
+        });
+        groupEntries.sort((a, b) => {
+          if (a.allDecided !== b.allDecided) return a.allDecided ? 1 : -1; // still-live/pending groups float to the top
+          return b.latestDate.localeCompare(a.latestDate); // most recently loaded first within each bucket
+        });
+        const hiddenCount = groupEntries.filter((g) => g.allDecided && !builderGroupOverrides.has(g.group)).length;
+
+        return (
+          <>
+            {hiddenCount > 0 && (
+              <div className="subline" style={{ marginBottom: 10 }}>
+                {hiddenCount} fully-settled round{hiddenCount === 1 ? "" : "s"} collapsed below - click one to expand it.
+              </div>
+            )}
+            {groupEntries.map(({ group, groupBets, allDecided }) => {
+              const hasSelectedLeg = groupBets.some((b) => selectedLegIds.has(b.id));
+              const collapsed = builderGroupOverrides.has(group) ? !allDecided : allDecided && !hasSelectedLeg;
+              return (
+                <div key={group} className="card" style={{ marginBottom: 10 }}>
+                  <div
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", marginBottom: collapsed ? 0 : 8 }}
+                    onClick={() =>
+                      setBuilderGroupOverrides((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(group)) next.delete(group);
+                        else next.add(group);
+                        return next;
+                      })
+                    }
+                  >
+                    <div className="player" style={{ fontSize: 13 }}>{group}</div>
+                    <span className="subline" style={{ margin: 0 }}>
+                      {groupBets.length} leg{groupBets.length === 1 ? "" : "s"} {collapsed ? "▸" : "▾"}
+                    </span>
+                  </div>
+                  {!collapsed && groupBets.map((b) => (
+                    <label key={b.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, fontSize: 12, cursor: "pointer" }}>
+                      <input type="checkbox" checked={selectedLegIds.has(b.id)} onChange={() => toggleLeg(b.id)} />
+                      <span style={{ color: "var(--cream)" }}>{b.player}</span>
+                      <span style={{ color: "var(--cream-dim)" }}>{b.bet}</span>
+                      {b.personal && (
+                        <span style={{ fontSize: 9, color: "var(--gold-bright)", border: "1px solid var(--gold-bright)", borderRadius: 3, padding: "1px 5px" }}>
+                          TedBeans
+                        </span>
+                      )}
+                      <span
+                        className={`tsum ${b.status === "hit" ? "win" : b.status === "miss" ? "loss" : b.status === "live" ? "live" : "tbd"}`}
+                        style={{ marginLeft: "auto" }}
+                      >
+                        {b.status === "hit" ? "WIN" : b.status === "miss" ? "LOSS" : b.status === "live" ? "LIVE" : "TBD"}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              );
+            })}
+          </>
+        );
+      })()}
 
       <div className="card" style={{ marginTop: 16, marginBottom: 16 }}>
         <div className="player" style={{ fontSize: 13, marginBottom: 8 }}>
@@ -1593,33 +1661,56 @@ export default function AdminPage() {
       {(liveParlays.length > 0 || parlayArchiveList.length > 0) && (
         <>
           <div className="round-label">All parlays (tap a name to rename it)</div>
-          {[...liveParlays, ...parlayArchiveList].map((p) => (
+          {[...liveParlays, ...parlayArchiveList].map((p) => {
+            const isLive = liveParlays.some((lp) => lp.id === p.id);
+            return (
             <div key={p.id} className="card" style={{ marginBottom: 8 }}>
-              {renamingId === p.id ? (
-                <div style={{ display: "flex", gap: 6 }}>
-                  <input
-                    autoFocus
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && saveRename(p.id)}
-                    style={{
-                      flex: 1, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
-                      color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
-                      padding: "6px 8px", borderRadius: 3,
-                    }}
-                  />
-                  <button className="add-btn-inline" onClick={() => saveRename(p.id)}>Save</button>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {renamingId === p.id ? (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && saveRename(p.id)}
+                        style={{
+                          flex: 1, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                          color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                          padding: "6px 8px", borderRadius: 3,
+                        }}
+                      />
+                      <button className="add-btn-inline" onClick={() => saveRename(p.id)}>Save</button>
+                    </div>
+                  ) : (
+                    <div className="player" style={{ fontSize: 13, cursor: "pointer" }} onClick={() => startRename(p)}>
+                      {p.label} · {p.oddsPrice} · {p.wagerUnits}u
+                    </div>
+                  )}
+                  <div className="subline" style={{ marginTop: 4 }}>
+                    {p.legs.length} legs · {p.loadedDate} · {p.status === "hit" ? "WIN" : p.status === "miss" ? "LOSS" : "open"}
+                  </div>
                 </div>
-              ) : (
-                <div className="player" style={{ fontSize: 13, cursor: "pointer" }} onClick={() => startRename(p)}>
-                  {p.label} · {p.oddsPrice} · {p.wagerUnits}u
-                </div>
-              )}
-              <div className="subline" style={{ marginTop: 4 }}>
-                {p.legs.length} legs · {p.loadedDate} · {p.status === "hit" ? "WIN" : p.status === "miss" ? "LOSS" : "open"}
+                {isLive && (
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    <button
+                      className="sbtn win"
+                      onClick={() => settleParlay(p, "hit")}
+                    >
+                      WIN
+                    </button>
+                    <button
+                      className="sbtn loss"
+                      onClick={() => settleParlay(p, "miss")}
+                    >
+                      LOSS
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </>
       )}
       </>

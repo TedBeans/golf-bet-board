@@ -59,16 +59,49 @@ export async function PUT(req: NextRequest) {
 }
 
 // Renames a parlay wherever it currently lives - still open, or already
-// settled and sitting in the recap archive.
+// settled and sitting in the recap archive. Also handles manually settling
+// a still-live parlay to WIN/LOSS (manualStatus) - used when Teddy already
+// knows the outcome and wants it off the live board without waiting for
+// every leg to individually resolve on its own.
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
-  const { passcode, parlayId, label } = body as { passcode: string; parlayId: string; label: string };
+  const { passcode, parlayId, label, manualStatus } = body as {
+    passcode: string;
+    parlayId: string;
+    label?: string;
+    manualStatus?: "hit" | "miss";
+  };
 
   if (!passcode || passcode !== process.env.EDIT_PASSCODE) {
     return NextResponse.json({ error: "Wrong passcode" }, { status: 401 });
   }
-  if (!parlayId || !label?.trim()) {
-    return NextResponse.json({ error: "Missing parlayId or label" }, { status: 400 });
+  if (!parlayId) {
+    return NextResponse.json({ error: "Missing parlayId" }, { status: 400 });
+  }
+
+  if (manualStatus) {
+    if (manualStatus !== "hit" && manualStatus !== "miss") {
+      return NextResponse.json({ error: "manualStatus must be \"hit\" or \"miss\"" }, { status: 400 });
+    }
+    const live = (await redis.get<Parlay[]>(PARLAYS_KEY)) || [];
+    const idx = live.findIndex((p) => p.id === parlayId);
+    if (idx === -1) {
+      return NextResponse.json({ error: "Parlay not found on the live board (already archived?)" }, { status: 404 });
+    }
+    const [settled] = live.splice(idx, 1);
+    settled.manualStatus = manualStatus;
+    settled.status = manualStatus;
+    settled.archivedAt = new Date().toISOString();
+
+    await redis.set(PARLAYS_KEY, live);
+    const archived = (await redis.get<Parlay[]>(PARLAY_ARCHIVE_KEY)) || [];
+    await redis.set(PARLAY_ARCHIVE_KEY, [...archived, settled]);
+
+    return NextResponse.json({ ok: true, parlay: settled });
+  }
+
+  if (!label?.trim()) {
+    return NextResponse.json({ error: "Missing label or manualStatus" }, { status: 400 });
   }
 
   const live = (await redis.get<Parlay[]>(PARLAYS_KEY)) || [];
