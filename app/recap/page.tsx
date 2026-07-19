@@ -267,7 +267,12 @@ export default function RecapPage() {
   // TedBeans' personal plays (Winner/Top N/Make Cut/H2H) never appear in
   // the regular calendar/tournament recaps above - they get their own tab,
   // grouped by tournament only since they're tournament-long, not per-round.
-  const personalArchive = useMemo(() => archive.filter((b) => b.personal), [archive]);
+  // Hidden ones are excluded here too - "hidden" means the bet was only
+  // ever used as a parlay leg, never actually bet straight on its own, so
+  // it shouldn't count toward (or even show up in) the straight-bet
+  // W/L/units recap here. Its parlay still carries its own record via
+  // personalParlayArchive below, untouched by this filter.
+  const personalArchive = useMemo(() => archive.filter((b) => b.personal && !b.hidden), [archive]);
   const personalTournMap = useMemo(() => {
     const m: Record<string, Bet[]> = {};
     personalArchive.forEach((b) => {

@@ -44,7 +44,7 @@ export default function AnalysisPage() {
   const [barGroupBy, setBarGroupBy] = useState<"player" | "type">("player");
 
   useEffect(() => {
-    fetch("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
+    fetch("/api/archive").then((r) => r.json()).then((d) => setArchive((d.archive || []).filter((b: Bet) => !b.personal)));
   }, []);
 
   const players = useMemo(() => Array.from(new Set(archive.map((b) => b.player))).sort(), [archive]);
