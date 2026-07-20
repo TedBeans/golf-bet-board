@@ -362,6 +362,7 @@ export default function RecapPage() {
               TedBeans Plays
             </button>
             <Link href="/analysis" className="recap-btn">Analysis</Link>
+            <Link href="/course-history" className="recap-btn">Course History</Link>
           </div>
         </div>
         <div className="subline">

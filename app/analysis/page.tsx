@@ -95,6 +95,7 @@ export default function AnalysisPage() {
           <h1><GolfFlagIcon />Golf <span>Tracker</span></h1>
           <div className="header-actions">
             <Link href="/recap" className="recap-btn">Recap/Archives</Link>
+            <Link href="/course-history" className="recap-btn">Course History</Link>
           </div>
         </div>
         <div className="subline">

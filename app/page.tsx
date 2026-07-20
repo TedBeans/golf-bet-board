@@ -480,6 +480,7 @@ export default function Page() {
             )}
             <Link href="/recap" className="recap-btn">Recap/Archives</Link>
             <Link href="/analysis" className="recap-btn">Analysis</Link>
+            <Link href="/course-history" className="recap-btn">Course History</Link>
           </div>
         </div>
         <div className="subline">

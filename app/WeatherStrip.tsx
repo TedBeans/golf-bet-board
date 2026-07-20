@@ -24,6 +24,38 @@ function weatherLabel(code: number): string {
   return "—";
 }
 
+function weatherEmoji(code: number): string {
+  if (code === 0) return "☀️";
+  if (code <= 2) return "🌤️";
+  if (code === 3) return "☁️";
+  if (code === 45 || code === 48) return "🌫️";
+  if (code >= 51 && code <= 57) return "🌦️";
+  if (code >= 61 && code <= 67) return "🌧️";
+  if (code >= 71 && code <= 77) return "🌨️";
+  if (code >= 80 && code <= 82) return "🌧️";
+  if (code >= 95) return "⛈️";
+  return "🌡️";
+}
+
+// Cool blue (<=65°) -> gold (~85°) -> clay/hot (105°+), so a scorching
+// forecast day reads instantly instead of blending into the same white
+// text as every other number on the card.
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+function tempColor(hi: number): string {
+  const STEEL: [number, number, number] = [122, 128, 135]; // var(--steel)
+  const GOLD: [number, number, number] = [228, 190, 74]; // var(--gold-bright)
+  const CLAY: [number, number, number] = [192, 106, 76]; // var(--clay)
+  let c1: [number, number, number], c2: [number, number, number], t: number;
+  if (hi <= 85) { c1 = STEEL; c2 = GOLD; t = Math.max(0, Math.min(1, (hi - 60) / 25)); }
+  else { c1 = GOLD; c2 = CLAY; t = Math.max(0, Math.min(1, (hi - 85) / 20)); }
+  const r = Math.round(lerp(c1[0], c2[0], t));
+  const g = Math.round(lerp(c1[1], c2[1], t));
+  const b = Math.round(lerp(c1[2], c2[2], t));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 // Live-board tournament headers pass today's date as both start/end so the
 // strip only shows the single current day rather than the whole week
 // (which the pre-tournament "upcoming this week" widget still shows in
@@ -113,16 +145,32 @@ export default function WeatherStrip({
   }
 
   return (
-    <div style={{ display: "flex", gap: 8, overflowX: "auto" }}>
+    <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 2 }}>
       {forecast.map((d) => (
-        <div key={d.date} style={{ minWidth: 68, textAlign: "center", fontSize: 11 }}>
-          <div style={{ color: "var(--cream-dim)", marginBottom: 2 }}>
+        <div
+          key={d.date}
+          style={{
+            minWidth: compact ? 92 : 108,
+            textAlign: "center",
+            padding: compact ? "8px 10px" : "12px 14px",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+            background: "linear-gradient(180deg, rgba(228,190,74,0.05), rgba(228,190,74,0.01))",
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--cream-dim)", marginBottom: 4 }}>
             {new Date(d.date + "T12:00:00").toLocaleDateString([], { weekday: "short", month: "numeric", day: "numeric" })}
           </div>
-          <div style={{ color: "var(--cream)" }}>{weatherLabel(d.code)}</div>
-          <div style={{ color: "var(--cream)", fontWeight: 700 }}>{d.hi}° <span style={{ color: "var(--cream-dim)", fontWeight: 400 }}>{d.lo}°</span></div>
-          <div style={{ color: d.rainChance >= 40 ? "var(--gold-bright)" : "var(--cream-dim)" }}>{d.rainChance}% rain</div>
-          <div style={{ color: "var(--cream-dim)" }}>{d.windMax} mph wind</div>
+          <div style={{ fontSize: compact ? 22 : 28, lineHeight: 1, marginBottom: 4 }}>{weatherEmoji(d.code)}</div>
+          <div style={{ fontSize: 11, color: "var(--cream)", marginBottom: 6 }}>{weatherLabel(d.code)}</div>
+          <div style={{ fontSize: compact ? 18 : 22, fontWeight: 700, color: tempColor(d.hi), lineHeight: 1 }}>
+            {d.hi}° <span style={{ fontSize: compact ? 12 : 14, fontWeight: 400, color: "var(--cream-dim)" }}>{d.lo}°</span>
+          </div>
+          <div style={{ fontSize: 10, marginTop: 6, color: d.rainChance >= 40 ? "var(--gold-bright)" : "var(--cream-dim)" }}>
+            💧 {d.rainChance}%
+          </div>
+          <div style={{ fontSize: 10, color: "var(--cream-dim)" }}>💨 {d.windMax} mph</div>
         </div>
       ))}
     </div>
