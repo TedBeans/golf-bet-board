@@ -556,9 +556,28 @@ export default function RecapPage() {
               <div className="empty">No decided personal plays yet - they show up here once every play for a tournament is settled.</div>
             )}
 
+            {personalArchive.length > 0 && (() => {
+              const totalUnits = Math.round(
+                personalArchive.reduce((sum, b) => sum + (computeUnitResult(b.oddsPrice, b.oddsUnits, b.status) || 0), 0) * 100
+              ) / 100;
+              return (
+                <div className="tourn-head" style={{ marginBottom: 16 }}>
+                  <h2>TedBeans straight plays</h2>
+                  <div className="tourn-summary">
+                    <span className="tsum win">{personalArchive.filter((b) => b.status === "hit").length}W</span>
+                    <span className="tsum loss">{personalArchive.filter((b) => b.status === "miss").length}L</span>
+                    <span className={totalUnits >= 0 ? "tsum win" : "tsum loss"}>{formatUnits(totalUnits)}</span>
+                  </div>
+                </div>
+              );
+            })()}
+
             {Object.keys(personalTournMap).map((t) => {
               const tBets = personalTournMap[t];
               const isOpen = expandedTourn === `tedbeans:${t}`;
+              const tUnits = Math.round(
+                tBets.reduce((sum, b) => sum + (computeUnitResult(b.oddsPrice, b.oddsUnits, b.status) || 0), 0) * 100
+              ) / 100;
               return (
                 <div key={t} className="tourn" style={{ marginBottom: 14 }}>
                   <div className="tourn-head" style={{ cursor: "pointer" }} onClick={() => setExpandedTourn(isOpen ? null : `tedbeans:${t}`)}>
@@ -573,6 +592,7 @@ export default function RecapPage() {
                     <div className="tourn-summary">
                       <span className="tsum win">{tBets.filter((b) => b.status === "hit").length}W</span>
                       <span className="tsum loss">{tBets.filter((b) => b.status === "miss").length}L</span>
+                      <span className={tUnits >= 0 ? "tsum win" : "tsum loss"}>{formatUnits(tUnits)}</span>
                     </div>
                   </div>
                   {isOpen && tBets.map((b) => <BetDetailCard key={b.id} b={b} mapping={mapping} />)}
