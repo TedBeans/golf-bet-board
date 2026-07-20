@@ -12,6 +12,8 @@ import { computeUnitResult, formatUnits } from "../lib/units";
 import HoleScorecardModal from "./HoleScorecardModal";
 import GolfFlagIcon from "./GolfFlagIcon";
 import UpcomingTournamentCard from "./UpcomingTournamentCard";
+import WeatherStrip from "./WeatherStrip";
+import { nowInCentral } from "../lib/centralTime";
 
 const SYNC_INTERVAL_MS = 60000;
 
@@ -292,6 +294,7 @@ export default function Page() {
   const [mapping, setMapping] = useState<Mapping>(EMPTY_MAPPING);
   const [archive, setArchive] = useState<Bet[]>([]);
   const [liveParlays, setLiveParlays] = useState<Parlay[]>([]);
+  const [expandedWeather, setExpandedWeather] = useState<Set<string>>(new Set());
   const [cutlineProbs, setCutlineProbs] = useState<{ score: number; prob: number }[]>([]);
   const [scorecardModal, setScorecardModal] = useState<{ betId: string; tournament: string; round: string; player: string; loading: boolean; scorecard: any | null; position?: string | null; totalToPar?: number | null; message?: string } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -516,6 +519,10 @@ export default function Page() {
           tournBets.forEach((b) => (tc[b.status] = (tc[b.status] || 0) + 1));
           const suspendType = mapping.tournaments[tourn]?.suspendedType || "none";
           const isSuspended = suspendType !== "none";
+          const tm = mapping.tournaments[tourn];
+          const hasCoords = tm?.latitude !== undefined && tm?.longitude !== undefined;
+          const weatherOpen = expandedWeather.has(tourn);
+          const today = nowInCentral().dateStr;
           return (
           <div className="tourn" key={tourn}>
             <div className="tourn-head">
@@ -530,6 +537,29 @@ export default function Page() {
                 <span className="tsum tbd">TBD {tc.pending || 0}</span>
               </div>
             </div>
+            {hasCoords && (
+              <div style={{ marginBottom: 10 }}>
+                <span
+                  className="subline"
+                  style={{ cursor: "pointer", display: "inline-block" }}
+                  onClick={() =>
+                    setExpandedWeather((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(tourn)) next.delete(tourn);
+                      else next.add(tourn);
+                      return next;
+                    })
+                  }
+                >
+                  Weather {weatherOpen ? "▾" : "▸"}
+                </span>
+                {weatherOpen && (
+                  <div style={{ marginTop: 6 }}>
+                    <WeatherStrip latitude={tm!.latitude} longitude={tm!.longitude} startDate={today} endDate={today} compact />
+                  </div>
+                )}
+              </div>
+            )}
             {isSuspended && (
               <div className={`suspend-overlay variant-${suspendType}`}>
                 {suspendType === "fog" && (
