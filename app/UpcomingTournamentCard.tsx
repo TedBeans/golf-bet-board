@@ -1,6 +1,7 @@
 "use client";
 
 import WeatherStrip from "./WeatherStrip";
+import CourseHistoryTable from "./CourseHistoryTable";
 
 type TournMeta = {
   venue?: string;
@@ -38,6 +39,8 @@ export default function UpcomingTournamentCard({ name, meta }: { name: string; m
           <WeatherStrip latitude={meta.latitude} longitude={meta.longitude} startDate={meta.startDate} endDate={meta.endDate} />
         </div>
       )}
+
+      <CourseHistoryTable tournamentName={name} />
     </div>
   );
 }

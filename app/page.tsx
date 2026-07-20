@@ -480,7 +480,6 @@ export default function Page() {
             )}
             <Link href="/recap" className="recap-btn">Recap/Archives</Link>
             <Link href="/analysis" className="recap-btn">Analysis</Link>
-            <Link href="/course-history" className="recap-btn">Course History</Link>
           </div>
         </div>
         <div className="subline">
@@ -505,9 +504,11 @@ export default function Page() {
       </header>
 
       <main>
-        {bets.length === 0 && (
+        {regularBets.length === 0 && (
           <>
-            <div className="empty">No bets loaded. Upcoming events:</div>
+            <div className="empty">
+              {bets.length === 0 ? "No bets loaded. Upcoming events:" : "No official round bets loaded yet. Upcoming events:"}
+            </div>
             {Object.entries(mapping.tournaments)
               .filter(([, tm]) => tm.upcoming)
               .map(([name, tm]) => <UpcomingTournamentCard key={name} name={name} meta={tm} />)}
