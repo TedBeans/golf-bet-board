@@ -48,6 +48,13 @@ export default function UpcomingTournamentCard({ name, meta }: { name: string; m
       timezone: "auto",
       temperature_unit: "fahrenheit",
       windspeed_unit: "mph",
+      // Pinned to NOAA's GFS instead of Open-Meteo's auto-picked "best
+      // match" model - the auto-pick can land on a different underlying
+      // model per request and occasionally produces an outlier day
+      // (e.g. a 101° spike out of nowhere) that diverges sharply from
+      // what US weather apps (Google, NWS, etc.) show for the same day.
+      // GFS is the standard US model and tracks much closer to those.
+      models: "gfs_seamless",
     });
     if (meta.startDate) params.set("start_date", meta.startDate);
     if (meta.endDate) params.set("end_date", meta.endDate);
@@ -60,13 +67,31 @@ export default function UpcomingTournamentCard({ name, meta }: { name: string; m
           setWeatherError(true);
           return;
         }
-        const days: DayForecast[] = d.daily.time.map((date: string, i: number) => ({
+        // Open-Meteo only suffixes fields with the model name once you ask
+        // for more than one model at a time - a single explicit model like
+        // this should come back unsuffixed, same shape as the old
+        // auto-picked request. Falling back to the suffixed key too just
+        // in case, rather than assuming and silently breaking if that
+        // ever changes.
+        const daily = d.daily;
+        const field = (base: string) => daily[base] ?? daily[`${base}_gfs_seamless`];
+        const times = daily.time;
+        const tempMax = field("temperature_2m_max");
+        const tempMin = field("temperature_2m_min");
+        const rain = field("precipitation_probability_max");
+        const wind = field("windspeed_10m_max");
+        const code = field("weathercode");
+        if (!times || !tempMax) {
+          setWeatherError(true);
+          return;
+        }
+        const days: DayForecast[] = times.map((date: string, i: number) => ({
           date,
-          hi: Math.round(d.daily.temperature_2m_max[i]),
-          lo: Math.round(d.daily.temperature_2m_min[i]),
-          rainChance: d.daily.precipitation_probability_max[i],
-          windMax: Math.round(d.daily.windspeed_10m_max[i]),
-          code: d.daily.weathercode[i],
+          hi: Math.round(tempMax[i]),
+          lo: Math.round(tempMin[i]),
+          rainChance: rain[i],
+          windMax: Math.round(wind[i]),
+          code: code[i],
         }));
         setForecast(days);
       })
