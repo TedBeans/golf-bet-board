@@ -46,3 +46,23 @@ export function formatUnits(n: number | null): string {
   const rounded = Math.round(n * 100) / 100;
   return rounded > 0 ? `+${rounded}u` : `${rounded}u`;
 }
+
+// Same idea as computeUnitResult but for a parlay as a whole - status here
+// can also be "push" (a manual-only outcome, never auto-derived from legs):
+// half the wager pays out at the parlay's listed odds, the other half is
+// simply refunded rather than lost, which is the standard meaning of a
+// "half win" when one leg of a parlay turns out to have pushed.
+export function computeParlayUnitResult(
+  oddsPrice: string | null | undefined,
+  wagerUnits: number,
+  status: "pending" | "live" | "hit" | "miss" | "push"
+): number | null {
+  if (status === "hit" || status === "push") {
+    const multiplier = oddsMultiplier(oddsPrice);
+    if (multiplier === null) return null;
+    const fullWin = wagerUnits * multiplier;
+    return status === "push" ? fullWin / 2 : fullWin;
+  }
+  if (status === "miss") return -wagerUnits;
+  return null;
+}

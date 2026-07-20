@@ -60,16 +60,19 @@ export async function PUT(req: NextRequest) {
 
 // Renames a parlay wherever it currently lives - still open, or already
 // settled and sitting in the recap archive. Also handles manually settling
-// a still-live parlay to WIN/LOSS (manualStatus) - used when Teddy already
-// knows the outcome and wants it off the live board without waiting for
-// every leg to individually resolve on its own.
+// a parlay to WIN/LOSS/PUSH (manualStatus) - either a still-live one
+// (moves it into the archive immediately, for when Teddy already knows the
+// outcome and doesn't want to wait for every leg to individually resolve),
+// or one that's already archived but graded wrong (corrects it in place -
+// e.g. a leg that auto-graded off a bad or premature stat, or a leg that
+// turned out to be a push on the sportsbook's end).
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
   const { passcode, parlayId, label, manualStatus } = body as {
     passcode: string;
     parlayId: string;
     label?: string;
-    manualStatus?: "hit" | "miss";
+    manualStatus?: "hit" | "miss" | "push";
   };
 
   if (!passcode || passcode !== process.env.EDIT_PASSCODE) {
@@ -80,24 +83,35 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (manualStatus) {
-    if (manualStatus !== "hit" && manualStatus !== "miss") {
-      return NextResponse.json({ error: "manualStatus must be \"hit\" or \"miss\"" }, { status: 400 });
+    if (manualStatus !== "hit" && manualStatus !== "miss" && manualStatus !== "push") {
+      return NextResponse.json({ error: "manualStatus must be \"hit\", \"miss\", or \"push\"" }, { status: 400 });
     }
     const live = (await redis.get<Parlay[]>(PARLAYS_KEY)) || [];
     const idx = live.findIndex((p) => p.id === parlayId);
-    if (idx === -1) {
-      return NextResponse.json({ error: "Parlay not found on the live board (already archived?)" }, { status: 404 });
+    if (idx !== -1) {
+      const [settled] = live.splice(idx, 1);
+      settled.manualStatus = manualStatus;
+      settled.status = manualStatus;
+      settled.archivedAt = new Date().toISOString();
+
+      await redis.set(PARLAYS_KEY, live);
+      const archived = (await redis.get<Parlay[]>(PARLAY_ARCHIVE_KEY)) || [];
+      await redis.set(PARLAY_ARCHIVE_KEY, [...archived, settled]);
+
+      return NextResponse.json({ ok: true, parlay: settled });
     }
-    const [settled] = live.splice(idx, 1);
-    settled.manualStatus = manualStatus;
-    settled.status = manualStatus;
-    settled.archivedAt = new Date().toISOString();
 
-    await redis.set(PARLAYS_KEY, live);
+    // Not on the live board - see if it's already archived and just needs
+    // correcting in place (nothing to move between lists in that case).
     const archived = (await redis.get<Parlay[]>(PARLAY_ARCHIVE_KEY)) || [];
-    await redis.set(PARLAY_ARCHIVE_KEY, [...archived, settled]);
-
-    return NextResponse.json({ ok: true, parlay: settled });
+    const archivedIdx = archived.findIndex((p) => p.id === parlayId);
+    if (archivedIdx === -1) {
+      return NextResponse.json({ error: "Parlay not found on the live board or in the archive" }, { status: 404 });
+    }
+    archived[archivedIdx].manualStatus = manualStatus;
+    archived[archivedIdx].status = manualStatus;
+    await redis.set(PARLAY_ARCHIVE_KEY, archived);
+    return NextResponse.json({ ok: true, parlay: archived[archivedIdx] });
   }
 
   if (!label?.trim()) {

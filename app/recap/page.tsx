@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Bet } from "../../lib/seed";
 import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
 import { parseBetType, trendClassName, friendlyLabel, formatScore } from "../../lib/betLogic";
-import { computeUnitResult, formatUnits, oddsMultiplier } from "../../lib/units";
+import { computeUnitResult, computeParlayUnitResult, formatUnits } from "../../lib/units";
 import { centralDateFromISO } from "../../lib/centralTime";
 import { Parlay } from "../../lib/parlay";
 import GolfFlagIcon from "../GolfFlagIcon";
@@ -172,14 +172,11 @@ function ParlayArchiveList({ parlays }: { parlays: Parlay[] }) {
   }
 
   const totalUnits = Math.round(
-    parlays.reduce((sum, p) => {
-      if (p.status === "hit") return sum + p.wagerUnits * (oddsMultiplier(p.oddsPrice) || 0);
-      if (p.status === "miss") return sum - p.wagerUnits;
-      return sum;
-    }, 0) * 100
+    parlays.reduce((sum, p) => sum + (computeParlayUnitResult(p.oddsPrice, p.wagerUnits, p.status) || 0), 0) * 100
   ) / 100;
   const wins = parlays.filter((p) => p.status === "hit").length;
   const losses = parlays.filter((p) => p.status === "miss").length;
+  const pushes = parlays.filter((p) => p.status === "push").length;
 
   return (
     <div>
@@ -188,6 +185,7 @@ function ParlayArchiveList({ parlays }: { parlays: Parlay[] }) {
         <div className="tourn-summary">
           <span className="tsum win">{wins}W</span>
           <span className="tsum loss">{losses}L</span>
+          {pushes > 0 && <span className="tsum tbd">{pushes}P</span>}
           <span className={totalUnits >= 0 ? "tsum win" : "tsum loss"}>{formatUnits(totalUnits)}</span>
         </div>
       </div>
@@ -196,9 +194,7 @@ function ParlayArchiveList({ parlays }: { parlays: Parlay[] }) {
         .sort((a, b) => (b.archivedAt || "").localeCompare(a.archivedAt || ""))
         .map((p) => {
           const isOpen = expandedParlay === p.id;
-          const unitResult = p.status === "hit"
-            ? Math.round(p.wagerUnits * (oddsMultiplier(p.oddsPrice) || 0) * 100) / 100
-            : p.status === "miss" ? -p.wagerUnits : null;
+          const unitResult = computeParlayUnitResult(p.oddsPrice, p.wagerUnits, p.status);
           return (
             <div key={p.id} className={`card ${p.status}`} style={{ marginBottom: 10, cursor: "pointer" }} onClick={() => setExpandedParlay(isOpen ? null : p.id)}>
               <div className="card-top">
@@ -208,8 +204,8 @@ function ParlayArchiveList({ parlays }: { parlays: Parlay[] }) {
                   <div className="bet-text">{p.oddsPrice} · {p.wagerUnits}u</div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                  <span className={`sbtn ${p.status === "hit" ? "win active" : "loss active"}`} style={{ cursor: "default" }}>
-                    {p.status === "hit" ? "WIN" : "LOSS"}
+                  <span className={`sbtn ${p.status === "hit" ? "win active" : p.status === "push" ? "tbd active" : "loss active"}`} style={{ cursor: "default" }}>
+                    {p.status === "hit" ? "WIN" : p.status === "push" ? "HALF WIN" : "LOSS"}
                   </span>
                   {unitResult !== null && (
                     <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: unitResult >= 0 ? "var(--live)" : "var(--clay)" }}>

@@ -307,11 +307,12 @@ export default function AdminPage() {
     });
   }
 
-  // Manually forces a still-live parlay to WIN or LOSS and moves it into
-  // the archive immediately - for when Teddy already knows the outcome
-  // (or just wants a stale one off the live board) rather than waiting for
-  // every leg to individually resolve on its own.
-  function settleParlay(parlay: Parlay, result: "hit" | "miss") {
+  // Manually forces a parlay to WIN/LOSS/PUSH. If it's still live, moves it
+  // into the archive immediately (for when Teddy already knows the outcome
+  // rather than waiting for every leg to individually resolve). If it's
+  // already archived, corrects it in place - e.g. a leg that auto-graded
+  // wrong, or a leg that turned out to be a push on the sportsbook's end.
+  function settleParlay(parlay: Parlay, result: "hit" | "miss" | "push") {
     fetch("/api/parlays", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -319,7 +320,10 @@ export default function AdminPage() {
     }).then((r) => r.json()).then((d) => {
       if (d.ok) {
         setLiveParlays((prev) => prev.filter((p) => p.id !== parlay.id));
-        setParlayArchiveList((prev) => [...prev, d.parlay]);
+        setParlayArchiveList((prev) => {
+          const withoutIt = prev.filter((p) => p.id !== parlay.id);
+          return [...withoutIt, d.parlay];
+        });
       } else {
         setParlayMsg(d.error || "Couldn't settle parlay.");
         setTimeout(() => setParlayMsg(""), 3000);
@@ -1662,7 +1666,6 @@ export default function AdminPage() {
         <>
           <div className="round-label">All parlays (tap a name to rename it)</div>
           {[...liveParlays, ...parlayArchiveList].map((p) => {
-            const isLive = liveParlays.some((lp) => lp.id === p.id);
             return (
             <div key={p.id} className="card" style={{ marginBottom: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
@@ -1688,25 +1691,29 @@ export default function AdminPage() {
                     </div>
                   )}
                   <div className="subline" style={{ marginTop: 4 }}>
-                    {p.legs.length} legs · {p.loadedDate} · {p.status === "hit" ? "WIN" : p.status === "miss" ? "LOSS" : "open"}
+                    {p.legs.length} legs · {p.loadedDate} · {p.status === "hit" ? "WIN" : p.status === "miss" ? "LOSS" : p.status === "push" ? "HALF WIN" : "open"}
                   </div>
                 </div>
-                {isLive && (
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                    <button
-                      className="sbtn win"
-                      onClick={() => settleParlay(p, "hit")}
-                    >
-                      WIN
-                    </button>
-                    <button
-                      className="sbtn loss"
-                      onClick={() => settleParlay(p, "miss")}
-                    >
-                      LOSS
-                    </button>
-                  </div>
-                )}
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <button
+                    className="sbtn win"
+                    onClick={() => settleParlay(p, "hit")}
+                  >
+                    WIN
+                  </button>
+                  <button
+                    className="sbtn tbd"
+                    onClick={() => settleParlay(p, "push")}
+                  >
+                    HALF WIN
+                  </button>
+                  <button
+                    className="sbtn loss"
+                    onClick={() => settleParlay(p, "miss")}
+                  >
+                    LOSS
+                  </button>
+                </div>
               </div>
             </div>
             );

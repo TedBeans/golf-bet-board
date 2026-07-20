@@ -229,22 +229,20 @@ export function autoGradeStatus(
     return null;
   }
 
-  const remaining = effectiveHolesTotal - thru;
-  if (remaining < 0) return null;
-  const worstCase = stat + remaining; // max the count could still reach
-
-  if (parsed.type === "max") {
-    // Bet wins if the final count ends at or under the target.
-    if (stat > parsed.target) return "miss"; // already over, can't undo
-    if (worstCase <= parsed.target) return "hit"; // can't exceed it even in the worst case
-    return null;
-  }
-  if (parsed.type === "min") {
-    // Bet wins if the final count reaches at least the target.
-    if (stat >= parsed.target) return "hit"; // already there, can't lose it
-    if (worstCase < parsed.target) return "miss"; // can't reach it even in the best case
-    return null;
-  }
+  // Count-based bets (GIR/BIRDIES/BOGEYS/PARS) used to grade early off a
+  // "worst case" bound - e.g. a min-type bet like "12+ pars" would lock in
+  // a win the moment the count hit 12, on the assumption a completed
+  // hole's tally can never move backward. In practice that assumption
+  // isn't safe enough to bet a permanent grade on (a count can come from a
+  // feed that's briefly wrong, or a hole result can get revised) - and
+  // once autoGradeStatus returns a verdict, sync stops re-checking that
+  // bet forever (see "already decided - stop pulling for it" in the sync
+  // route), so an early wrong verdict never gets a chance to self-correct.
+  // Wait for the round to actually finish and do one direct final
+  // comparison instead, same as SCORE above.
+  if (thru < effectiveHolesTotal) return null;
+  if (parsed.type === "max") return stat <= parsed.target ? "hit" : "miss";
+  if (parsed.type === "min") return stat >= parsed.target ? "hit" : "miss";
   return null;
 }
 

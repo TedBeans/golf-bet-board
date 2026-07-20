@@ -695,7 +695,7 @@ export async function GET() {
         const legStatuses = resolveLegStatuses(p.legs, finalBets, archiveForLegs);
         p.status = deriveParlayStatus(legStatuses);
       }
-      if (p.status === "hit" || p.status === "miss") {
+      if (p.status === "hit" || p.status === "miss" || p.status === "push") {
         nowDecided.push({ ...p, archivedAt: new Date().toISOString() });
       } else {
         stillOpen.push(p);
