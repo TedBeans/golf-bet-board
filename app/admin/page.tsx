@@ -99,6 +99,11 @@ export default function AdminPage() {
   // builder screen before this: a dozen fully-settled rounds from days ago
   // sitting open above the one round you actually want to pick legs from).
   const [builderGroupOverrides, setBuilderGroupOverrides] = useState<Set<string>>(new Set());
+  // Tournament config cards in the Auto-sync setup tab (each one has ~15
+  // fields) start collapsed to just the header, so the list is scannable
+  // instead of forcing a long scroll through every field of every
+  // tournament ever added just to find the one you want.
+  const [expandedTournaments, setExpandedTournaments] = useState<Set<string>>(new Set());
   const [parlayLabel, setParlayLabel] = useState("");
   const [parlayOdds, setParlayOdds] = useState("");
   const [parlayWagerDollars, setParlayWagerDollars] = useState("");
@@ -1222,24 +1227,44 @@ export default function AdminPage() {
             },
           }));
         }
+        const isExpanded = expandedTournaments.has(tourn);
+        function toggleExpanded() {
+          setExpandedTournaments((prev) => {
+            const next = new Set(prev);
+            if (next.has(tourn)) next.delete(tourn);
+            else next.add(tourn);
+            return next;
+          });
+        }
         return (
           <div key={tourn} className="card" style={{ marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div className="player">{tourn}</div>
+            <div
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+              onClick={toggleExpanded}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div className="player">{tourn}</div>
+                <div className="subline" style={{ margin: 0 }}>
+                  {[tm?.pgaId || "no PGA ID set", isSuspended ? "suspended" : null, tm?.upcoming ? "shown as upcoming" : null].filter(Boolean).join(" · ")}
+                  {" "}{isExpanded ? "▾" : "▸"}
+                </div>
+              </div>
               <button
                 className="resume-btn"
-                onClick={() => removeTournament(tourn)}
-                style={{ fontSize: 9 }}
+                onClick={(e) => { e.stopPropagation(); removeTournament(tourn); }}
+                style={{ fontSize: 9, flexShrink: 0 }}
               >
                 Remove
               </button>
             </div>
+            {isExpanded && (
+            <>
             <input
               placeholder="e.g. R2026518"
               value={tm?.pgaId || ""}
               onChange={(e) => updateTourn({ pgaId: e.target.value })}
               style={{
-                width: "100%", background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                width: "100%", marginTop: 12, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
                 color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
                 padding: "8px 10px", borderRadius: 3,
               }}
@@ -1472,6 +1497,8 @@ export default function AdminPage() {
                   Leave blank to lift it manually instead.
                 </div>
               </label>
+            )}
+            </>
             )}
           </div>
         );
