@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 type PlayerRow = {
   name: string;
@@ -79,7 +79,7 @@ const COURSE_HISTORY: Record<string, [string, number, number, number, number | n
     ["Garrick Higgo", 4, 3, 63.0, 13, 12, 0.26],
     ["Corey Conners", 1, 1, 46.0, 46, 4, 0.75],
     ["Beau Hossler", 7, 3, 70.9, 13, 20, 0.14],
-    ["Dylan Wu", 3, 2, 52.7, 5, 12, 0.22],
+    ["Dylan Wu", 4, 2, 52.7, 5, 12, 0.22],
     ["Jake Knapp", 1, 1, 3.0, 3, 7, 0.30],
     ["Davis Riley", 3, 1, 82.0, 46, 8, 0.25],
     ["Matthieu Pavon", 1, 1, 44.0, 44, 4, 0.50],
@@ -137,6 +137,135 @@ const COURSE_HISTORY: Record<string, [string, number, number, number, number | n
   ],
 };
 
+const YEARS = [2025, 2024, 2023, 2022, 2021, 2020, 2019];
+
+type YearResult = number | "MC" | "DQ" | null;
+
+// Same source screenshot as COURSE_HISTORY above, kept year-by-year instead
+// of collapsed to an average - "100" on the sheet becomes "MC" here (and
+// the one "DQ" stays labeled as such), both shown in the same red as a
+// missed cut everywhere else on the board. Order matches YEARS (2025 ->
+// 2019). Keyed by tournament the same way COURSE_HISTORY is, in case
+// another course's sheet gets added later.
+const YEAR_HISTORY: Record<string, Record<string, YearResult[]>> = {
+  "3M Open": {
+    "Tony Finau": ["MC", 12, 7, 1, 28, 3, 23],
+    "Emiliano Grillo": [20, 24, 10, 2, "MC", 3, null],
+    "Cam Davis": ["MC", 19, 10, 16, 28, 12, "MC"],
+    "Brice Garnett": [57, 33, 53, 31, 16, 26, 23],
+    "Doug Ghim": ["MC", 24, 27, 16, "MC", 18, null],
+    "Adam Hadwin": [44, "MC", "MC", 38, 6, null, 4],
+    "Kurt Kitayama": [1, 6, null, null, null, null, null],
+    "Cameron Champ": [28, 12, null, 16, 1, null, "MC"],
+    "Sam Stevens": [2, 64, 10, null, null, null, null],
+    "Adam Svensson": [14, 37, 37, "MC", null, null, 15],
+    "Lee Hodges": ["MC", "MC", 1, 16, null, null, null],
+    "Hank Lebioda": [null, null, "MC", 16, null, 26, 34],
+    "Keith Mitchell": ["MC", 46, 5, null, 5, "MC", 66],
+    "Sungjae Im": ["MC", null, "MC", 2, null, null, 15],
+    "Maverick McNealy": ["MC", 3, null, 49, 16, null, null],
+    "Kevin Streelman": [null, 64, 2, null, null, null, 34],
+    "Taylor Moore": [14, 12, null, null, null, null, null],
+    "Matt Kuchar": [null, 3, 43, null, "MC", null, null],
+    "Patrick Rodgers": ["MC", 37, 37, null, 39, 32, null],
+    "Matti Schmid": [61, 12, 20, null, null, null, null],
+    "Nick Hardy": [28, 46, 13, 58, null, null, null],
+    "Gary Woodland": [20, 37, "MC", null, 11, null, null],
+    "Brian Harman": [null, null, null, null, 41, 7, null],
+    "Max Greyserman": ["MC", 2, null, null, null, null, null],
+    "Patrick Fishburn": [44, 6, null, null, null, null, null],
+    "Max Homa": [39, null, null, null, 3, 79, null],
+    "David Lipsky": [3, "MC", 43, null, null, null, null],
+    "Ben Kohles": [20, 24, null, "MC", null, null, null],
+    "Chad Ramey": [28, 24, 53, null, null, null, null],
+    "Mackenzie Hughes": [53, 19, 30, null, null, 66, null],
+    "Takumi Kanaya": [7, null, null, null, null, null, null],
+    "William Mouw": [7, null, null, null, null, null, null],
+    "Taylor Pendrith": [68, 5, "MC", null, null, null, null],
+    "Tom Kim": [null, null, null, 28, null, null, null],
+    "Hideki Matsuyama": [null, null, 30, null, null, null, 7],
+    "Troy Merritt": [44, "MC", "MC", 49, 39, "MC", 7],
+    "Zac Blair": [44, "MC", 13, null, null, null, null],
+    "Tom Hoge": ["MC", "MC", 20, 4, "MC", 46, 23],
+    "Chris Kirk": [14, null, null, "MC", 41, null, null],
+    "Denny McCarthy": [null, null, null, null, 67, 32, 23],
+    "Billy Horschel": [null, null, 13, null, null, null, null],
+    "Jesper Svensson": [14, null, null, null, null, null, null],
+    "Thorbjorn Olesen": [14, null, null, null, null, null, null],
+    "Mac Meissner": [14, 59, null, null, null, null, null],
+    "Tyler Duncan": [null, 53, 20, 45, "MC", null, 83],
+    "David Skinns": [57, 24, null, 54, null, null, null],
+    "Pierceson Coody": [3, 72, null, null, null, null, null],
+    "Trace Crowe": [null, 24, null, null, null, null, null],
+    "Christiaan Bezuidenhout": [20, null, "MC", null, null, null, null],
+    "Austin Eckroat": [39, "MC", "MC", null, 16, null, null],
+    "Brandt Snedeker": ["MC", "MC", 53, null, 11, null, null],
+    "Andrew Putnam": ["MC", 19, null, 11, "MC", "MC", null],
+    "Mark Hubbard": [61, null, "MC", null, 16, null, null],
+    "Neal Shipley": [null, 37, null, null, null, null, null],
+    "Fabian Gomez": [null, null, null, null, "MC", "MC", 13],
+    "Seamus Power": [28, 37, null, null, null, null, null],
+    "Garrick Higgo": [39, 37, 13, "MC", null, null, null],
+    "Corey Conners": [null, null, null, null, null, 46, null],
+    "Beau Hossler": ["MC", "MC", 13, "MC", 49, "MC", 34],
+    "Dylan Wu": ["DQ", 53, 5, "MC", null, null, null],
+    "Jake Knapp": [3, null, null, null, null, null, null],
+    "Davis Riley": ["MC", 46, null, "MC", null, null, null],
+    "Matthieu Pavon": [44, null, null, null, null, null, null],
+    "Kevin Roy": [28, null, "MC", null, null, null, null],
+    "Camilo Villegas": [null, null, 53, 58, 51, null, null],
+    "Joe Highsmith": ["MC", 44, null, null, null, null, null],
+    "Patton Kizzire": ["MC", "MC", "MC", 38, 39, 46, 34],
+    "Aaron Wise": [null, null, null, null, null, "MC", null],
+    "Haotong Li": ["MC", null, null, null, null, null, null],
+    "Paul Peterson": ["MC", null, null, null, null, null, null],
+    "Preston Stout": ["MC", null, null, null, null, null, null],
+    "Ricky Castillo": ["MC", null, null, null, null, null, null],
+    "Lucas Glover": [null, null, "MC", "MC", null, "MC", 7],
+    "Justin Lower": ["MC", 33, 43, "MC", null, null, null],
+    "Jeremy Paul": ["MC", null, null, null, null, null, null],
+    "Luke List": ["MC", "MC", null, null, 58, 32, "MC"],
+    "Hayden Springer": ["MC", 59, null, null, null, null, null],
+    "Stephan Jaeger": [null, null, 30, "MC", null, null, 66],
+    "Jackson Suber": ["MC", null, null, null, null, null, null],
+    "Rico Hoey": [57, 67, null, null, null, null, null],
+    "Davis Thompson": [null, null, "MC", null, null, null, null],
+    "Luke Clanton": [61, "MC", null, null, null, null, null],
+    "Adrien Dumont de Chassart": [null, "MC", null, null, null, null, null],
+    "Danny Walker": ["MC", null, null, null, null, null, null],
+    "Karl Vilips": ["MC", null, null, null, null, null, null],
+    "Joel Dahmen": [39, "MC", "MC", null, 67, null, null],
+    "Peter Malnati": ["MC", "MC", "MC", 11, "MC", "MC", 46],
+    "Kevin Yu": ["MC", 73, 37, null, null, null, null],
+    "Jason Day": [null, null, null, 64, null, null, 66],
+    "Austin Smotherman": [null, 53, "MC", 24, null, null, null],
+    "Max McGreevy": ["MC", null, 30, "MC", null, null, null],
+    "Ben James": [null, "MC", null, null, null, null, null],
+    "Gordon Sargent": ["MC", null, null, null, null, null, null],
+    "Steven Fisk": [74, null, null, null, null, null, null],
+    "Zecheng Dou": [null, null, "MC", null, null, null, null],
+    "Lanto Griffin": ["MC", 44, "MC", null, "MC", null, null],
+    "Chandler Phillips": ["MC", "MC", null, null, null, null, null],
+    "Kris Ventura": [null, null, null, "MC", "MC", null, null],
+    "Adam Schenk": ["MC", 59, null, 54, 51, 41, "MC"],
+    "S.Y. Noh": [null, null, 69, 38, null, null, null],
+    "Ryan Fox": [null, null, "MC", null, null, null, null],
+    "Vince Whaley": [57, null, null, null, "MC", "MC", null],
+    "Nicholas Lindheim": [null, "MC", null, null, null, null, null],
+    "Michael Kim": [null, "MC", "MC", null, 39, "MC", null],
+    "Harry Higgs": [25, null, "MC", "MC", "MC", "MC", null],
+    "Ben Silverman": [61, 53, null, null, null, null, "MC"],
+    "Nick Dunlap": ["MC", "MC", null, null, null, null, null],
+    "Ben Martin": [null, "MC", "MC", "MC", "MC", null, null],
+    "Thomas Campbell": ["MC", null, null, null, null, null, null],
+    "Alejandro Tosti": [null, "MC", null, null, null, null, null],
+    "Erik van Rooyen": ["MC", "MC", "MC", null, 58, "MC", null],
+    "Ryan Brehm": ["MC", "MC", "MC", 31, 51, "MC", null],
+    "Rafael Campos": ["MC", "MC", null, null, "MC", null, null],
+    "Will Gordon": ["MC", "MC", "MC", null, null, null, null],
+  },
+};
+
 type SortKey = "name" | "app" | "made" | "rate" | "avg" | "best" | "rounds" | "sgAvg";
 
 function rateOf(r: PlayerRow): number {
@@ -155,10 +284,12 @@ function rateColor(r: number): string {
 // added to COURSE_HISTORY above.
 export default function CourseHistoryTable({ tournamentName }: { tournamentName: string }) {
   const raw = COURSE_HISTORY[tournamentName];
+  const yearHistory = YEAR_HISTORY[tournamentName] || {};
   const [query, setQuery] = useState("");
   const [minApp, setMinApp] = useState(2);
   const [sortKey, setSortKey] = useState<SortKey>("rate");
   const [sortDir, setSortDir] = useState<1 | -1>(-1);
+  const [openPlayer, setOpenPlayer] = useState<string | null>(null);
 
   const allRows: PlayerRow[] = useMemo(
     () => (raw || []).map(([name, app, made, avg, best, rounds, sgAvg]) => ({ name, app, made, avg, best, rounds, sgAvg })),
@@ -202,7 +333,7 @@ export default function CourseHistoryTable({ tournamentName }: { tournamentName:
       <div className="subline" style={{ marginBottom: 8 }}>Course history · {tournamentName}</div>
       <div style={{ fontSize: 11, color: "var(--cream-dim)", lineHeight: 1.5, marginBottom: 10, maxWidth: 640 }}>
         Every appearance 2019-2025, reshaped around make-cut rate and finish average - strokes gained kept as a secondary sort.
-        Manually transcribed from a screenshot, so spot-check a name before wagering off it if it matters.
+        Data from Betsperts/Ron Klos.
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
@@ -257,28 +388,67 @@ export default function CourseHistoryTable({ tournamentName }: { tournamentName:
           <tbody>
             {rows.map((r) => {
               const rate = rateOf(r);
+              const history = yearHistory[r.name];
+              const isOpen = openPlayer === r.name;
               return (
-                <tr key={r.name}>
-                  <td style={{ padding: "6px 10px", borderBottom: "1px solid var(--line)", color: "var(--cream)", fontWeight: 600, whiteSpace: "nowrap" }}>
-                    {r.name}
-                  </td>
-                  <td style={{ padding: "6px 10px", borderBottom: "1px solid var(--line)", textAlign: "right" }}>{r.app}</td>
-                  <td style={{ padding: "6px 10px", borderBottom: "1px solid var(--line)", textAlign: "right" }}>{r.made}</td>
-                  <td style={{ padding: "6px 10px", borderBottom: "1px solid var(--line)", textAlign: "right" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
-                      <div style={{ width: 46, height: 5, background: "var(--line)", borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{ width: `${rate}%`, height: "100%", background: rateColor(rate) }} />
+                <Fragment key={r.name}>
+                  <tr>
+                    <td
+                      onClick={() => history && setOpenPlayer(isOpen ? null : r.name)}
+                      style={{
+                        padding: "6px 10px", borderBottom: isOpen ? "none" : "1px solid var(--line)", color: "var(--cream)", fontWeight: 600, whiteSpace: "nowrap",
+                        cursor: history ? "pointer" : "default",
+                        textDecoration: history ? "underline" : "none", textDecorationStyle: "dotted", textDecorationColor: "var(--cream-dim)",
+                      }}
+                    >
+                      {r.name}
+                    </td>
+                    <td style={{ padding: "6px 10px", borderBottom: isOpen ? "none" : "1px solid var(--line)", textAlign: "right" }}>{r.app}</td>
+                    <td style={{ padding: "6px 10px", borderBottom: isOpen ? "none" : "1px solid var(--line)", textAlign: "right" }}>{r.made}</td>
+                    <td style={{ padding: "6px 10px", borderBottom: isOpen ? "none" : "1px solid var(--line)", textAlign: "right" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
+                        <div style={{ width: 46, height: 5, background: "var(--line)", borderRadius: 3, overflow: "hidden" }}>
+                          <div style={{ width: `${rate}%`, height: "100%", background: rateColor(rate) }} />
+                        </div>
+                        <span style={{ color: rateColor(rate) }}>{rate.toFixed(0)}%</span>
                       </div>
-                      <span style={{ color: rateColor(rate) }}>{rate.toFixed(0)}%</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: "6px 10px", borderBottom: "1px solid var(--line)", textAlign: "right" }}>{r.avg.toFixed(1)}</td>
-                  <td style={{ padding: "6px 10px", borderBottom: "1px solid var(--line)", textAlign: "right" }}>{r.best === null ? "—" : r.best}</td>
-                  <td style={{ padding: "6px 10px", borderBottom: "1px solid var(--line)", textAlign: "right" }}>{r.rounds}</td>
-                  <td style={{ padding: "6px 10px", borderBottom: "1px solid var(--line)", textAlign: "right", color: r.sgAvg >= 0 ? "var(--live)" : "var(--clay)" }}>
-                    {r.sgAvg > 0 ? "+" : ""}{r.sgAvg.toFixed(2)}
-                  </td>
-                </tr>
+                    </td>
+                    <td style={{ padding: "6px 10px", borderBottom: isOpen ? "none" : "1px solid var(--line)", textAlign: "right" }}>{r.avg.toFixed(1)}</td>
+                    <td style={{ padding: "6px 10px", borderBottom: isOpen ? "none" : "1px solid var(--line)", textAlign: "right" }}>{r.best === null ? "—" : r.best}</td>
+                    <td style={{ padding: "6px 10px", borderBottom: isOpen ? "none" : "1px solid var(--line)", textAlign: "right" }}>{r.rounds}</td>
+                    <td style={{ padding: "6px 10px", borderBottom: isOpen ? "none" : "1px solid var(--line)", textAlign: "right", color: r.sgAvg >= 0 ? "var(--live)" : "var(--clay)" }}>
+                      {r.sgAvg > 0 ? "+" : ""}{r.sgAvg.toFixed(2)}
+                    </td>
+                  </tr>
+                  {isOpen && history && (
+                    <tr>
+                      <td colSpan={8} style={{ padding: "4px 10px 12px", borderBottom: "1px solid var(--line)", background: "rgba(0,0,0,0.15)" }}>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {YEARS.map((year, i) => {
+                            const val = history[i];
+                            if (val === undefined || val === null) return null;
+                            const missed = val === "MC" || val === "DQ";
+                            return (
+                              <div
+                                key={year}
+                                style={{
+                                  minWidth: 46, textAlign: "center", padding: "5px 8px", borderRadius: 5,
+                                  border: `1px solid ${missed ? "rgba(192,106,76,0.4)" : "var(--line)"}`,
+                                  background: missed ? "rgba(192,106,76,0.08)" : "rgba(228,190,74,0.05)",
+                                }}
+                              >
+                                <div style={{ fontSize: 9, color: "var(--cream-dim)" }}>{year}</div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: missed ? "var(--clay)" : "var(--cream)" }}>
+                                  {missed ? val : val}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>
