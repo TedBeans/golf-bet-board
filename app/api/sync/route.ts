@@ -3,7 +3,7 @@ import { redis, BETS_KEY, MAPPING_KEY, SYNC_LOCK_KEY, ARCHIVE_KEY, PARLAYS_KEY, 
 import { Bet } from "../../../lib/seed";
 import { Mapping } from "../../../lib/mapping";
 import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../../../lib/parlay";
-import { fetchPgaLeaderboard, fetchPlayerScorecardStats, fetchPlayerHoleScores } from "../../../lib/pgatour";
+import { fetchPgaLeaderboard, fetchPlayerScorecardStats, fetchPlayerHoleScores, fetchPgaTeeTimes, extractPgaTeeTimes, PgaTeeTimeRow } from "../../../lib/pgatour";
 import { extractPlayers, findPlayerMatch, findLeader, PgaPlayerRow } from "../../../lib/pgaMatch";
 import { extractScorecardStats, roundNumberFromLabel, computeSegmentStats, computeFullRoundStats } from "../../../lib/pgaScorecard";
 import { fetchOpenLeaderboard, fetchOpenStatistics } from "../../../lib/theopen";
@@ -57,6 +57,46 @@ export async function GET() {
     redis.get<Bet[]>(BETS_KEY),
     redis.get<Mapping>(MAPPING_KEY),
   ]);
+
+  // Auto-fill tee times for any regular bet loaded without one.
+  // Runs once per sync pass; at most one fetch per tournament+round.
+  // PGA-sourced tournaments only - The Open uses its own feed.
+  const teeTimeCache = new Map<string, PgaTeeTimeRow[]>();
+  let teeTimesChanged = false;
+  function normTT(s: string): string {
+    return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim();
+  }
+  function matchTeeTime(name: string, rows: PgaTeeTimeRow[]): PgaTeeTimeRow | null {
+    const t = normTT(name);
+    let m = rows.find(r => normTT(r.displayName) === t);
+    if (m) return m;
+    const tLast = t.split(" ").pop()!;
+    const byLast = rows.filter(r => normTT(r.lastName) === tLast);
+    if (byLast.length === 1) return byLast[0];
+    m = rows.find(r => normTT(r.displayName).startsWith(t) || t.startsWith(normTT(r.displayName)));
+    if (m) return m;
+    return rows.find(r => normTT(r.displayName).includes(t) || t.includes(normTT(r.displayName))) || null;
+  }
+  for (const b of bets) {
+    if (b.personal || b.time) continue;
+    const tm = mapping.tournaments?.[b.t];
+    if (!tm?.pgaId || tm.dataSource === "theopen") continue;
+    const roundNum = parseInt((b.r || "").match(/(\d+)/)?.[1] || "0", 10);
+    if (!roundNum) continue;
+    const key = `${tm.pgaId}:${roundNum}`;
+    if (!teeTimeCache.has(key)) {
+      try {
+        const payload = await fetchPgaTeeTimes(tm.pgaId);
+        teeTimeCache.set(key, extractPgaTeeTimes(payload, roundNum));
+      } catch { teeTimeCache.set(key, []); }
+    }
+    const match = matchTeeTime(b.player, teeTimeCache.get(key) || []);
+    if (match) {
+      b.time = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(match.teeTimeMs));
+      teeTimesChanged = true;
+    }
+  }
+  if (teeTimesChanged) await redis.set(BETS_KEY, bets);
 
   if (!bets || !mapping) {
     return noCacheJson({ ok: true, updated: 0, errors: ["Nothing to sync yet"] });
