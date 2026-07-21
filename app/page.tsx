@@ -625,7 +625,7 @@ export default function Page() {
                       <div className={`card ${b.status}`} key={b.id}>
                         <div className="card-top">
                           <div className="who">
-                            <div className="time">{b.time}</div>
+                            <div className="time">{b.time || "Tee time TBD"}</div>
                             <div style={{ position: "relative", display: "inline-block" }}>
                               <div
                                 className="player"

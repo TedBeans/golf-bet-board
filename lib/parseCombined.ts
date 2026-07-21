@@ -54,9 +54,14 @@ export function deriveBetPhrase(
 }
 
 // Parses the combined format: a "Tournament Round N" header, then one line
-// per bet: "TIME Player [Front/Back 9 Score] **Over/Under** Line [Category]
-// Price (DK) for X units" - both the plain-English bet description and the
-// odds come from this single line, no separate odds paste needed.
+// per bet: "[TIME] Player [Front/Back 9 Score] **Over/Under** Line
+// [Category] Price (DK) for X units" - both the plain-English bet
+// description and the odds come from this single line, no separate odds
+// paste needed. TIME is optional - if tee times aren't posted yet, just
+// start the line with the player's name; sync fills the time in later via
+// a tee-times lookup (see fetchPgaTeeTimes in lib/pgatour.ts) once that
+// info exists, matching by player name the same way scores/stats already
+// get matched.
 export function parseCombinedText(
   text: string,
   forDate: string | undefined,
@@ -66,10 +71,13 @@ export function parseCombinedText(
 
   // Odds occasionally wrap onto a second line (multiple sportsbooks listed) -
   // fold any line that isn't a header and doesn't start with a time back
-  // into the previous line.
+  // into the previous line. A line with no time prefix at all (tee times
+  // not posted yet, or just skipped) starts a new bet as long as it looks
+  // like one is starting (contains "**") rather than being a continuation.
   const lines: string[] = [];
   for (const line of rawLines) {
-    if (HEADER_RE.test(line) || TIME_RE.test(line) || lines.length === 0) {
+    const looksLikeNewBet = HEADER_RE.test(line) || TIME_RE.test(line) || /\*\*(over|under)\*\*/i.test(line);
+    if (looksLikeNewBet || lines.length === 0) {
       lines.push(line);
     } else {
       lines[lines.length - 1] += " " + line;
@@ -99,12 +107,8 @@ export function parseCombinedText(
     }
 
     const timeMatch = line.match(TIME_RE);
-    if (!timeMatch) {
-      warnings.push(`Couldn't find a time at the start of: "${line}"`);
-      continue;
-    }
-    const time = timeMatch[1];
-    const rest = line.slice(timeMatch[0].length);
+    const time = timeMatch ? timeMatch[1] : "";
+    const rest = timeMatch ? line.slice(timeMatch[0].length) : line;
 
     const sideAt = rest.search(/\*\*(\w+)\*\*/);
     if (sideAt === -1) {

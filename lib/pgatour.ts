@@ -90,3 +90,64 @@ export async function fetchPlayerHoleScores(tournamentId: string, playerId: stri
   });
   return decompressPayload(json, "scorecardCompressedV3");
 }
+
+// ---- Tee times (not yet wired into sync - discovery/validation stage) ----
+//
+// We don't have a captured, confirmed tee-times query the way the three
+// above were captured from real network traffic. Rather than guess a
+// query name/shape and ship something fragile, this does two things a
+// caller (see /api/debug-pga-teetimes) can use to find the real one:
+//
+// 1. introspectPgaQueryFields(): asks the API's own schema what query
+//    fields exist, filtered to ones that look tee-time related. If
+//    introspection is disabled server-side this comes back empty rather
+//    than throwing - that's an expected, informative outcome, not a bug.
+// 2. fetchPgaTeeTimesGuess(): tries a handful of plausible query shapes
+//    following the same "<Thing>CompressedV3" naming convention as the
+//    three confirmed queries above, and reports which ones actually
+//    resolve. Once one of these (or the introspection result) turns up
+//    the real field name, replace this whole section with a single
+//    confirmed query the same way the other three are built, and wire the
+//    result into sync to fill in bet.time automatically.
+export async function introspectPgaQueryFields(): Promise<string[]> {
+  const query = `query IntrospectionQuery { __schema { queryType { fields { name } } } }`;
+  try {
+    const json = await pgaGraphQL("IntrospectionQuery", query, {});
+    const fields: { name: string }[] = json?.data?.__schema?.queryType?.fields || [];
+    return fields.map((f) => f.name).filter((n) => /tee|round|time/i.test(n));
+  } catch {
+    return [];
+  }
+}
+
+const TEE_TIME_QUERY_GUESSES: { queryName: string; fieldName: string; idArg: string }[] = [
+  { queryName: "TeeTimesCompressedV3", fieldName: "teeTimesCompressedV3", idArg: "teeTimesCompressedV3Id" },
+  { queryName: "TeeTimesV3", fieldName: "teeTimesV3", idArg: "id" },
+  { queryName: "RoundTeeTimesV3", fieldName: "roundTeeTimesV3", idArg: "id" },
+];
+
+export async function fetchPgaTeeTimesGuess(tournamentId: string): Promise<{ queryName: string; result: any }[]> {
+  const attempts: { queryName: string; result: any }[] = [];
+  for (const g of TEE_TIME_QUERY_GUESSES) {
+    const query = `
+      query ${g.queryName}($${g.idArg}: ID!) {
+        ${g.fieldName}(${g.idArg}: $${g.idArg}) {
+          id
+          payload
+        }
+      }
+    `;
+    try {
+      const json = await pgaGraphQL(g.queryName, query, { [g.idArg]: tournamentId });
+      if (json?.errors) {
+        attempts.push({ queryName: g.queryName, result: { errors: json.errors } });
+        continue;
+      }
+      const decompressed = decompressPayload(json, g.fieldName);
+      attempts.push({ queryName: g.queryName, result: { success: true, sample: decompressed } });
+    } catch (e: any) {
+      attempts.push({ queryName: g.queryName, result: { error: e.message || String(e) } });
+    }
+  }
+  return attempts;
+}
