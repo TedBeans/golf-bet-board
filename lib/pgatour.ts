@@ -111,3 +111,25 @@ export async function fetchPgaTeeTimes(tournamentId: string): Promise<any> {
   });
   return decompressPayload(json, "teeTimesCompressedV2");
 }
+
+// Flattens the tee-times payload (shape confirmed against live 3M Open
+// data, 2026-07-21: rounds[] -> groups[] -> teeTime epoch-ms +
+// players[].displayName) into one row per player for a given round.
+export type PgaTeeTimeRow = { displayName: string; lastName: string; teeTimeMs: number };
+
+export function extractPgaTeeTimes(payload: any, roundInt: number): PgaTeeTimeRow[] {
+  const rounds: any[] = payload?.rounds || [];
+  const round = rounds.find((r: any) => r.roundInt === roundInt);
+  if (!round) return [];
+  const rows: PgaTeeTimeRow[] = [];
+  for (const group of round.groups || []) {
+    const teeTimeMs = typeof group.teeTime === "number" ? group.teeTime : null;
+    if (teeTimeMs === null) continue;
+    for (const p of group.players || []) {
+      const displayName = String(p.displayName || `${p.firstName || ""} ${p.lastName || ""}`).trim();
+      if (!displayName) continue;
+      rows.push({ displayName, lastName: String(p.lastName || "").trim(), teeTimeMs });
+    }
+  }
+  return rows;
+}
