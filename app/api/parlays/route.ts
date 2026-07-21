@@ -8,12 +8,33 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
+type CutlineCacheEntry = { cutlineProbs: CutlineProb[]; fetchedAt: string };
+
+// datagolf.com's live-model page doesn't rotate to the next event on any
+// predictable schedule we can rely on, and our own fetch only happens
+// lazily (when a personal MAKE_CUT bet needs it) - so between tournaments
+// this value can sit unchanged for days, still showing last week's
+// (by-then-irrelevant, often near-100%/0% "the cut is basically decided"
+// degenerate) distribution. Rather than display something that's
+// plausibly for the wrong tournament entirely, treat anything older than
+// this as not current and just hide the strip until a fresh fetch lands.
+const CUTLINE_MAX_AGE_MS = 20 * 60 * 60 * 1000; // 20 hours
+
 export async function GET() {
-  const [parlays, cutlineProbs] = await Promise.all([
+  const [parlays, cutlineEntry] = await Promise.all([
     redis.get<Parlay[]>(PARLAYS_KEY),
-    redis.get<CutlineProb[]>(DG_CUTLINE_KEY),
+    redis.get<CutlineCacheEntry | CutlineProb[]>(DG_CUTLINE_KEY),
   ]);
-  return NextResponse.json({ parlays: parlays || [], cutlineProbs: cutlineProbs || [] });
+
+  let cutlineProbs: CutlineProb[] = [];
+  if (Array.isArray(cutlineEntry)) {
+    // Pre-existing cache written before the fetchedAt field was added -
+    // no way to know its age, so treat it as stale rather than guess.
+  } else if (cutlineEntry && Date.now() - new Date(cutlineEntry.fetchedAt).getTime() <= CUTLINE_MAX_AGE_MS) {
+    cutlineProbs = cutlineEntry.cutlineProbs;
+  }
+
+  return NextResponse.json({ parlays: parlays || [], cutlineProbs });
 }
 
 export async function POST(req: NextRequest) {

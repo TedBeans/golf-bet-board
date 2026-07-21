@@ -87,9 +87,15 @@ export async function GET() {
         // serve the last-known distribution even between sync passes - a
         // fetch failure just leaves the previously-cached value in place
         // rather than wiping it out (same "fail silently, keep last good
-        // value" approach as dgCutProb on individual bets).
+        // value" approach as dgCutProb on individual bets). Stamped with
+        // when it was fetched so a stale value (e.g. still sitting here
+        // from a tournament that already finished, since datagolf.com's
+        // live-model page doesn't rotate to the next event on any
+        // predictable schedule we can rely on) can be told apart from a
+        // genuinely current one - see the freshness check in
+        // /api/parlays/route.ts.
         if (data.cutlineProbs.length > 0) {
-          await redis.set(DG_CUTLINE_KEY, data.cutlineProbs);
+          await redis.set(DG_CUTLINE_KEY, { cutlineProbs: data.cutlineProbs, fetchedAt: new Date().toISOString() });
         }
       } catch {
         dataGolfCache = null;
