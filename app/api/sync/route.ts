@@ -558,6 +558,8 @@ export async function GET() {
           bet.stat = stats.pars;
         } else if (parsed.label === "GIR" && girFairways.girCount !== null) {
           bet.stat = girFairways.girCount;
+        } else if (parsed.label === "FAIRWAYS" && girFairways.fairwaysCount !== null) {
+          bet.stat = girFairways.fairwaysCount;
         }
 
         if (bet.status === "live") {
@@ -676,6 +678,8 @@ export async function GET() {
         bet.stat = row.score;
       } else if (parsed.label === "GIR" && scorecard?.girCount !== null && scorecard?.girCount !== undefined) {
         bet.stat = scorecard.girCount;
+      } else if (parsed.label === "FAIRWAYS" && scorecard?.fairwaysCount !== null && scorecard?.fairwaysCount !== undefined) {
+        bet.stat = scorecard.fairwaysCount;
       } else if (parsed.label === "BIRDIES" && scorecard?.birdiesOrBetter !== null && scorecard?.birdiesOrBetter !== undefined) {
         // "Birdies or better" bets also count eagles/albatrosses.
         bet.stat = scorecard.birdiesOrBetter;
