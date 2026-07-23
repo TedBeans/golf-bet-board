@@ -196,7 +196,7 @@ export function friendlyLabel(label: string, segment?: "front9" | "back9"): stri
     case "BIRDIES": return "Birdies";
     case "BOGEYS": return "Bogeys";
     case "PARS": return "Pars";
-    case "WINNER_SCORE": return "Winner";
+    case "WINNER_SCORE": return "Tournament Score";
     case "WINNER": return "Winner";
     case "TOP_N": return "Top N";
     case "MAKE_CUT": return "Make Cut";

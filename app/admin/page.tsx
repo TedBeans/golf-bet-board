@@ -1221,6 +1221,7 @@ export default function AdminPage() {
           venue: string; location: string; latitude: number; longitude: number;
           startDate: string; endDate: string; notes: string; upcoming: boolean; roundPar: number;
           front9Par: number; back9Par: number; dataSource: string; cutLine: number;
+          courseType: string;
         }>) {
           setMapping((m) => ({
             ...m,
@@ -1360,6 +1361,25 @@ export default function AdminPage() {
                   padding: "8px 10px", borderRadius: 3,
                 }}
               />
+            </label>
+
+            <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
+              Course type (for Analysis page filtering)
+              <select
+                value={tm?.courseType || ""}
+                onChange={(e) => updateTourn({ courseType: (e.target.value || undefined) as any })}
+                style={{
+                  display: "block", width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                  color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                  padding: "8px 10px", borderRadius: 3,
+                }}
+              >
+                <option value="">Not set</option>
+                <option value="parkland">Parkland</option>
+                <option value="links">Links</option>
+                <option value="desert">Desert</option>
+                <option value="other">Other</option>
+              </select>
             </label>
 
             <div style={{ borderTop: "1px solid var(--line)", marginTop: 14, paddingTop: 14 }}>

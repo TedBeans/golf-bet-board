@@ -13,7 +13,8 @@ import HoleScorecardModal from "./HoleScorecardModal";
 import GolfFlagIcon from "./GolfFlagIcon";
 import UpcomingTournamentCard from "./UpcomingTournamentCard";
 import WeatherStrip from "./WeatherStrip";
-import { nowInCentral } from "../lib/centralTime";
+import CourseHistoryTable from "./CourseHistoryTable";
+
 
 const SYNC_INTERVAL_MS = 60000;
 
@@ -523,8 +524,9 @@ export default function Page() {
           const isSuspended = suspendType !== "none";
           const tm = mapping.tournaments[tourn];
           const hasCoords = tm?.latitude !== undefined && tm?.longitude !== undefined;
+          const hasCourseHistory = !!tm; // CourseHistoryTable renders null if no data for this tournament
+          const showWeatherSection = hasCoords || hasCourseHistory;
           const weatherOpen = expandedWeather.has(tourn);
-          const today = nowInCentral().dateStr;
           return (
           <div className="tourn" key={tourn}>
             <div className="tourn-head">
@@ -539,7 +541,7 @@ export default function Page() {
                 <span className="tsum tbd">TBD {tc.pending || 0}</span>
               </div>
             </div>
-            {hasCoords && (
+            {showWeatherSection && (
               <div style={{ marginBottom: 10 }}>
                 <span
                   className="subline"
@@ -553,11 +555,20 @@ export default function Page() {
                     })
                   }
                 >
-                  Weather {weatherOpen ? "▾" : "▸"}
+                  Weather + Course History {weatherOpen ? "▾" : "▸"}
                 </span>
                 {weatherOpen && (
-                  <div style={{ marginTop: 6 }}>
-                    <WeatherStrip latitude={tm!.latitude} longitude={tm!.longitude} startDate={today} endDate={today} compact />
+                  <div style={{ marginTop: 8 }}>
+                    {hasCoords && (
+                      <WeatherStrip
+                        latitude={tm!.latitude}
+                        longitude={tm!.longitude}
+                        startDate={tm!.startDate}
+                        endDate={tm!.endDate}
+                        compact
+                      />
+                    )}
+                    <CourseHistoryTable tournamentName={tourn} />
                   </div>
                 )}
               </div>

@@ -29,6 +29,7 @@ export type Mapping = {
                          // announced. Personal "Make Cut" plays auto-grade off this the moment each
                          // player's round 2 is fully finished; leave unset before the cut happens
                          // (nothing grades until it's set, same as any other bet missing a required input).
+      courseType?: "parkland" | "links" | "desert" | "other"; // for filtering in the Analysis page
     };
   };
 };
