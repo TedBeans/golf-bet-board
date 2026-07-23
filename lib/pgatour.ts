@@ -91,11 +91,71 @@ export async function fetchPlayerHoleScores(tournamentId: string, playerId: stri
   return decompressPayload(json, "scorecardCompressedV3");
 }
 
+// ---- Tee times (not yet wired into sync - discovery/validation stage) ----
+//
+// We don't have a captured, confirmed tee-times query the way the three
+// above were captured from real network traffic. Rather than guess a
+// query name/shape and ship something fragile, this does two things a
+// caller (see /api/debug-pga-teetimes) can use to find the real one:
+//
+// 1. introspectPgaQueryFields(): asks the API's own schema what query
+//    fields exist, filtered to ones that look tee-time related. If
+//    introspection is disabled server-side this comes back empty rather
+//    than throwing - that's an expected, informative outcome, not a bug.
+// 2. fetchPgaTeeTimesGuess(): tries a handful of plausible query shapes
+//    following the same "<Thing>CompressedV3" naming convention as the
+//    three confirmed queries above, and reports which ones actually
+//    resolve. Once one of these (or the introspection result) turns up
+//    the real field name, replace this whole section with a single
+//    confirmed query the same way the other three are built, and wire the
+//    result into sync to fill in bet.time automatically.
+export async function introspectPgaQueryFields(): Promise<string[]> {
+  const query = `query IntrospectionQuery { __schema { queryType { fields { name } } } }`;
+  try {
+    const json = await pgaGraphQL("IntrospectionQuery", query, {});
+    const fields: { name: string }[] = json?.data?.__schema?.queryType?.fields || [];
+    return fields.map((f) => f.name).filter((n) => /tee|round|time/i.test(n));
+  } catch {
+    return [];
+  }
+}
+
+const TEE_TIME_QUERY_GUESSES: { queryName: string; fieldName: string; idArg: string }[] = [
+  { queryName: "TeeTimesCompressedV3", fieldName: "teeTimesCompressedV3", idArg: "teeTimesCompressedV3Id" },
+  { queryName: "TeeTimesV3", fieldName: "teeTimesV3", idArg: "id" },
+  { queryName: "RoundTeeTimesV3", fieldName: "roundTeeTimesV3", idArg: "id" },
+];
+
+export async function fetchPgaTeeTimesGuess(tournamentId: string): Promise<{ queryName: string; result: any }[]> {
+  const attempts: { queryName: string; result: any }[] = [];
+  for (const g of TEE_TIME_QUERY_GUESSES) {
+    const query = `
+      query ${g.queryName}($${g.idArg}: ID!) {
+        ${g.fieldName}(${g.idArg}: $${g.idArg}) {
+          id
+          payload
+        }
+      }
+    `;
+    try {
+      const json = await pgaGraphQL(g.queryName, query, { [g.idArg]: tournamentId });
+      if (json?.errors) {
+        attempts.push({ queryName: g.queryName, result: { errors: json.errors } });
+        continue;
+      }
+      const decompressed = decompressPayload(json, g.fieldName);
+      attempts.push({ queryName: g.queryName, result: { success: true, sample: decompressed } });
+    } catch (e: any) {
+      attempts.push({ queryName: g.queryName, result: { error: e.message || String(e) } });
+    }
+  }
+  return attempts;
+}
+
 // Tee times - query captured from pgatour.com's tee-times page network
-// traffic (2026-07-21), same provenance as the three queries above. Note
-// it's CompressedV2, not V3 like the others - which is why the earlier
-// V3-convention guesses all came back FieldUndefined. Same compressed
-// payload envelope as everything else, so decompressPayload just works.
+// traffic (2026-07-21), same provenance as the leaderboard/scorecard
+// queries. Note it's CompressedV2, not V3 like the others - which is why
+// the earlier V3-convention guesses all came back FieldUndefined.
 const TEE_TIMES_QUERY = `
   query TeeTimesCompressedV2($teeTimesCompressedV2Id: ID!) {
     teeTimesCompressedV2(id: $teeTimesCompressedV2Id) {
@@ -112,14 +172,12 @@ export async function fetchPgaTeeTimes(tournamentId: string): Promise<any> {
   return decompressPayload(json, "teeTimesCompressedV2");
 }
 
-// Flattens the tee-times payload (shape confirmed against live 3M Open
-// data, 2026-07-21: rounds[] -> groups[] -> teeTime epoch-ms +
-// players[].displayName) into one row per player for a given round.
+// Shape confirmed against live 3M Open data (2026-07-21):
+// rounds[] -> groups[] -> teeTime (epoch-ms) + players[].displayName
 export type PgaTeeTimeRow = { displayName: string; lastName: string; teeTimeMs: number };
 
 export function extractPgaTeeTimes(payload: any, roundInt: number): PgaTeeTimeRow[] {
-  const rounds: any[] = payload?.rounds || [];
-  const round = rounds.find((r: any) => r.roundInt === roundInt);
+  const round = (payload?.rounds || []).find((r: any) => r.roundInt === roundInt);
   if (!round) return [];
   const rows: PgaTeeTimeRow[] = [];
   for (const group of round.groups || []) {
@@ -127,8 +185,7 @@ export function extractPgaTeeTimes(payload: any, roundInt: number): PgaTeeTimeRo
     if (teeTimeMs === null) continue;
     for (const p of group.players || []) {
       const displayName = String(p.displayName || `${p.firstName || ""} ${p.lastName || ""}`).trim();
-      if (!displayName) continue;
-      rows.push({ displayName, lastName: String(p.lastName || "").trim(), teeTimeMs });
+      if (displayName) rows.push({ displayName, lastName: String(p.lastName || "").trim(), teeTimeMs });
     }
   }
   return rows;

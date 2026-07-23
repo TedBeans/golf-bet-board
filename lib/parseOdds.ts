@@ -8,7 +8,7 @@ export type OddsEntry = {
   player: string;
   side: "Over" | "Under";
   lineValue: string;
-  category: "SCORE" | "GIR" | "BIRDIES" | "BOGEYS" | "PARS";
+  category: "SCORE" | "GIR" | "BIRDIES" | "BOGEYS" | "PARS" | "FAIRWAYS";
   oddsDK: string | null;
   units: string | null;
   raw: string;
@@ -20,11 +20,12 @@ const HEADER_RE = /^(.*?)\s+Round\s+(\d+)\s*:?$/i;
 // A line starting a new entry: "Player Name **Under** ..."
 const PLAYER_START_RE = /^([A-Za-z.'\u2019\-\u00C0-\u024F ]+?)\s*\*\*/;
 
-export function detectCategory(text: string): "SCORE" | "GIR" | "BIRDIES" | "BOGEYS" | "PARS" {
+export function detectCategory(text: string): "SCORE" | "GIR" | "BIRDIES" | "BOGEYS" | "PARS" | "FAIRWAYS" {
   if (/bogeys/i.test(text)) return "BOGEYS";
   if (/birdies/i.test(text)) return "BIRDIES";
   if (/greens/i.test(text)) return "GIR";
   if (/pars/i.test(text)) return "PARS";
+  if (/fairways/i.test(text)) return "FAIRWAYS";
   return "SCORE";
 }
 

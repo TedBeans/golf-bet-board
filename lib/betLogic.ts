@@ -98,6 +98,12 @@ export function parseBetType(text: string): ParsedBet {
   if ((m = t.match(/^(\d+)\s*pars or less$/i))) {
     return { type: "max", label: "PARS", target: parseInt(m[1], 10), targetDisplay: "≤ " + m[1] };
   }
+  if ((m = t.match(/^(\d+)\+\s*fairways$/i))) {
+    return { type: "min", label: "FAIRWAYS", target: parseInt(m[1], 10), targetDisplay: "≥ " + m[1] };
+  }
+  if ((m = t.match(/^(\d+)\s*fairways or less$/i))) {
+    return { type: "max", label: "FAIRWAYS", target: parseInt(m[1], 10), targetDisplay: "≤ " + m[1] };
+  }
   if ((m = t.match(/^winning score\s+(-?\d+(?:\.\d+)?|E)\s+or\s+better$/i))) {
     const val = /^E$/i.test(m[1]) ? 0 : parseFloat(m[1]);
     return { type: "max", label: "WINNER_SCORE", target: val, targetDisplay: "≤ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
@@ -123,7 +129,7 @@ export function trend(parsed: ParsedBet, stat: number | null, thru: number | nul
   return "neutral";
 }
 
-const PACE_LABELS = ["GIR", "BIRDIES", "BOGEYS", "PARS", "SCORE"];
+const PACE_LABELS = ["GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "SCORE"];
 
 // For count-based bets (greens/birdies/bogeys/pars) and round score, compares
 // the pace you're actually keeping (stat so far ÷ holes played) against the
@@ -186,6 +192,7 @@ export function friendlyLabel(label: string, segment?: "front9" | "back9"): stri
   switch (label) {
     case "SCORE": return "Score";
     case "GIR": return "Greens";
+    case "FAIRWAYS": return "Fairways";
     case "BIRDIES": return "Birdies";
     case "BOGEYS": return "Bogeys";
     case "PARS": return "Pars";
@@ -331,5 +338,9 @@ export function autoStatValue(
   if (parsed.label === "BIRDIES") return auto.birdies;
   if (parsed.label === "BOGEYS") return auto.bogeys;
   if (parsed.label === "PARS") return auto.pars ?? null;
+  if (parsed.label === "FAIRWAYS") {
+    const m = auto.fairways?.match(/(\d+)/);
+    return m ? parseInt(m[1], 10) : null;
+  }
   return null;
 }

@@ -58,8 +58,13 @@ export async function GET() {
     redis.get<Mapping>(MAPPING_KEY),
   ]);
 
-  // Auto-fill tee times for any regular bet loaded without one.
-  // Runs once per sync pass; at most one fetch per tournament+round.
+  if (!bets || !mapping) {
+    return noCacheJson({ ok: true, updated: 0, errors: ["Nothing to sync yet"] });
+  }
+
+  // Auto-fill tee times for any regular bet loaded without one (the paste
+  // format's TIME prefix is now optional). Runs once per sync pass; at
+  // most one fetch per tournament+round that actually has a missing time.
   // PGA-sourced tournaments only - The Open uses its own feed.
   const teeTimeCache = new Map<string, PgaTeeTimeRow[]>();
   let teeTimesChanged = false;
@@ -97,10 +102,6 @@ export async function GET() {
     }
   }
   if (teeTimesChanged) await redis.set(BETS_KEY, bets);
-
-  if (!bets || !mapping) {
-    return noCacheJson({ ok: true, updated: 0, errors: ["Nothing to sync yet"] });
-  }
 
   const errors: string[] = [];
   const leaderboardCache = new Map<string, PgaPlayerRow[]>();

@@ -26,7 +26,7 @@ export type Segment = "front9" | "back9" | undefined;
 export function deriveBetPhrase(
   side: "Over" | "Under",
   lineValue: string,
-  category: "SCORE" | "GIR" | "BIRDIES" | "BOGEYS" | "PARS",
+  category: "SCORE" | "GIR" | "BIRDIES" | "BOGEYS" | "PARS" | "FAIRWAYS",
   par: number | undefined,
   segment?: Segment
 ): string | null {
@@ -44,7 +44,7 @@ export function deriveBetPhrase(
     return `${display} ${suffix}`;
   }
 
-  const noun = category === "GIR" ? "greens" : category === "BIRDIES" ? "birdies" : category === "BOGEYS" ? "bogeys" : "pars";
+  const noun = category === "GIR" ? "greens" : category === "BIRDIES" ? "birdies" : category === "BOGEYS" ? "bogeys" : category === "FAIRWAYS" ? "fairways" : "pars";
   if (side === "Over") {
     const threshold = Math.floor(line) + 1;
     return `${threshold}+ ${noun}`;
