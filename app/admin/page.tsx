@@ -924,10 +924,11 @@ export default function AdminPage() {
         Fairways, Birdies, Bogeys, Pars). Kept in their own section on the
         live board and recap tab, never mixed into the regular calendar.
         Tournament-long plays: just the tournament name on its own line, no
-        round header. Round-scoped stat bets: include "Round N" in the line.
+        round header. Round-scoped stat bets: "Round N" is optional (defaults
+        to Round 1 if omitted). No bold markers needed — just plain text.
       </div>
       <div className="bet-text" style={{ marginBottom: 12, whiteSpace: "pre-wrap" }}>
-        {"The Open Championship\nWyndham Clark Top 10 +450 (DK) for 25 units\nAkshay Bhatia Winner +8000 (DK) for 10 units\nSomeone Else Make Cut -200 (DK) for 5 units\nWyndham Clark vs Jon Rahm Round 1 +110 (DK) for 1 unit\nTommy Fleetwood Round 1 Over 11.5 Pars -135 (DK) for 1.35 units\nMaverick McNealy Round 2 Under 8.5 Fairways +112 (DK) for 1 unit"}
+        {"The Open Championship\nWyndham Clark Top 10 +450 (DK) for 25 units\nAkshay Bhatia Winner +8000 (DK) for 10 units\nSomeone Else Make Cut -200 (DK) for 5 units\nWyndham Clark vs Jon Rahm Round 1 +110 (DK) for 1 unit\nTommy Fleetwood Over 11.5 Pars -135 (DK) for 1.35 units\nMaverick McNealy Round 2 Under 8.5 Fairways +112 (DK) for 1 unit"}
       </div>
       <div className="subline" style={{ marginBottom: 12 }}>
         Winner and Top N show a live leaderboard position but settle by

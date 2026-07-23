@@ -45,14 +45,13 @@ const WINNER_RE = /^(.*?)\s+(?:outright\s+)?winner$/i;
 // all stored as the same canonical "Make Cut" phrase.
 const MAKECUT_RE = /^(.*?)\s+(?:to\s+)?make\s+(?:the\s+)?cut$/i;
 
-// Round-scoped stat bets: "Player Round N Over/Under X.X Category"
+// Round-scoped stat bets: "Player [Round N] Over/Under X.X [Category]"
 // e.g. "Tommy Fleetwood Round 1 Over 11.5 Pars"
-//      "Maverick McNealy Round 2 Under 8.5 Fairways"
-//      "Scottie Scheffler Round 3 Over 68.5" (score bet, raw strokes)
-// Category is optional for score bets (defaults to SCORE).
-// Stored using the same bet-phrase format as parseCombined so all existing
-// grading, display, and pace logic just works without any changes there.
-const ROUND_STAT_RE = /^(.*?)\s+Round\s+(\d+)\s+(over|under)\s+([\d.]+)(?:\s+(greens?|fairways?|birdies?|bogeys?|pars?))?$/i;
+//      "Maverick McNealy Over 8.5 Fairways" (Round defaults to 1)
+//      "Scottie Scheffler Over 68.5" (score bet, no category, defaults Round 1)
+// Round N is optional - defaults to Round 1 if not provided.
+// The **bold** markers from the nightly paste are NOT required here.
+const ROUND_STAT_RE = /^(.*?)\s+(?:Round\s+(\d+)\s+)?(over|under)\s+([\d.]+)(?:\s+(greens?|fairways?|birdies?|bogeys?|pars?))?$/i;
 
 const ODDS_RE = /([+-]\d+)\s*\(\s*([A-Za-z]{2,5})\s*\)/;
 const UNITS_RE = /for\s+([\d.]+)\s*units?/i;
@@ -67,15 +66,27 @@ export function parsePersonalText(text: string, forDate: string | undefined): Pa
   }
 
   let currentTournament = "";
+  let currentDefaultRound = 1; // set when the header line includes "Round N"
   const bets: Bet[] = [];
   const warnings: string[] = [];
   let counter = 0;
 
   for (const line of rawLines) {
     if (!ODDS_RE.test(line)) {
-      currentTournament = line
-        .replace(/[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{E0000}-\u{E007F}\uFE0F]/gu, "")
-        .trim();
+      // Header line - strip trailing "Round N" if present so "3M Open Round 1"
+      // correctly sets tournament = "3M Open" and default round = 1.
+      const roundHeaderMatch = line.match(/^(.*?)\s+Round\s+(\d+)\s*$/i);
+      if (roundHeaderMatch) {
+        currentTournament = roundHeaderMatch[1]
+          .replace(/[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{E0000}-\u{E007F}\uFE0F]/gu, "")
+          .trim();
+        currentDefaultRound = parseInt(roundHeaderMatch[2], 10);
+      } else {
+        currentTournament = line
+          .replace(/[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{E0000}-\u{E007F}\uFE0F]/gu, "")
+          .trim();
+        currentDefaultRound = 1;
+      }
       continue;
     }
 
@@ -119,7 +130,10 @@ export function parsePersonalText(text: string, forDate: string | undefined): Pa
       phrase = "Make Cut";
     } else if ((m = descriptor.match(ROUND_STAT_RE))) {
       player = m[1].trim();
-      const roundNum = parseInt(m[2], 10);
+      // Use Round N from the bet line if present, otherwise fall back to
+      // the round number from the header (e.g. "3M Open Round 1"), and
+      // finally default to 1 if neither specifies one.
+      const roundNum = m[2] ? parseInt(m[2], 10) : currentDefaultRound;
       const side = m[3].toLowerCase(); // "over" | "under"
       const line = parseFloat(m[4]);
       const catRaw = (m[5] || "").toLowerCase();
