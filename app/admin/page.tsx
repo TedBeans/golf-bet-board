@@ -919,23 +919,24 @@ export default function AdminPage() {
 
       <h1 style={{ marginTop: 36, marginBottom: 4 }}>TedBeans Plays</h1>
       <div className="subline" style={{ marginBottom: 12 }}>
-        Your own personal props - outright Winner, Top N finish, Make Cut,
-        or H2H matchups - kept in their own section on the live board and
-        their own recap tab, never mixed into the regular calendar/tournament
-        recaps. Just the tournament name on its own line (no round header -
-        these are tournament-long), then one bet per line:
+        Your own personal props — outright Winner, Top N finish, Make Cut,
+        H2H matchups, and now round-scoped stat bets (Score, Greens,
+        Fairways, Birdies, Bogeys, Pars). Kept in their own section on the
+        live board and recap tab, never mixed into the regular calendar.
+        Tournament-long plays: just the tournament name on its own line, no
+        round header. Round-scoped stat bets: include "Round N" in the line.
       </div>
       <div className="bet-text" style={{ marginBottom: 12, whiteSpace: "pre-wrap" }}>
-        {"The Open Championship\nWyndham Clark Top 10 +450 (DK) for 25 units\nAkshay Bhatia Winner +8000 (DK) for 10 units\nSomeone Else Make Cut -200 (DK) for 5 units\nWyndham Clark vs Jon Rahm Round 1 +110 (DK) for 1 unit"}
+        {"The Open Championship\nWyndham Clark Top 10 +450 (DK) for 25 units\nAkshay Bhatia Winner +8000 (DK) for 10 units\nSomeone Else Make Cut -200 (DK) for 5 units\nWyndham Clark vs Jon Rahm Round 1 +110 (DK) for 1 unit\nTommy Fleetwood Round 1 Over 11.5 Pars -135 (DK) for 1.35 units\nMaverick McNealy Round 2 Under 8.5 Fairways +112 (DK) for 1 unit"}
       </div>
       <div className="subline" style={{ marginBottom: 12 }}>
         Winner and Top N show a live leaderboard position but settle by
-        hand. Make Cut auto-grades once your round 2 is finished (set the
-        tournament's cut line on the Tournaments tab first). H2H always
-        auto-grades on whoever named first having the better score for the
-        stated scope, once both players finish it. For your 4-way top-10
-        parlay: paste the 4 "Top N" lines below, then combine them on the
-        Parlays tab as usual.
+        hand. Make Cut auto-grades once round 2 is finished (set the
+        tournament's cut line on the Tournaments tab first). H2H auto-grades
+        on whoever is named first having the better score for the stated
+        scope. Round-stat bets (Over/Under X.X Greens/Fairways/Birdies/Bogeys/Pars,
+        or just a raw stroke line for Score) sync and auto-grade exactly like
+        regular nightly bets.
       </div>
       <label style={{ display: "block", marginBottom: 12, fontSize: 12 }}>
         These plays are for (recap date)
@@ -953,7 +954,7 @@ export default function AdminPage() {
       <textarea
         value={personalText}
         onChange={(e) => setPersonalText(e.target.value)}
-        placeholder={"The Open Championship\nWyndham Clark Top 10 +450 (DK) for 25 units\n..."}
+        placeholder={"The Open Championship\nWyndham Clark Top 10 +450 (DK) for 25 units\nTommy Fleetwood Round 1 Over 11.5 Pars -135 (DK) for 1.35 units\n..."}
         rows={6}
         style={{
           width: "100%", background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",

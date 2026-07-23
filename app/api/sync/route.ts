@@ -460,9 +460,20 @@ export async function GET() {
           continue;
         }
 
-        // Unrecognized personal bet type - shouldn't happen given the
-        // parser, but leave it alone rather than guessing at anything.
-        continue;
+        // Unrecognized personal bet type OR a round-scoped stat bet
+        // (Score/GIR/Birdies/Bogeys/Pars/Fairways). Stat bets use the
+        // exact same bet-phrase format as regular bets and their round
+        // label is set to the actual round ("Round 1", "Round 2", etc.)
+        // rather than PERSONAL_ROUND_LABEL, so they fall through here and
+        // get picked up by the regular stat/grading pipeline below -
+        // everything just works because parseBetType already handles those
+        // phrases, and the data fetching is keyed on tournamentId not round.
+        // Only the true unrecognized types (which shouldn't happen given
+        // the parser) are skipped entirely.
+        if (!["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "WINNER_SCORE"].includes(parsed.label)) {
+          continue;
+        }
+        // Fall through to the regular stat/grading pipeline below.
       }
 
       if (tournamentMap.dataSource === "theopen") {

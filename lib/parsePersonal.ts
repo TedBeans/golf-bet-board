@@ -4,16 +4,18 @@ import { defaultUnitsToWinOne } from "./units";
 export type ParsePersonalResult = { bets: Bet[]; warnings: string[] };
 
 // Personal plays are tournament-long propositions (outright winner, top-N
-// finish, make-the-cut, head-to-head) rather than the nightly over/under
-// paste - so unlike parseCombined's "Tournament Round N" header, this
-// format just needs the tournament name on its own line, then one bet per
-// line after it:
+// finish, make-the-cut, head-to-head) as well as round-scoped stat bets
+// (score, greens, birdies, bogeys, pars, fairways) - the same bet types
+// available in the nightly paste, just entered in personal-play format.
+// Format: tournament name on its own line, then one bet per line:
 //
 //   The Open Championship
 //   Wyndham Clark Top 10 +450 (DK) for 25 units
 //   Akshay Bhatia Winner +8000 (DK) for 10 units
 //   Someone Else Make Cut -200 (DK) for 5 units
 //   Wyndham Clark vs Jon Rahm Round 1 +110 (DK) for 1 unit
+//   Tommy Fleetwood Round 1 Over 11.5 Pars -135 (DK) for 1.35 units
+//   Tommy Fleetwood Round 2 Under 8.5 Fairways +112 (DK) for 1 unit
 //
 // A line counts as a header (not a bet) whenever it has no odds marker in
 // it at all - every real bet line has one, so this is a reliable enough
@@ -42,6 +44,15 @@ const WINNER_RE = /^(.*?)\s+(?:outright\s+)?winner$/i;
 // Accepts "Make Cut", "make the cut", "to make the cut", "to make cut" -
 // all stored as the same canonical "Make Cut" phrase.
 const MAKECUT_RE = /^(.*?)\s+(?:to\s+)?make\s+(?:the\s+)?cut$/i;
+
+// Round-scoped stat bets: "Player Round N Over/Under X.X Category"
+// e.g. "Tommy Fleetwood Round 1 Over 11.5 Pars"
+//      "Maverick McNealy Round 2 Under 8.5 Fairways"
+//      "Scottie Scheffler Round 3 Over 68.5" (score bet, raw strokes)
+// Category is optional for score bets (defaults to SCORE).
+// Stored using the same bet-phrase format as parseCombined so all existing
+// grading, display, and pace logic just works without any changes there.
+const ROUND_STAT_RE = /^(.*?)\s+Round\s+(\d+)\s+(over|under)\s+([\d.]+)(?:\s+(greens?|fairways?|birdies?|bogeys?|pars?))?$/i;
 
 const ODDS_RE = /([+-]\d+)\s*\(\s*([A-Za-z]{2,5})\s*\)/;
 const UNITS_RE = /for\s+([\d.]+)\s*units?/i;
@@ -106,10 +117,60 @@ export function parsePersonalText(text: string, forDate: string | undefined): Pa
     } else if ((m = descriptor.match(MAKECUT_RE))) {
       player = m[1].trim();
       phrase = "Make Cut";
+    } else if ((m = descriptor.match(ROUND_STAT_RE))) {
+      player = m[1].trim();
+      const roundNum = parseInt(m[2], 10);
+      const side = m[3].toLowerCase(); // "over" | "under"
+      const line = parseFloat(m[4]);
+      const catRaw = (m[5] || "").toLowerCase();
+      // Derive the noun for the phrase - same canonical phrases parseCombined
+      // produces so all downstream grading/display logic is unchanged.
+      let noun: string;
+      if (/fairway/.test(catRaw)) noun = "fairways";
+      else if (/green/.test(catRaw)) noun = "greens";
+      else if (/birdie/.test(catRaw)) noun = "birdies";
+      else if (/bogey/.test(catRaw)) noun = "bogeys";
+      else if (/par/.test(catRaw)) noun = "pars";
+      else noun = ""; // score bet - no noun
+      // Convert line to a threshold: 11.5 Over → 12+, 11.5 Under → 11 or fewer
+      const isOver = side === "over";
+      let betPhrase: string;
+      if (noun === "") {
+        // Score bet - keep as raw strokes phrasing; sync/betLogic converts
+        // to to-par using roundPar the same as parseCombined does.
+        betPhrase = isOver ? `${line} or worse` : `${line} or better`;
+      } else {
+        const threshold = isOver ? Math.ceil(line) : Math.floor(line);
+        betPhrase = isOver ? `${threshold}+ ${noun}` : `${threshold} ${noun} or less`;
+      }
+      phrase = betPhrase;
+      // Use the actual round label so sync routes/grading find the right
+      // round data, and so the scorecard popover opens the right round.
+      // We return early here to override the default PERSONAL_ROUND_LABEL.
+      bets.push({
+        id: "bp" + counter++ + "_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+        t: currentTournament,
+        r: `Round ${roundNum}`,
+        time: "",
+        player,
+        bet: betPhrase,
+        stat: null,
+        thru: null,
+        status: "pending",
+        autoEnabled: true,
+        auto: null,
+        oddsLine: `${side.charAt(0).toUpperCase() + side.slice(1)} ${line}${noun ? " " + noun.charAt(0).toUpperCase() + noun.slice(1) : ""}`,
+        oddsPrice: price,
+        sportsbook,
+        oddsUnits: units,
+        loadedDate,
+        personal: true,
+      });
+      continue;
     }
 
     if (!player || !phrase) {
-      warnings.push(`Couldn't recognize a bet type (Top N / Winner / outright Winner / Make Cut / to make the cut / "vs ... Round N" / "vs ... Tournament" / "and ... to tie Round N" / "and ... to tie Tournament") in: "${line}"`);
+      warnings.push(`Couldn't recognize a bet type in: "${line}"\nSupported: Top N / Winner / Make Cut / H2H ("vs ... Round N" / "vs ... Tournament") / Tie ("and ... to tie") / Stat ("Player Round N Over/Under X.X [Greens/Fairways/Birdies/Bogeys/Pars]")`);
       continue;
     }
 
