@@ -89,11 +89,12 @@ export async function PUT(req: NextRequest) {
 // turned out to be a push on the sportsbook's end).
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
-  const { passcode, parlayId, label, manualStatus } = body as {
+  const { passcode, parlayId, label, manualStatus, reopen } = body as {
     passcode: string;
     parlayId: string;
     label?: string;
     manualStatus?: "hit" | "miss" | "push";
+    reopen?: boolean;
   };
 
   if (!passcode || passcode !== process.env.EDIT_PASSCODE) {
@@ -101,6 +102,24 @@ export async function PATCH(req: NextRequest) {
   }
   if (!parlayId) {
     return NextResponse.json({ error: "Missing parlayId" }, { status: 400 });
+  }
+
+  if (reopen) {
+    // Move an archived parlay back to the live board as "live",
+    // clearing manualStatus so sync can re-derive status from legs again.
+    const archived = (await redis.get<Parlay[]>(PARLAY_ARCHIVE_KEY)) || [];
+    const idx = archived.findIndex((p) => p.id === parlayId);
+    if (idx === -1) {
+      return NextResponse.json({ error: "Parlay not found in archive" }, { status: 404 });
+    }
+    const [restored] = archived.splice(idx, 1);
+    delete restored.manualStatus;
+    delete restored.archivedAt;
+    restored.status = "live";
+    await redis.set(PARLAY_ARCHIVE_KEY, archived);
+    const live = (await redis.get<Parlay[]>(PARLAYS_KEY)) || [];
+    await redis.set(PARLAYS_KEY, [...live, restored]);
+    return NextResponse.json({ ok: true, parlay: restored });
   }
 
   if (manualStatus) {

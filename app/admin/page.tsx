@@ -336,6 +336,22 @@ export default function AdminPage() {
     });
   }
 
+  function reopenParlay(parlay: Parlay) {
+    fetch("/api/parlays", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, parlayId: parlay.id, reopen: true }),
+    }).then((r) => r.json()).then((d) => {
+      if (d.ok) {
+        setParlayArchiveList((prev) => prev.filter((p) => p.id !== parlay.id));
+        setLiveParlays((prev) => [...prev, d.parlay]);
+      } else {
+        setParlayMsg(d.error || "Couldn't reopen parlay.");
+        setTimeout(() => setParlayMsg(""), 3000);
+      }
+    });
+  }
+
   function submitParlay() {
     const dollars = parseFloat(parlayWagerDollars);
     if (!parlayOdds.trim() || isNaN(dollars) || selectedLegIds.size === 0) {
@@ -1746,25 +1762,11 @@ export default function AdminPage() {
                     {p.legs.length} legs · {p.loadedDate} · {p.status === "hit" ? "WIN" : p.status === "miss" ? "LOSS" : p.status === "push" ? "HALF WIN" : "open"}
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  <button
-                    className="sbtn win"
-                    onClick={() => settleParlay(p, "hit")}
-                  >
-                    WIN
-                  </button>
-                  <button
-                    className="sbtn tbd"
-                    onClick={() => settleParlay(p, "push")}
-                  >
-                    HALF WIN
-                  </button>
-                  <button
-                    className="sbtn loss"
-                    onClick={() => settleParlay(p, "miss")}
-                  >
-                    LOSS
-                  </button>
+                <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                  <button className="sbtn live" onClick={() => reopenParlay(p)}>IN PROGRESS</button>
+                  <button className="sbtn win" onClick={() => settleParlay(p, "hit")}>WIN</button>
+                  <button className="sbtn tbd" onClick={() => settleParlay(p, "push")}>HALF WIN</button>
+                  <button className="sbtn loss" onClick={() => settleParlay(p, "miss")}>LOSS</button>
                 </div>
               </div>
             </div>
