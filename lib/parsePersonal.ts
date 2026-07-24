@@ -1,5 +1,7 @@
 import { Bet } from "./seed";
 import { defaultUnitsToWinOne } from "./units";
+import { deriveBetPhrase } from "./parseCombined";
+import { Mapping } from "./mapping";
 
 export type ParsePersonalResult = { bets: Bet[]; warnings: string[] };
 
@@ -56,7 +58,7 @@ const ROUND_STAT_RE = /^(.*?)\s+(?:Round\s+(\d+)\s+)?(over|under)\s+([\d.]+)(?:\
 const ODDS_RE = /([+-]\d+)\s*\(\s*([A-Za-z]{2,5})\s*\)/;
 const UNITS_RE = /for\s+([\d.]+)\s*units?/i;
 
-export function parsePersonalText(text: string, forDate: string | undefined): ParsePersonalResult {
+export function parsePersonalText(text: string, forDate: string | undefined, mapping?: Mapping | null): ParsePersonalResult {
   const rawLines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
 
   let loadedDate = forDate;
@@ -150,9 +152,24 @@ export function parsePersonalText(text: string, forDate: string | undefined): Pa
       const isOver = side === "over";
       let betPhrase: string;
       if (noun === "") {
-        // Score bet - keep as raw strokes phrasing; sync/betLogic converts
-        // to to-par using roundPar the same as parseCombined does.
-        betPhrase = isOver ? `${line} or worse` : `${line} or better`;
+        // Score bet - use deriveBetPhrase so it converts raw strokes to
+        // to-par terms using the tournament's roundPar, exactly the same
+        // way parseCombined does. Falls back to raw strokes if no par on
+        // file (same "skip with a warning" behaviour as parseCombined).
+        const tm = mapping?.tournaments?.[currentTournament];
+        const roundPar = tm?.roundPar;
+        const derived = deriveBetPhrase(
+          isOver ? "Over" : "Under",
+          String(line),
+          "SCORE",
+          roundPar,
+          undefined // no segment for personal score bets (full round only)
+        );
+        if (derived === null) {
+          warnings.push(`No round par on file for "${currentTournament}" - add one in Admin → Tournaments to convert score bets. Skipped: "${line}"`);
+          continue;
+        }
+        betPhrase = derived;
       } else {
         const threshold = isOver ? Math.ceil(line) : Math.floor(line);
         betPhrase = isOver ? `${threshold}+ ${noun}` : `${threshold} ${noun} or less`;

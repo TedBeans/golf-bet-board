@@ -524,7 +524,7 @@ export default function AdminPage() {
 
   function previewPersonal() {
     setPersonalMsg("");
-    setPersonalPreview(parsePersonalText(personalText, personalDate));
+    setPersonalPreview(parsePersonalText(personalText, personalDate, mapping));
   }
 
   function confirmPersonal() {
