@@ -32,11 +32,16 @@ const RAINDROPS = Array.from({ length: 18 }).map((_, i) => ({
 function legLiveDetail(bet: Bet): string {
   const p = parseBetType(bet.bet);
   if (p.label === "TOP_N" || p.label === "WINNER") {
-    return `${bet.auto?.position ?? "—"} thru ${bet.auto?.thru ?? "—"}`;
+    const thru = bet.auto?.thru ?? null;
+    const score = formatScore(bet.auto?.scoreToPar ?? null);
+    const thruLabel = thru === null ? "—" : thru % 18 === 0 ? `${thru} (F)` : `${thru}`;
+    return `${bet.auto?.position ?? "—"} · ${score} thru ${thruLabel}`;
   }
   if (p.label === "MAKE_CUT") {
-    const rd = bet.auto?.currentRound;
-    return `${bet.auto?.position ?? "—"} · ${formatScore(bet.auto?.scoreToPar ?? null)} thru ${bet.auto?.thru ?? "—"}${rd ? ` (R${rd})` : ""}`;
+    const thru = bet.auto?.thru ?? null;
+    const score = formatScore(bet.auto?.scoreToPar ?? null);
+    const thruLabel = thru === null ? "—" : thru % 18 === 0 ? `${thru} (F)` : `${thru}`;
+    return `${bet.auto?.position ?? "—"} · ${score} thru ${thruLabel}`;
   }
   if (p.label === "H2H" || p.label === "TIE") {
     const subjectThru = bet.auto?.thru ?? null;

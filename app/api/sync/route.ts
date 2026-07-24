@@ -175,7 +175,33 @@ export async function GET() {
     const row = findPlayerMatch(playerName, pgaPlayers);
     if (!row) return null;
     if (roundNum === null) {
-      return { id: row.id, thru: null as number | null, scoreToPar: row.total };
+      // Tournament cumulative view: total score and total holes completed
+      // across all rounds played so far. row.total is the cumulative
+      // tournament score. For thru: fetch the hole-by-hole data and sum
+      // finalized holes across all rounds so we get e.g. 36 after R2
+      // rather than null (which is what the leaderboard returns once a
+      // round is complete and the player hasn't started the next one).
+      const key = `holes:${tournamentId}:${row.id}`;
+      let holeJson = scorecardCache.get(key);
+      if (holeJson === undefined) {
+        try {
+          holeJson = await fetchPlayerHoleScores(tournamentId, row.id);
+        } catch {
+          holeJson = null;
+        }
+        scorecardCache.set(key, holeJson);
+      }
+      let totalThru: number | null = null;
+      if (holeJson) {
+        const rounds: any[] = holeJson?.rounds || [];
+        let count = 0;
+        for (const r of rounds) {
+          const holes: any[] = r.holes || [];
+          count += holes.filter((h: any) => h.score != null && h.score > 0).length;
+        }
+        if (count > 0) totalThru = count;
+      }
+      return { id: row.id, thru: totalThru ?? row.thru, scoreToPar: row.total };
     }
     const key = `holes:${tournamentId}:${row.id}`;
     let holeJson = scorecardCache.get(key);
