@@ -236,20 +236,37 @@ export function autoGradeStatus(
     return null;
   }
 
-  // Count-based bets (GIR/BIRDIES/BOGEYS/PARS) used to grade early off a
-  // "worst case" bound - e.g. a min-type bet like "12+ pars" would lock in
-  // a win the moment the count hit 12, on the assumption a completed
-  // hole's tally can never move backward. In practice that assumption
-  // isn't safe enough to bet a permanent grade on (a count can come from a
-  // feed that's briefly wrong, or a hole result can get revised) - and
-  // once autoGradeStatus returns a verdict, sync stops re-checking that
-  // bet forever (see "already decided - stop pulling for it" in the sync
-  // route), so an early wrong verdict never gets a chance to self-correct.
-  // Wait for the round to actually finish and do one direct final
-  // comparison instead, same as SCORE above.
-  if (thru < effectiveHolesTotal) return null;
-  if (parsed.type === "max") return stat <= parsed.target ? "hit" : "miss";
-  if (parsed.type === "min") return stat >= parsed.target ? "hit" : "miss";
+  // Count-based bets (GIR/BIRDIES/BOGEYS/PARS/FAIRWAYS):
+  // Counts can only increase as holes are completed - they never go backward.
+  // This means some outcomes are mathematically locked before the round ends:
+  //   - A MAX bet (e.g. "Under 4.5 birdies") is a guaranteed MISS the moment
+  //     the count exceeds the target, even with holes remaining.
+  //   - A MIN bet (e.g. "Over 11.5 greens") is a guaranteed MISS if the
+  //     remaining opportunities can't possibly get the count to the target.
+  // We grade these early misses immediately. We still wait for completion
+  // before grading wins - the "already there, can't lose it" early win
+  // shortcut was removed after a pars count briefly read wrong mid-round
+  // and locked in a wrong WIN that never self-corrected (once graded, sync
+  // stops re-checking). Misses are safe to lock early because if the count
+  // goes any higher it only makes the miss more certain, never a win.
+  //
+  // Each stat type has its own max opportunities per round:
+  //   - Fairways: 14 (par-4s and par-5s only; par-3s have no fairway)
+  //   - GIR, Birdies, Bogeys, Pars: 18 holes
+  //   - Segment bets: 9 holes
+  const statTotal = parsed.segment ? HOLES_IN_NINE : (parsed.label === "FAIRWAYS" ? 14 : effectiveHolesTotal);
+  const remaining = statTotal - (thru ?? 0);
+  if (parsed.type === "max") {
+    if (stat > parsed.target) return "miss"; // already exceeded, locked miss
+    if (thru >= statTotal) return stat <= parsed.target ? "hit" : "miss";
+    return null; // still possible to win, wait for completion
+  }
+  if (parsed.type === "min") {
+    const bestCase = stat + remaining;
+    if (bestCase < parsed.target) return "miss"; // can't reach it, locked miss
+    if (thru >= statTotal) return stat >= parsed.target ? "hit" : "miss";
+    return null; // still possible to win, wait for completion
+  }
   return null;
 }
 

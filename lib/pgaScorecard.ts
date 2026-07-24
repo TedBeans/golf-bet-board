@@ -10,6 +10,9 @@ export type ScorecardRoundStats = {
   girCount: number | null; // e.g. 13
   fairways: string | null; // raw display, e.g. "64.29% (9/14)"
   fairwaysCount: number | null; // e.g. 9
+  thruCount: number | null; // holes completed this round, derived from hole-by-hole data;
+                             // 18 when the round is fully finished even if the leaderboard
+                             // returns "-" (null) for thru (see parseThru in pgaMatch.ts)
 };
 
 function findLabel(list: any[], ...labels: string[]): string | null {
@@ -77,10 +80,6 @@ export function extractScorecardStats(json: any, roundNumber: number): Scorecard
     bogeys,
     eagles,
     doubleBogeys,
-    // A "birdies or better" bet should also count anything better than a
-    // birdie (eagle, albatross); a "bogeys or worse" bet should also count
-    // anything worse than a bogey (double bogey+). These totals - not the
-    // literal counts above - are what bet grading actually uses.
     birdiesOrBetter: birdies + eagles,
     bogeysOrWorse: bogeys + doubleBogeys,
     pars: parseCountValue(parsStr),
@@ -88,6 +87,12 @@ export function extractScorecardStats(json: any, roundNumber: number): Scorecard
     girCount: numeratorOf(girDisplay),
     fairways: fractionOnly(fairwaysDisplay),
     fairwaysCount: numeratorOf(fairwaysDisplay),
+    // Count finalized holes directly from the scoring data - this is 18
+    // for a player who has finished, even if the leaderboard returns "-"
+    // for thru (which parseThru converts to null). Derived from the
+    // scoring array which has one entry per hole, each with a totalStrokes
+    // value once the hole is complete.
+    thruCount: scoring.filter((h: any) => h.totalStrokes != null && h.totalStrokes > 0).length || null,
   };
 }
 
