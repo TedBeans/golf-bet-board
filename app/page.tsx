@@ -940,20 +940,16 @@ export default function Page() {
                               {" · "}thru {b.auto?.thru ?? "—"}/{b.auto?.opponentThru ?? "—"}
                             </>
                           ) : (["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "WINNER_SCORE"].includes(parsed.label)) ? (
-                            // Round-scoped stat bet: render the same 3-column tracker as regular bets
-                            <div className="stat-row" style={{ marginTop: 8 }}>
-                              <div className="stat-cell">
-                                <div className="stat-label">{friendlyLabel(parsed.label)}</div>
-                                <div className="stat-val">{parsed.targetDisplay}</div>
-                              </div>
-                              <div className={`stat-cell ${trendClassName(parsed, b.stat, b.thru)}`}>
-                                <div className="stat-label">{friendlyLabel(parsed.label)}</div>
-                                <div className="stat-val">{b.stat !== null && b.stat !== undefined ? b.stat : "—"}</div>
-                              </div>
-                              <div className="stat-cell">
-                                <div className="stat-label">THRU</div>
-                                <div className="stat-val">{b.thru !== null && b.thru !== undefined ? b.thru : "—"}</div>
-                              </div>
+                            <div style={{ display: "flex", gap: 24, alignItems: "baseline", marginTop: 6, flexWrap: "wrap" }}>
+                              <span style={{ color: "var(--cream-dim)", fontSize: 11 }}>
+                                {friendlyLabel(parsed.label).toUpperCase()} {parsed.targetDisplay}
+                              </span>
+                              <span className={trendClassName(parsed, b.stat, b.thru)} style={{ fontSize: 13, fontWeight: 700 }}>
+                                {b.stat !== null && b.stat !== undefined ? b.stat : "—"}
+                              </span>
+                              <span style={{ color: "var(--cream-dim)", fontSize: 11 }}>
+                                THRU {b.thru !== null && b.thru !== undefined ? b.thru : "—"}
+                              </span>
                             </div>
                           ) : (
                             <>
