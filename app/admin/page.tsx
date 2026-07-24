@@ -352,6 +352,23 @@ export default function AdminPage() {
     });
   }
 
+  function deleteParlay(parlay: Parlay) {
+    if (!confirm(`Delete "${parlay.label}"? This cannot be undone.`)) return;
+    fetch("/api/parlays", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, parlayId: parlay.id }),
+    }).then((r) => r.json()).then((d) => {
+      if (d.ok) {
+        setLiveParlays((prev) => prev.filter((p) => p.id !== parlay.id));
+        setParlayArchiveList((prev) => prev.filter((p) => p.id !== parlay.id));
+      } else {
+        setParlayMsg(d.error || "Couldn't delete parlay.");
+        setTimeout(() => setParlayMsg(""), 3000);
+      }
+    });
+  }
+
   function submitParlay() {
     const dollars = parseFloat(parlayWagerDollars);
     if (!parlayOdds.trim() || isNaN(dollars) || selectedLegIds.size === 0) {
@@ -1767,6 +1784,7 @@ export default function AdminPage() {
                   <button className="sbtn win" onClick={() => settleParlay(p, "hit")}>WIN</button>
                   <button className="sbtn tbd" onClick={() => settleParlay(p, "push")}>HALF WIN</button>
                   <button className="sbtn loss" onClick={() => settleParlay(p, "miss")}>LOSS</button>
+                  <button className="resume-btn" style={{ fontSize: 10 }} onClick={() => deleteParlay(p)}>DELETE</button>
                 </div>
               </div>
             </div>

@@ -176,3 +176,28 @@ export async function PATCH(req: NextRequest) {
 
   return NextResponse.json({ error: "Parlay not found" }, { status: 404 });
 }
+
+export async function DELETE(req: NextRequest) {
+  const body = await req.json();
+  const { passcode, parlayId } = body as { passcode: string; parlayId: string };
+  if (!passcode || passcode !== process.env.EDIT_PASSCODE) {
+    return NextResponse.json({ error: "Wrong passcode" }, { status: 401 });
+  }
+  if (!parlayId) return NextResponse.json({ error: "Missing parlayId" }, { status: 400 });
+
+  const live = (await redis.get<Parlay[]>(PARLAYS_KEY)) || [];
+  const liveFiltered = live.filter((p) => p.id !== parlayId);
+  if (liveFiltered.length < live.length) {
+    await redis.set(PARLAYS_KEY, liveFiltered);
+    return NextResponse.json({ ok: true });
+  }
+
+  const archived = (await redis.get<Parlay[]>(PARLAY_ARCHIVE_KEY)) || [];
+  const archFiltered = archived.filter((p) => p.id !== parlayId);
+  if (archFiltered.length < archived.length) {
+    await redis.set(PARLAY_ARCHIVE_KEY, archFiltered);
+    return NextResponse.json({ ok: true });
+  }
+
+  return NextResponse.json({ error: "Parlay not found" }, { status: 404 });
+}
