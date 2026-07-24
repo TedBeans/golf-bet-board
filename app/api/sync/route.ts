@@ -711,7 +711,7 @@ export async function GET() {
           }
           scorecardCache.set(holeKey, holeJson);
         }
-        scorecardThru = holeJson ? (computeFullRoundStats(holeJson, roundNum)?.thru ?? null) : null;
+        scorecardThru = holeJson ? (computeFullRoundStats(holeJson, roundNum)?.thru || null) : null;
       }
       const effectiveThru = row.thru ?? scorecardThru ?? null;
 

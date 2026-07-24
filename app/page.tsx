@@ -52,7 +52,8 @@ function legLiveDetail(bet: Bet): string {
     return `${matchPlayStatus(bet.auto?.scoreToPar ?? null, bet.auto?.opponentScoreToPar ?? null)} thru ${thru ?? "—"}`;
   }
   const valueDisplay = p.label === "SCORE" || p.label === "WINNER_SCORE" ? formatScore(bet.stat) : bet.stat ?? "—";
-  return `${valueDisplay} thru ${bet.thru ?? "—"}`;
+  const thruDisplay = !bet.thru ? "—" : bet.thru;
+  return `${valueDisplay} thru ${thruDisplay}`;
 }
 
 // DataGolf make-cut % for a MAKE_CUT leg, rendered as its own column in the
