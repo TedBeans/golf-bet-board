@@ -6,6 +6,7 @@ export type ParlayLegRef = {
   bet: string; // the bet description, e.g. "-2 or better"
   tournament: string;
   round: string;
+  status?: "hit" | "miss" | "push" | "live" | "pending" | "unknown"; // snapshotted at archive time
 };
 
 export type Parlay = {

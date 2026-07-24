@@ -201,7 +201,18 @@ function ParlayArchiveList({ parlays }: { parlays: Parlay[] }) {
                 <div className="who">
                   <div className="time">{p.loadedDate}</div>
                   <div className="player">{p.label}</div>
-                  <div className="bet-text">{p.oddsPrice} · {p.wagerUnits}u</div>
+                  <div className="bet-text">
+                    {p.oddsPrice} · {p.wagerUnits}u
+                    {p.legs.some(l => l.status) && (() => {
+                      const won = p.legs.filter(l => l.status === "hit").length;
+                      const total = p.legs.length;
+                      return (
+                        <span style={{ marginLeft: 8, color: won === total ? "var(--live)" : won === 0 ? "var(--clay)" : "var(--gold-bright)" }}>
+                          {won}/{total} legs
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                   <span className={`sbtn ${p.status === "hit" ? "win active" : p.status === "push" ? "tbd active" : "loss active"}`} style={{ cursor: "default" }}>
@@ -216,11 +227,18 @@ function ParlayArchiveList({ parlays }: { parlays: Parlay[] }) {
               </div>
               {isOpen && (
                 <div style={{ marginTop: 8 }}>
-                  {p.legs.map((leg, i) => (
-                    <div key={i} style={{ fontSize: 11, color: "var(--cream-dim)", marginBottom: 4 }}>
-                      {leg.tournament} · {leg.player} · {leg.bet}
-                    </div>
-                  ))}
+                  {p.legs.map((leg, i) => {
+                    const s = leg.status;
+                    const color = s === "hit" ? "var(--live)" : s === "miss" ? "var(--clay)" : "var(--cream-dim)";
+                    return (
+                      <div key={i} style={{ fontSize: 11, color, marginBottom: 4, display: "flex", gap: 6, alignItems: "center" }}>
+                        {s === "hit" && <span style={{ color: "var(--live)" }}>✓</span>}
+                        {s === "miss" && <span style={{ color: "var(--clay)" }}>✗</span>}
+                        {(!s || s === "unknown" || s === "live" || s === "pending") && <span style={{ color: "var(--cream-dim)", opacity: 0.4 }}>·</span>}
+                        <span>{leg.tournament} · {leg.player} · {leg.bet}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

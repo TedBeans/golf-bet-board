@@ -811,6 +811,11 @@ export async function GET() {
       } else {
         const legStatuses = resolveLegStatuses(p.legs, finalBets, archiveForLegs);
         p.status = deriveParlayStatus(legStatuses);
+        // Snapshot each leg's final status onto the leg ref so the recap
+        // can color-code legs without needing the full bet lookup.
+        legStatuses.forEach((ls, i) => {
+          if (p.legs[i]) p.legs[i].status = ls.status as any;
+        });
       }
       if (p.status === "hit" || p.status === "miss" || p.status === "push") {
         nowDecided.push({ ...p, archivedAt: new Date().toISOString() });
