@@ -193,11 +193,12 @@ export async function GET() {
       }
       let totalThru: number | null = null;
       if (holeJson) {
-        const rounds: any[] = holeJson?.rounds || [];
+        // Same structure computeFullRoundStats uses: roundScores[].firstNine.holes + secondNine.holes
+        const rounds: any[] = holeJson?.roundScores || [];
         let count = 0;
         for (const r of rounds) {
-          const holes: any[] = r.holes || [];
-          count += holes.filter((h: any) => h.score != null && h.score > 0).length;
+          const allHoles = [...(r.firstNine?.holes || []), ...(r.secondNine?.holes || [])];
+          count += allHoles.filter((h: any) => h.score && h.score !== "-").length;
         }
         if (count > 0) totalThru = count;
       }
