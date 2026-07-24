@@ -258,14 +258,17 @@ export function autoGradeStatus(
   const remaining = statTotal - (thru ?? 0);
   if (parsed.type === "max") {
     if (stat > parsed.target) return "miss"; // already exceeded, locked miss
+    const worstCase = stat + remaining;
+    if (worstCase <= parsed.target) return "hit"; // can't exceed even in worst case, locked win
     if (thru >= statTotal) return stat <= parsed.target ? "hit" : "miss";
-    return null; // still possible to win, wait for completion
+    return null; // still possible to bust, wait
   }
   if (parsed.type === "min") {
     const bestCase = stat + remaining;
     if (bestCase < parsed.target) return "miss"; // can't reach it, locked miss
+    if (stat >= parsed.target) return "hit"; // already there, locked win
     if (thru >= statTotal) return stat >= parsed.target ? "hit" : "miss";
-    return null; // still possible to win, wait for completion
+    return null; // not there yet, wait
   }
   return null;
 }
