@@ -694,12 +694,26 @@ export async function GET() {
       const scorecard = scorecardJson ? extractScorecardStats(scorecardJson, roundNum) : null;
 
       // The PGA Tour leaderboard returns thru="-" (which parseThru converts
-      // to null) for players who have finished their round. The scorecard
-      // counts finalized holes directly, so scorecard.thruCount is 18 for
-      // a finished player regardless of what the leaderboard says. Fall back
-      // to the scorecard's thruCount when the leaderboard gives null, so
-      // grading fires correctly for players who have completed their round.
-      const effectiveThru = row.thru ?? scorecard?.thruCount ?? null;
+      // to null) for players who have finished their round. scorecard.thruCount
+      // tries to count from the stats API but that API doesn't have per-hole
+      // data, so it's unreliable. Fall back to computeFullRoundStats from the
+      // hole-score data, which counts finalized holes directly and is always
+      // 18 for a finished player.
+      let scorecardThru = scorecard?.thruCount ?? null;
+      if (scorecardThru === null) {
+        const holeKey = `holes:${tournamentId}:${row.id}`;
+        let holeJson = scorecardCache.get(holeKey);
+        if (holeJson === undefined) {
+          try {
+            holeJson = await fetchPlayerHoleScores(tournamentId, row.id);
+          } catch {
+            holeJson = null;
+          }
+          scorecardCache.set(holeKey, holeJson);
+        }
+        scorecardThru = holeJson ? (computeFullRoundStats(holeJson, roundNum)?.thru ?? null) : null;
+      }
+      const effectiveThru = row.thru ?? scorecardThru ?? null;
 
       bet.thru = effectiveThru;
       bet.auto = {
