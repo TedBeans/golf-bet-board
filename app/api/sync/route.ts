@@ -384,23 +384,29 @@ export async function GET() {
 
           const dgCutProb = await getDataGolfCutProb(bet.player);
 
-          // Once Round 1 is fully complete, the more useful "current" line
-          // is Round 2's progress - not Round 1's frozen final line. This
-          // used to always show r1 regardless of r2, which is how you'd
-          // get something like "thru 24" (an 18+6 mashup baked into a
-          // single stat that was actually still just Round 1's numbers)
-          // once Round 2 got underway, and also why the scorecard popover
-          // (which reads bet.r) kept opening Round 1's card even mid Round
-          // 2.
+          // For display: always show the tournament cumulative score and
+          // total holes completed across all rounds (same as TOP_N legs).
+          // This means between rounds you see "-3 thru 18 (F)" rather than
+          // "— thru —" which is what the current-round thru gives when
+          // nobody has teed off yet. Grading still uses r1/r2 individually.
+          const cumulative = useOpen
+            ? await getOpenRoundStat(openPlayers!, bet.player, null)
+            : await getPgaRoundStat(tournamentId, pgaPlayers!, bet.player, null);
+
           const roundOneFinished = r1.thru === 18;
           const activeRound = roundOneFinished && r2 ? 2 : 1;
           const active = activeRound === 2 ? r2! : r1;
 
-          bet.thru = active.thru;
+          // Display uses cumulative stats (total score + total holes across all rounds).
+          // bet.stat and grading still use the active round's data.
+          const displayThru = cumulative?.thru ?? active.thru;
+          const displayScore = cumulative?.scoreToPar ?? active.scoreToPar;
+
+          bet.thru = displayThru;
           bet.stat = active.scoreToPar;
           bet.auto = {
-            thru: active.thru,
-            scoreToPar: active.scoreToPar,
+            thru: displayThru,
+            scoreToPar: displayScore,
             birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
             updatedAt: new Date().toISOString(),
             position: positions.get(active.id) ?? null,
