@@ -939,6 +939,22 @@ export default function Page() {
                               {formatScore(b.auto?.opponentScoreToPar ?? null)}
                               {" · "}thru {b.auto?.thru ?? "—"}/{b.auto?.opponentThru ?? "—"}
                             </>
+                          ) : (["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "WINNER_SCORE"].includes(parsed.label)) ? (
+                            // Round-scoped stat bet: render the same 3-column tracker as regular bets
+                            <div className="stat-row" style={{ marginTop: 8 }}>
+                              <div className="stat-cell">
+                                <div className="stat-label">{friendlyLabel(parsed.label)}</div>
+                                <div className="stat-val">{parsed.targetDisplay}</div>
+                              </div>
+                              <div className={`stat-cell ${trendClassName(parsed, b.stat, b.thru)}`}>
+                                <div className="stat-label">{friendlyLabel(parsed.label)}</div>
+                                <div className="stat-val">{b.stat !== null && b.stat !== undefined ? b.stat : "—"}</div>
+                              </div>
+                              <div className="stat-cell">
+                                <div className="stat-label">THRU</div>
+                                <div className="stat-val">{b.thru !== null && b.thru !== undefined ? b.thru : "—"}</div>
+                              </div>
+                            </div>
                           ) : (
                             <>
                               <span className={inTopN ? "detail-hi" : ""}>
