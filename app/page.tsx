@@ -894,7 +894,12 @@ export default function Page() {
                           </div>
                           <div className="bet-text">{b.bet}</div>
                           {b.oddsPrice && (
-                            <div className="odds-line">{b.sportsbook || "DK"} {b.oddsPrice} · {b.oddsUnits}u</div>
+                            <div className="odds-line">
+                              {(["SCORE","GIR","BIRDIES","BOGEYS","PARS","FAIRWAYS","WINNER_SCORE"].includes(parsed.label) && b.r && !b.r.includes("TedBeans")) && (
+                                <span style={{ color: "var(--gold-bright)", marginRight: 6 }}>{b.r}</span>
+                              )}
+                              {b.sportsbook || "DK"} {b.oddsPrice} · {b.oddsUnits}u
+                            </div>
                           )}
                         </div>
                         <div className="status-btns">
