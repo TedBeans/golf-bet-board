@@ -922,6 +922,44 @@ export default function Page() {
                           </button>
                         </div>
                       </div>
+                      {(["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "WINNER_SCORE"].includes(parsed.label)) && (
+                        <div className="scorecard">
+                          <div className="sc-cell">
+                            <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
+                            <div className="sc-target">{parsed.targetDisplay}</div>
+                          </div>
+                          <div className="sc-cell">
+                            <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
+                            {parsed.label === "SCORE" ? (
+                              <input
+                                disabled={!unlocked}
+                                className={`sc-input ${trendClassName(parsed, b.stat, b.thru)}`}
+                                type="text" inputMode="numeric" placeholder="—"
+                                value={formatScore(b.stat, "")}
+                                onChange={(e) => updateBetManually(b.id, { stat: parseScoreInput(e.target.value) })}
+                              />
+                            ) : (
+                              <input
+                                disabled={!unlocked}
+                                className={`sc-input ${trendClassName(parsed, b.stat, b.thru)}`}
+                                type="text" inputMode="numeric" placeholder="—"
+                                value={b.stat === null || b.stat === undefined ? "" : String(b.stat)}
+                                onChange={(e) => updateBetManually(b.id, { stat: e.target.value === "" ? null : parseFloat(e.target.value) })}
+                              />
+                            )}
+                          </div>
+                          <div className="sc-cell">
+                            <div className="sc-label">Thru</div>
+                            <input
+                              disabled={!unlocked}
+                              className="sc-input thru-input"
+                              type="text" inputMode="numeric" placeholder="—"
+                              value={b.thru === null || b.thru === undefined ? "" : String(b.thru)}
+                              onChange={(e) => updateBetManually(b.id, { thru: e.target.value === "" ? null : parseInt(e.target.value, 10) })}
+                            />
+                          </div>
+                        </div>
+                      )}
                       <div className="auto-row">
                         <span className="detail-strip">
                           {parsed.label === "MAKE_CUT" ? (
@@ -940,17 +978,7 @@ export default function Page() {
                               {" · "}thru {b.auto?.thru ?? "—"}/{b.auto?.opponentThru ?? "—"}
                             </>
                           ) : (["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "WINNER_SCORE"].includes(parsed.label)) ? (
-                            <div style={{ display: "flex", gap: 24, alignItems: "baseline", marginTop: 6, flexWrap: "wrap" }}>
-                              <span style={{ color: "var(--cream-dim)", fontSize: 11 }}>
-                                {friendlyLabel(parsed.label).toUpperCase()} {parsed.targetDisplay}
-                              </span>
-                              <span className={trendClassName(parsed, b.stat, b.thru)} style={{ fontSize: 13, fontWeight: 700 }}>
-                                {b.stat !== null && b.stat !== undefined ? b.stat : "—"}
-                              </span>
-                              <span style={{ color: "var(--cream-dim)", fontSize: 11 }}>
-                                THRU {b.thru !== null && b.thru !== undefined ? b.thru : "—"}
-                              </span>
-                            </div>
+                            null
                           ) : (
                             <>
                               <span className={inTopN ? "detail-hi" : ""}>
