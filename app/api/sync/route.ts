@@ -693,29 +693,40 @@ export async function GET() {
       }
       const scorecard = scorecardJson ? extractScorecardStats(scorecardJson, roundNum) : null;
 
-      // The PGA Tour leaderboard returns thru="-" (which parseThru converts
-      // to null) for players who have finished their round. scorecard.thruCount
-      // tries to count from the stats API but that API doesn't have per-hole
-      // data, so it's unreliable. Fall back to computeFullRoundStats from the
-      // hole-score data, which counts finalized holes directly and is always
-      // 18 for a finished player.
-      let scorecardThru = scorecard?.thruCount ?? null;
-      if (scorecardThru === null) {
-        const holeKey = `holes:${tournamentId}:${row.id}`;
-        let holeJson = scorecardCache.get(holeKey);
-        if (holeJson === undefined) {
-          try {
-            holeJson = await fetchPlayerHoleScores(tournamentId, row.id);
-          } catch {
-            holeJson = null;
-          }
-          scorecardCache.set(holeKey, holeJson);
+      // For stat bets, derive thru from hole-by-hole data for the specific
+      // round rather than row.thru from the leaderboard. row.thru reflects
+      // the current active round's progress, but between rounds it carries
+      // over the previous round's final thru (e.g. 18 from R2 bleeds onto
+      // an R3 bet before R3 starts). computeFullRoundStats counts finalized
+      // holes for the specific round number, returning null if that round
+      // hasn't been played yet - which is exactly what we want.
+      const holeKey = `holes:${tournamentId}:${row.id}`;
+      let holeJson = scorecardCache.get(holeKey);
+      if (holeJson === undefined) {
+        try {
+          holeJson = await fetchPlayerHoleScores(tournamentId, row.id);
+        } catch {
+          holeJson = null;
         }
-        scorecardThru = holeJson ? (computeFullRoundStats(holeJson, roundNum)?.thru || null) : null;
+        scorecardCache.set(holeKey, holeJson);
       }
-      const effectiveThru = row.thru ?? scorecardThru ?? null;
+      const roundThru = holeJson ? (computeFullRoundStats(holeJson, roundNum)?.thru || null) : null;
+      // Fall back to row.thru only if we couldn't get hole data at all
+      const effectiveThru = roundThru ?? (holeJson === null ? row.thru : null);
 
       bet.thru = effectiveThru;
+      // If this round hasn't started yet (no holes played), clear the stat
+      // so we don't display stale values from a previous completed round.
+      if (effectiveThru === null) {
+        bet.stat = null;
+        bet.auto = {
+          thru: null, scoreToPar: null, birdies: null, bogeys: null, pars: null,
+          eagles: null, doubleBogeys: null, gir: null, fairways: null,
+          updatedAt: new Date().toISOString(),
+        };
+        updatedCount += 1;
+        continue;
+      }
       bet.auto = {
         thru: effectiveThru,
         scoreToPar: row.score,
