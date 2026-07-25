@@ -627,6 +627,18 @@ export default function AdminPage() {
     });
   }
 
+  function archivePersonalBet(betId: string) {
+    fetch("/api/bets", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, betId }),
+    }).then((r) => r.json()).then((d) => {
+      if (d.ok) {
+        setBets((prev) => prev.filter((b) => b.id !== betId));
+      }
+    });
+  }
+
   // Bulk one-click fix for the known gap where personal plays need a
   // REGULAR bet loaded for the same tournament before sync's own
   // pending->live promotion ever fires (see lib/seed.ts's
@@ -1067,10 +1079,18 @@ export default function AdminPage() {
               }}
             >
               <span style={{ color: "var(--cream-dim)", fontSize: 14 }}>⠿</span>
-              <span style={{ color: "var(--cream)", fontSize: 12, flex: 1 }}>{b.player} · {b.bet}</span>
+              <span style={{ color: "var(--cream)", fontSize: 12, flex: 1 }}>
+                {b.player} · {b.bet}
+                {b.r && !b.r.includes("TedBeans") && (
+                  <span style={{ color: "var(--gold-bright)", fontSize: 10, marginLeft: 6 }}>{b.r}</span>
+                )}
+              </span>
               {b.hidden && <span className="subline" style={{ margin: 0, fontSize: 10 }}>hidden</span>}
               <button className="recap-btn" style={{ fontSize: 9, padding: "4px 8px" }} onClick={() => togglePersonalHidden(b.id)}>
                 {b.hidden ? "Unhide" : "Hide"}
+              </button>
+              <button className="resume-btn" style={{ fontSize: 9, padding: "4px 8px" }} onClick={() => archivePersonalBet(b.id)}>
+                Archive
               </button>
             </div>
           ))}
