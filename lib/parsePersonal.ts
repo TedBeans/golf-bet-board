@@ -55,7 +55,8 @@ const MAKECUT_RE = /^(.*?)\s+(?:to\s+)?make\s+(?:the\s+)?cut$/i;
 // The **bold** markers from the nightly paste are NOT required here.
 const ROUND_STAT_RE = /^(.*?)\s+(?:Round\s+(\d+)\s+)?(over|under)\s+([\d.]+)(?:\s+(greens?|fairways?|birdies?|bogeys?|pars?))?$/i;
 
-const ODDS_RE = /([+-]\d+)\s*\(\s*([A-Za-z]{2,5})\s*\)/;
+// Matches either "PRICE (BOOK)" or "(BOOK) PRICE" order.
+const ODDS_RE = /([+-]\d+)\s*\(\s*([A-Za-z]{2,5})\s*\)|\(\s*([A-Za-z]{2,5})\s*\)\s*([+-]\d+)/;
 const UNITS_RE = /for\s+([\d.]+)\s*units?/i;
 
 export function parsePersonalText(text: string, forDate: string | undefined, mapping?: Mapping | null): ParsePersonalResult {
@@ -99,8 +100,9 @@ export function parsePersonalText(text: string, forDate: string | undefined, map
 
     const oddsMatch = line.match(ODDS_RE)!;
     const descriptor = line.slice(0, oddsMatch.index).trim();
-    const price = oddsMatch[1];
-    const sportsbook = oddsMatch[2].toUpperCase();
+    // Group 1+2 = "PRICE (BOOK)", group 3+4 = "(BOOK) PRICE"
+    const price = (oddsMatch[1] || oddsMatch[4])!;
+    const sportsbook = (oddsMatch[2] || oddsMatch[3])!.toUpperCase();
     const afterOdds = line.slice((oddsMatch.index ?? 0) + oddsMatch[0].length);
     const unitsMatch = afterOdds.match(UNITS_RE);
     const units = unitsMatch ? unitsMatch[1] : String(defaultUnitsToWinOne(price));
