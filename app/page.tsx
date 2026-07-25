@@ -206,7 +206,18 @@ function LegRow({
     );
   }
 
-  if (ls.status === "live" && ls.bet) {
+  const STAT_LABELS = ["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "WINNER_SCORE"];
+  const isStatBet = STAT_LABELS.includes(parsedLegBet.label);
+
+  // For count/score stat bets, a "live" status from the bet object just means
+  // the bet is actively syncing - but if thru is null/0 the player hasn't
+  // actually started this round yet (e.g. a personal R2 bet being re-used as
+  // a R3 parlay leg before R3 begins). Show TBD in that case, not LIVE.
+  const effectiveStatus = (ls.status === "live" && isStatBet && !ls.bet?.thru)
+    ? "pending"
+    : ls.status;
+
+  if (effectiveStatus === "live" && ls.bet) {
     const badgeClass = ls.bet.personal
       ? legStatusClass(ls.bet)
       : (() => {
@@ -230,8 +241,8 @@ function LegRow({
   return (
     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
       <span style={{ color: "var(--cream-dim)" }}>{subjectSpan} · {betPhraseNode}</span>
-      <span className={ls.status === "hit" ? "tsum win" : ls.status === "miss" ? "tsum loss" : "tsum tbd"}>
-        {ls.status === "hit" ? "WIN" : ls.status === "miss" ? "LOSS" : "TBD"}
+      <span className={effectiveStatus === "hit" ? "tsum win" : effectiveStatus === "miss" ? "tsum loss" : "tsum tbd"}>
+        {effectiveStatus === "hit" ? "WIN" : effectiveStatus === "miss" ? "LOSS" : "TBD"}
       </span>
     </div>
   );

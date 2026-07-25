@@ -1621,21 +1621,19 @@ export default function AdminPage() {
           return { group, groupBets, allDecided, latestDate };
         });
         groupEntries.sort((a, b) => {
-          if (a.allDecided !== b.allDecided) return a.allDecided ? 1 : -1; // still-live/pending groups float to the top
-          return b.latestDate.localeCompare(a.latestDate); // most recently loaded first within each bucket
+          // Sort purely by most-recently-loaded, newest first — no more
+          // "live groups float to top" since everything starts collapsed anyway.
+          return b.latestDate.localeCompare(a.latestDate);
         });
-        const hiddenCount = groupEntries.filter((g) => g.allDecided && !builderGroupOverrides.has(g.group)).length;
 
         return (
           <>
-            {hiddenCount > 0 && (
-              <div className="subline" style={{ marginBottom: 10 }}>
-                {hiddenCount} fully-settled round{hiddenCount === 1 ? "" : "s"} collapsed below - click one to expand it.
-              </div>
-            )}
-            {groupEntries.map(({ group, groupBets, allDecided }) => {
+            {groupEntries.map(({ group, groupBets }) => {
               const hasSelectedLeg = groupBets.some((b) => selectedLegIds.has(b.id));
-              const collapsed = builderGroupOverrides.has(group) ? !allDecided : allDecided && !hasSelectedLeg;
+              // All groups start collapsed. Override flips to open. Exception:
+              // any group with a selected leg is always kept open so you can
+              // see and uncheck your picks.
+              const collapsed = hasSelectedLeg ? false : !builderGroupOverrides.has(group);
               return (
                 <div key={group} className="card" style={{ marginBottom: 10 }}>
                   <div
@@ -1662,6 +1660,11 @@ export default function AdminPage() {
                       {b.personal && (
                         <span style={{ fontSize: 9, color: "var(--gold-bright)", border: "1px solid var(--gold-bright)", borderRadius: 3, padding: "1px 5px" }}>
                           TedBeans
+                        </span>
+                      )}
+                      {b.r && b.r !== group.split(" · ")[1] && (
+                        <span style={{ fontSize: 9, color: "var(--cream-dim)", border: "1px solid var(--line)", borderRadius: 3, padding: "1px 5px" }}>
+                          {b.r}
                         </span>
                       )}
                       <span
