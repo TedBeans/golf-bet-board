@@ -126,6 +126,12 @@ export async function PATCH(req: NextRequest) {
     if (manualStatus !== "hit" && manualStatus !== "miss" && manualStatus !== "push") {
       return NextResponse.json({ error: "manualStatus must be \"hit\", \"miss\", or \"push\"" }, { status: 400 });
     }
+    // Fetch current bet statuses to stamp onto legs
+    const [liveBets, archivedBets] = await Promise.all([
+      redis.get<Bet[]>(BETS_KEY),
+      redis.get<Bet[]>(ARCHIVE_KEY),
+    ]);
+
     const live = (await redis.get<Parlay[]>(PARLAYS_KEY)) || [];
     const idx = live.findIndex((p) => p.id === parlayId);
     if (idx !== -1) {
@@ -133,6 +139,9 @@ export async function PATCH(req: NextRequest) {
       settled.manualStatus = manualStatus;
       settled.status = manualStatus;
       settled.archivedAt = new Date().toISOString();
+      // Stamp each leg's current status so the recap can color-code them
+      const legStatuses = resolveLegStatuses(settled.legs, liveBets || [], archivedBets || []);
+      legStatuses.forEach((ls, i) => { if (settled.legs[i]) settled.legs[i].status = ls.status as any; });
 
       await redis.set(PARLAYS_KEY, live);
       const archived = (await redis.get<Parlay[]>(PARLAY_ARCHIVE_KEY)) || [];
@@ -141,8 +150,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ ok: true, parlay: settled });
     }
 
-    // Not on the live board - see if it's already archived and just needs
-    // correcting in place (nothing to move between lists in that case).
+    // Not on the live board - correct an already-archived parlay in place.
     const archived = (await redis.get<Parlay[]>(PARLAY_ARCHIVE_KEY)) || [];
     const archivedIdx = archived.findIndex((p) => p.id === parlayId);
     if (archivedIdx === -1) {
@@ -150,6 +158,9 @@ export async function PATCH(req: NextRequest) {
     }
     archived[archivedIdx].manualStatus = manualStatus;
     archived[archivedIdx].status = manualStatus;
+    // Re-stamp leg statuses in case they weren't set when first archived
+    const legStatuses2 = resolveLegStatuses(archived[archivedIdx].legs, liveBets || [], archivedBets || []);
+    legStatuses2.forEach((ls, i) => { if (archived[archivedIdx].legs[i]) archived[archivedIdx].legs[i].status = ls.status as any; });
     await redis.set(PARLAY_ARCHIVE_KEY, archived);
     return NextResponse.json({ ok: true, parlay: archived[archivedIdx] });
   }
