@@ -1475,9 +1475,15 @@ export default function AdminPage() {
                 <label style={{ flex: 1, fontSize: 12 }}>
                   Latitude
                   <input
-                    placeholder="53.6329"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="42.3986"
                     value={tm?.latitude ?? ""}
-                    onChange={(e) => updateTourn({ latitude: parseFloat(e.target.value) || undefined })}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "" || v === "-") updateTourn({ latitude: undefined });
+                      else { const n = parseFloat(v); if (!isNaN(n)) updateTourn({ latitude: n }); }
+                    }}
                     style={{
                       width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
                       color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
@@ -1488,9 +1494,15 @@ export default function AdminPage() {
                 <label style={{ flex: 1, fontSize: 12 }}>
                   Longitude
                   <input
-                    placeholder="-3.0323"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="-83.0910"
                     value={tm?.longitude ?? ""}
-                    onChange={(e) => updateTourn({ longitude: parseFloat(e.target.value) || undefined })}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "" || v === "-") updateTourn({ longitude: undefined });
+                      else { const n = parseFloat(v); if (!isNaN(n)) updateTourn({ longitude: n }); }
+                    }}
                     style={{
                       width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
                       color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
