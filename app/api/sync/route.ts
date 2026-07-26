@@ -737,12 +737,15 @@ export async function GET() {
         if (holeRound) {
           const allHoles = [...(holeRound.firstNine?.holes || []), ...(holeRound.secondNine?.holes || [])];
           for (const h of allHoles.filter((h: any) => h.score && h.score !== "-")) {
-            const st = String(h.status || "").toUpperCase();
-            if (["EAGLE", "ALBATROSS", "EAGLES_OR_BETTER", "DOUBLE_EAGLE"].includes(st)) holeEagles++;
-            else if (st === "BIRDIE") holeBirdies++;
-            else if (st === "PAR") holePars++;
-            else if (st === "BOGEY") holeBogeys++;
-            else if (["DOUBLE_BOGEY", "TRIPLE_BOGEY", "OTHER", "DOUBLE_BOGEY_OR_WORSE"].includes(st)) holeDoubleBogeys++;
+            // Use score - par directly rather than the status field — status
+            // strings vary across API versions and can be missing/null, but
+            // score and par are always present and unambiguous.
+            const diff = parseInt(h.score, 10) - (h.par || 0);
+            if (diff <= -2) holeEagles++;
+            else if (diff === -1) holeBirdies++;
+            else if (diff === 0) holePars++;
+            else if (diff === 1) holeBogeys++;
+            else if (diff >= 2) holeDoubleBogeys++;
           }
         }
       }
