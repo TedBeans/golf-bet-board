@@ -727,38 +727,42 @@ export async function GET() {
         updatedCount += 1;
         continue;
       }
-      bet.auto = {
-        thru: effectiveThru,
-        scoreToPar: row.score,
-        birdies: scorecard?.birdies ?? null,
-        bogeys: scorecard?.bogeys ?? null,
-        pars: scorecard?.pars ?? null,
-        eagles: scorecard?.eagles ?? null,
-        doubleBogeys: scorecard?.doubleBogeys ?? null,
-        gir: scorecard?.gir ?? null,
-        fairways: scorecard?.fairways ?? null,
-        updatedAt: new Date().toISOString(),
-      };
-
-      // Compute birdies-or-better and bogeys-or-worse from hole status flags
-      // rather than the stats API aggregate labels - eagle labels vary across
-      // API responses ("Eagles", "Eagle", "Eagles or Better", "Albatross")
-      // causing eagles to sometimes be missed. The hole-by-hole status field
-      // is reliable. holeJson is already fetched above for thru.
-      let holeBirdiesOrBetter: number | null = null;
-      let holeBogeysOrWorse: number | null = null;
+      // Derive all scoring stats from hole-by-hole status flags — always
+      // more current than the aggregate stats section which can lag by
+      // several holes. holeJson is already fetched above for thru.
+      let holeEagles = 0, holeBirdies = 0, holePars = 0, holeBogeys = 0, holeDoubleBogeys = 0;
       if (holeJson) {
         const holeRounds: any[] = (holeJson as any)?.roundScores || [];
         const holeRound = holeRounds.find((r: any) => r.roundNumber === roundNum);
         if (holeRound) {
           const allHoles = [...(holeRound.firstNine?.holes || []), ...(holeRound.secondNine?.holes || [])];
-          const played = allHoles.filter((h: any) => h.score && h.score !== "-");
-          const BIRDIE_STATUSES = ["BIRDIE", "EAGLE", "ALBATROSS", "EAGLES_OR_BETTER", "DOUBLE_EAGLE"];
-          const BOGEY_STATUSES = ["BOGEY", "DOUBLE_BOGEY", "TRIPLE_BOGEY", "OTHER", "DOUBLE_BOGEY_OR_WORSE"];
-          holeBirdiesOrBetter = played.filter((h: any) => BIRDIE_STATUSES.includes(String(h.status || "").toUpperCase())).length;
-          holeBogeysOrWorse = played.filter((h: any) => BOGEY_STATUSES.includes(String(h.status || "").toUpperCase())).length;
+          for (const h of allHoles.filter((h: any) => h.score && h.score !== "-")) {
+            const st = String(h.status || "").toUpperCase();
+            if (["EAGLE", "ALBATROSS", "EAGLES_OR_BETTER", "DOUBLE_EAGLE"].includes(st)) holeEagles++;
+            else if (st === "BIRDIE") holeBirdies++;
+            else if (st === "PAR") holePars++;
+            else if (st === "BOGEY") holeBogeys++;
+            else if (["DOUBLE_BOGEY", "TRIPLE_BOGEY", "OTHER", "DOUBLE_BOGEY_OR_WORSE"].includes(st)) holeDoubleBogeys++;
+          }
         }
       }
+      const holeStatsAvailable = holeJson !== null;
+      const holeBirdiesOrBetter = holeStatsAvailable ? holeBirdies + holeEagles : null;
+      const holeBogeysOrWorse = holeStatsAvailable ? holeBogeys + holeDoubleBogeys : null;
+
+      bet.auto = {
+        thru: effectiveThru,
+        scoreToPar: row.score,
+        // Prefer hole-by-hole counts — more current than aggregate stats section
+        birdies: holeStatsAvailable ? holeBirdies : scorecard?.birdies ?? null,
+        bogeys: holeStatsAvailable ? holeBogeys : scorecard?.bogeys ?? null,
+        pars: holeStatsAvailable ? holePars : scorecard?.pars ?? null,
+        eagles: holeStatsAvailable ? holeEagles : scorecard?.eagles ?? null,
+        doubleBogeys: holeStatsAvailable ? holeDoubleBogeys : scorecard?.doubleBogeys ?? null,
+        gir: scorecard?.gir ?? null,
+        fairways: scorecard?.fairways ?? null,
+        updatedAt: new Date().toISOString(),
+      };
 
       if (parsed.label === "SCORE" && row.score !== null) {
         bet.stat = row.score;
@@ -767,12 +771,11 @@ export async function GET() {
       } else if (parsed.label === "FAIRWAYS" && scorecard?.fairwaysCount !== null && scorecard?.fairwaysCount !== undefined) {
         bet.stat = scorecard.fairwaysCount;
       } else if (parsed.label === "BIRDIES") {
-        // Prefer hole-by-hole status count (catches eagles regardless of label)
         bet.stat = holeBirdiesOrBetter ?? scorecard?.birdiesOrBetter ?? null;
       } else if (parsed.label === "BOGEYS") {
         bet.stat = holeBogeysOrWorse ?? scorecard?.bogeysOrWorse ?? null;
-      } else if (parsed.label === "PARS" && scorecard?.pars !== null && scorecard?.pars !== undefined) {
-        bet.stat = scorecard.pars;
+      } else if (parsed.label === "PARS") {
+        bet.stat = holeStatsAvailable ? holePars : scorecard?.pars ?? null;
       }
 
       // Only progress a bet forward automatically while it's still live -
