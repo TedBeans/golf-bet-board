@@ -475,7 +475,7 @@ export default function AdminPage() {
     const newBet: Bet = {
       id: "b_winner_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
       t: winnerTournament,
-      r: "Tournament Winner",
+      r: "Tournament Score",
       time: "",
       player: "Field",
       bet: phrase,
