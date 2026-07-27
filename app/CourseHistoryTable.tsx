@@ -509,7 +509,8 @@ export default function CourseHistoryTable({ tournamentName }: { tournamentName:
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === 1 ? -1 : 1) as 1 | -1);
-    else { setSortKey(key); setSortDir(key === "name" ? 1 : -1); }
+    // avg and best finish: lower number = better, so ascending on first click
+    else { setSortKey(key); setSortDir((key === "name" || key === "avg" || key === "best") ? 1 : -1); }
   }
 
   const columns: { key: SortKey; label: string }[] = [
