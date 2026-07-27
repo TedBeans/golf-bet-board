@@ -119,7 +119,6 @@ const COURSE_HISTORY: Record<string, [string, number, number, number, number | n
     ["Nick Watney", 2, 1, 100.0, 19, 6, -3.28],
     ["Michael Kim", 3, 3, 75.5, 26, 12, -1.35],
     ["Tom Hoge", 5, 4, 91.0, 44, 18, -1.76],
-    ["Rafael Campos", 3, 1, 100.0, 60, 6, -1.76],
   ],
   "3M Open": [
     ["Tony Finau", 7, 6, 24.9, 1, 26, 1.84],
