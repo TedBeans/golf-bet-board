@@ -14,6 +14,7 @@ import GolfFlagIcon from "./GolfFlagIcon";
 import UpcomingTournamentCard from "./UpcomingTournamentCard";
 import WeatherStrip from "./WeatherStrip";
 import CourseHistoryTable from "./CourseHistoryTable";
+import CourseFactsPanel from "./CourseFactsPanel";
 
 
 const SYNC_INTERVAL_MS = 60000;
@@ -585,6 +586,7 @@ export default function Page() {
                         compact
                       />
                     )}
+                    <CourseFactsPanel tournamentName={tourn} />
                     <CourseHistoryTable tournamentName={tourn} />
                   </div>
                 )}

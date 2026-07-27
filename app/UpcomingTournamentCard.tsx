@@ -2,6 +2,7 @@
 
 import WeatherStrip from "./WeatherStrip";
 import CourseHistoryTable from "./CourseHistoryTable";
+import CourseFactsPanel from "./CourseFactsPanel";
 
 type TournMeta = {
   venue?: string;
@@ -40,6 +41,7 @@ export default function UpcomingTournamentCard({ name, meta }: { name: string; m
         </div>
       )}
 
+      <CourseFactsPanel tournamentName={name} />
       <CourseHistoryTable tournamentName={name} />
     </div>
   );
