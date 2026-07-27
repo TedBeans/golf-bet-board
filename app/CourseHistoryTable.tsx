@@ -587,16 +587,20 @@ export default function CourseHistoryTable({ tournamentName }: { tournamentName:
             {rows.map((r) => {
               const rate = rateOf(r);
               const history = yearHistory[r.name];
+              // Only show year chips if non-null count matches apps count —
+              // silently hides expand for rows with incomplete transcribed data.
+              const nonNull = history ? history.filter((v: any) => v !== null).length : 0;
+              const historyVerified = history && nonNull === r.app;
               const isOpen = openPlayer === r.name;
               return (
                 <Fragment key={r.name}>
                   <tr>
                     <td
-                      onClick={() => history && setOpenPlayer(isOpen ? null : r.name)}
+                      onClick={() => historyVerified && setOpenPlayer(isOpen ? null : r.name)}
                       style={{
                         padding: "6px 10px", borderBottom: isOpen ? "none" : "1px solid var(--line)", color: "var(--cream)", fontWeight: 600, whiteSpace: "nowrap",
-                        cursor: history ? "pointer" : "default",
-                        textDecoration: history ? "underline" : "none", textDecorationStyle: "dotted", textDecorationColor: "var(--cream-dim)",
+                        cursor: historyVerified ? "pointer" : "default",
+                        textDecoration: historyVerified ? "underline" : "none", textDecorationStyle: "dotted", textDecorationColor: "var(--cream-dim)",
                       }}
                     >
                       {r.name}
@@ -618,7 +622,7 @@ export default function CourseHistoryTable({ tournamentName }: { tournamentName:
                       {r.sgAvg > 0 ? "+" : ""}{r.sgAvg.toFixed(2)}
                     </td>
                   </tr>
-                  {isOpen && history && (
+                  {isOpen && historyVerified && (
                     <tr>
                       <td colSpan={8} style={{ padding: "4px 10px 12px", borderBottom: "1px solid var(--line)", background: "rgba(0,0,0,0.15)" }}>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
