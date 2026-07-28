@@ -570,9 +570,6 @@ export default function CourseHistoryTable({ tournamentName }: { tournamentName:
       <div style={{ fontSize: 11, color: "var(--cream-dim)", lineHeight: 1.5, marginBottom: 10, maxWidth: 640 }}>
         Every appearance 2019-2025, reshaped around make-cut rate and finish average - strokes gained kept as a secondary sort.
         Data from Betsperts/Ron Klos.
-        {tournamentName === "Rocket Classic" && (
-          <span style={{ color: "var(--gold-bright)" }}> ⚠ 2026 redesign: par 72 → 70 after $16M Donald Ross restoration with added length and tighter bunkering — historical data has limited predictive value this year.</span>
-        )}
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
