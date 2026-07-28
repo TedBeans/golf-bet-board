@@ -47,7 +47,7 @@ const COURSE_HISTORY: Record<string, [string, number, number, number, number | n
     ["Jason Day", 3, 3, 43.7, 14, 10, 1.33],
     ["Stephan Jaeger", 5, 3, 62.8, 5, 14, 0.93],
     ["Maverick McNealy", 4, 3, 43.3, 21, 14, 0.91],
-    ["Dylan Wu", 3, 3, 44.7, 10, 10, 1.25],
+    ["Dylan Wu", 3, 2, 44.7, 10, 10, 1.25],
     ["Nicolai Hojgaard", 3, 3, 37.0, 21, 12, 0.96],
     ["Jackson Suber", 1, 1, 6.0, 6, 4, 2.68],
     ["Chad Ramey", 4, 2, 60.8, 17, 12, 0.81],
