@@ -89,10 +89,11 @@ export async function PUT(req: NextRequest) {
 // turned out to be a push on the sportsbook's end).
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
-  const { passcode, parlayId, label, manualStatus, reopen } = body as {
+  const { passcode, parlayId, label, oddsPrice, manualStatus, reopen } = body as {
     passcode: string;
     parlayId: string;
     label?: string;
+    oddsPrice?: string;
     manualStatus?: "hit" | "miss" | "push";
     reopen?: boolean;
   };
@@ -165,24 +166,26 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true, parlay: archived[archivedIdx] });
   }
 
-  if (!label?.trim()) {
-    return NextResponse.json({ error: "Missing label or manualStatus" }, { status: 400 });
+  if (!label?.trim() && !oddsPrice?.trim()) {
+    return NextResponse.json({ error: "Missing label, oddsPrice, or manualStatus" }, { status: 400 });
   }
 
   const live = (await redis.get<Parlay[]>(PARLAYS_KEY)) || [];
   const liveMatch = live.find((p) => p.id === parlayId);
   if (liveMatch) {
-    liveMatch.label = label.trim();
+    if (label?.trim()) liveMatch.label = label.trim();
+    if (oddsPrice?.trim()) liveMatch.oddsPrice = oddsPrice.trim();
     await redis.set(PARLAYS_KEY, live);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, parlay: liveMatch });
   }
 
   const archived = (await redis.get<Parlay[]>(PARLAY_ARCHIVE_KEY)) || [];
   const archivedMatch = archived.find((p) => p.id === parlayId);
   if (archivedMatch) {
-    archivedMatch.label = label.trim();
+    if (label?.trim()) archivedMatch.label = label.trim();
+    if (oddsPrice?.trim()) archivedMatch.oddsPrice = oddsPrice.trim();
     await redis.set(PARLAY_ARCHIVE_KEY, archived);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, parlay: archivedMatch });
   }
 
   return NextResponse.json({ error: "Parlay not found" }, { status: 404 });

@@ -90,6 +90,7 @@ export default function AdminPage() {
   const [parlayArchiveList, setParlayArchiveList] = useState<Parlay[]>([]);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [renameOdds, setRenameOdds] = useState("");
 
   const [selectedLegIds, setSelectedLegIds] = useState<Set<string>>(new Set());
   // Groups (tournament+round) the user has manually clicked open/closed,
@@ -291,21 +292,23 @@ export default function AdminPage() {
   function startRename(p: Parlay) {
     setRenamingId(p.id);
     setRenameValue(p.label);
+    setRenameOdds(p.oddsPrice);
   }
 
   function saveRename(parlayId: string) {
     const label = renameValue.trim();
-    if (!label) return;
+    const oddsPrice = renameOdds.trim();
+    if (!label || !oddsPrice) return;
     fetch("/api/parlays", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ passcode, parlayId, label }),
+      body: JSON.stringify({ passcode, parlayId, label, oddsPrice }),
     }).then((r) => r.json()).then((d) => {
       if (d.ok) {
-        setLiveParlays((prev) => prev.map((p) => (p.id === parlayId ? { ...p, label } : p)));
-        setParlayArchiveList((prev) => prev.map((p) => (p.id === parlayId ? { ...p, label } : p)));
+        setLiveParlays((prev) => prev.map((p) => (p.id === parlayId ? { ...p, label, oddsPrice } : p)));
+        setParlayArchiveList((prev) => prev.map((p) => (p.id === parlayId ? { ...p, label, oddsPrice } : p)));
       } else {
-        setParlayMsg(d.error || "Rename failed.");
+        setParlayMsg(d.error || "Save failed.");
         setTimeout(() => setParlayMsg(""), 3000);
       }
       setRenamingId(null);
@@ -1784,43 +1787,57 @@ export default function AdminPage() {
 
       {(liveParlays.length > 0 || parlayArchiveList.length > 0) && (
         <>
-          <div className="round-label">All parlays (tap a name to rename it)</div>
+          <div className="round-label">All parlays (tap name or odds to edit)</div>
           {[...liveParlays, ...parlayArchiveList].map((p) => {
             return (
             <div key={p.id} className="card" style={{ marginBottom: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {renamingId === p.id ? (
+              <div style={{ minWidth: 0 }}>
+                {renamingId === p.id ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && saveRename(p.id)}
+                      placeholder="Label"
+                      style={{
+                        width: "100%", background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                        color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                        padding: "8px 10px", borderRadius: 3,
+                      }}
+                    />
                     <div style={{ display: "flex", gap: 6 }}>
                       <input
-                        autoFocus
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
+                        value={renameOdds}
+                        onChange={(e) => setRenameOdds(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && saveRename(p.id)}
+                        placeholder="Odds (e.g. +1486)"
                         style={{
-                          flex: 1, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                          flex: 1, minWidth: 0, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
                           color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
-                          padding: "6px 8px", borderRadius: 3,
+                          padding: "8px 10px", borderRadius: 3,
                         }}
                       />
-                      <button className="add-btn-inline" onClick={() => saveRename(p.id)}>Save</button>
+                      <button className="add-btn-inline" style={{ flexShrink: 0 }} onClick={() => saveRename(p.id)}>Save</button>
                     </div>
-                  ) : (
-                    <div className="player" style={{ fontSize: 13, cursor: "pointer" }} onClick={() => startRename(p)}>
-                      {p.label} · {p.oddsPrice} · {p.wagerUnits}u
-                    </div>
-                  )}
-                  <div className="subline" style={{ marginTop: 4 }}>
-                    {p.legs.length} legs · {p.loadedDate} · {p.status === "hit" ? "WIN" : p.status === "miss" ? "LOSS" : p.status === "push" ? "HALF WIN" : "open"}
                   </div>
+                ) : (
+                  <div className="player" style={{ fontSize: 13, cursor: "pointer" }} onClick={() => startRename(p)}>
+                    {p.label} · {p.oddsPrice} · {p.wagerUnits}u
+                  </div>
+                )}
+                <div className="subline" style={{ marginTop: 4 }}>
+                  {p.legs.length} legs · {p.loadedDate} · {p.status === "hit" ? "WIN" : p.status === "miss" ? "LOSS" : p.status === "push" ? "HALF WIN" : "open"}
                 </div>
-                <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              </div>
+              <div className="parlay-btn-row">
+                <div className="parlay-status-btns">
                   <button className="sbtn live" onClick={() => reopenParlay(p)}>IN PROGRESS</button>
                   <button className="sbtn win" onClick={() => settleParlay(p, "hit")}>WIN</button>
                   <button className="sbtn tbd" onClick={() => settleParlay(p, "push")}>HALF WIN</button>
                   <button className="sbtn loss" onClick={() => settleParlay(p, "miss")}>LOSS</button>
-                  <button className="resume-btn" style={{ fontSize: 10 }} onClick={() => deleteParlay(p)}>DELETE</button>
                 </div>
+                <button className="resume-btn parlay-delete-btn" onClick={() => deleteParlay(p)}>DELETE</button>
               </div>
             </div>
             );
