@@ -53,9 +53,10 @@ export async function GET() {
   }
   await redis.set(SYNC_LOCK_KEY, now);
 
-  const [bets, mapping] = await Promise.all([
+  const [bets, mapping, archivedBetsForStartCheck] = await Promise.all([
     redis.get<Bet[]>(BETS_KEY),
     redis.get<Mapping>(MAPPING_KEY),
+    redis.get<Bet[]>(ARCHIVE_KEY),
   ]);
 
   if (!bets || !mapping) {
@@ -273,12 +274,16 @@ export async function GET() {
     // This also self-corrects the other direction: a personal bet already
     // sitting at "live" (from before this gate existed, or from manually
     // clicking IN PROGRESS) gets reset to TBD if the tournament genuinely
-    // hasn't started yet. That's a one-time fix for anything created before
-    // this logic shipped - but it means a deliberate early "IN PROGRESS"
-    // click won't stick until the real gate fires either. Never touches a
-    // bet you've already settled by hand (hit/miss), only pending/live.
+    // hasn't started yet. "Started" checks both the live bets array and
+    // the archive - a tournament's Round 1 bets get archived once Round 1
+    // wraps, and Round 2's bets often aren't pasted in yet for a while
+    // after that, so checking live bets alone would make it look like the
+    // tournament "hadn't started" and wrongly flip Make Cut/Top N plays
+    // back to TBD mid-tournament. Never touches a bet you've already
+    // settled by hand (hit/miss), only pending/live.
     if (bet.personal && (bet.status === "pending" || bet.status === "live")) {
-      const started = bets.some((b) => b.t === bet.t && !b.personal && b.status !== "pending");
+      const started = bets.some((b) => b.t === bet.t && !b.personal && b.status !== "pending")
+        || (archivedBetsForStartCheck || []).some((b) => b.t === bet.t && !b.personal);
       if (started && bet.status === "pending") {
         bet.status = "live";
         updatedCount += 1;
