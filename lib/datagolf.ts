@@ -383,8 +383,10 @@ function collectCutlineCandidates(node: any, path: string, depth: number, out: C
   }
 }
 
+import { normalizeName } from "./nameNorm";
+
 function norm(s: string): string {
-  return s.toLowerCase().replace(/\./g, "").trim();
+  return normalizeName(s);
 }
 
 // Same exact/last-name/prefix/substring matching strategy as

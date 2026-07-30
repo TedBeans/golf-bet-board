@@ -1,3 +1,5 @@
+import { normalizeName } from "./nameNorm";
+
 export type PgaPlayerRow = {
   id: string;
   displayName: string;
@@ -48,8 +50,9 @@ export function findLeader(players: PgaPlayerRow[]): PgaPlayerRow | null {
   return withTotal.reduce((best, p) => ((p.total as number) < (best.total as number) ? p : best));
 }
 
+
 function norm(s: string): string {
-  return s.toLowerCase().replace(/\./g, "").trim();
+  return normalizeName(s);
 }
 
 // Matches a bet's free-text player name (e.g. "Koivun", "Chan Kim", "Matt

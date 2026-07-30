@@ -69,8 +69,10 @@ export function findTheOpenLeader(players: TheOpenPlayerRow[]): TheOpenPlayerRow
   return withSort.reduce((best, p) => ((p.sortValue as number) < (best.sortValue as number) ? p : best));
 }
 
+import { normalizeName } from "./nameNorm";
+
 function norm(s: string): string {
-  return s.toLowerCase().replace(/\./g, "").trim();
+  return normalizeName(s);
 }
 
 // Same matching strategy as pgaMatch.ts's findPlayerMatch: exact full-name

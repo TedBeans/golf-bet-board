@@ -19,8 +19,10 @@ export function extractOpenPlayers(traditionalJson: any): OpenPlayerRow[] {
   }));
 }
 
+import { normalizeName } from "./nameNorm";
+
 function norm(s: string): string {
-  return s.toLowerCase().replace(/\./g, "").trim();
+  return normalizeName(s);
 }
 
 // Same matching strategy as lib/pgaMatch.ts's findPlayerMatch (exact, then
