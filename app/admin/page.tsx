@@ -277,8 +277,13 @@ export default function AdminPage() {
   // Every bet currently visible for parlay-building, whether it's still
   // live on the board or already resolved and archived - a leg from an
   // already-decided round (like the ISCO example) still needs to show up
-  // here so past-dated parlays can reference it.
-  const pickableBets = [...bets, ...archive];
+  // here so past-dated parlays can reference it. But once a tournament has
+  // no live bets left at all (fully wrapped and archived), its old rounds
+  // just clutter this list with events that are long over - so archived
+  // bets only carry over for tournaments that still have at least one
+  // live bet somewhere on the board.
+  const liveTournaments = new Set(bets.map((b) => b.t));
+  const pickableBets = [...bets, ...archive.filter((b) => liveTournaments.has(b.t))];
 
   function toggleLeg(betId: string) {
     setSelectedLegIds((prev) => {
