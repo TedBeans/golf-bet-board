@@ -35,13 +35,13 @@ function legLiveDetail(bet: Bet): string {
   if (p.label === "TOP_N" || p.label === "WINNER") {
     const thru = bet.auto?.thru ?? null;
     const score = formatScore(bet.auto?.scoreToPar ?? null);
-    const thruLabel = thru === null ? "—" : thru % 18 === 0 ? `${thru} (F)` : `${thru}`;
+    const thruLabel = thru === null || thru === 0 ? "—" : thru === 18 ? `${thru} (F)` : `${thru}`;
     return `${bet.auto?.position ?? "—"} · ${score} thru ${thruLabel}`;
   }
   if (p.label === "MAKE_CUT") {
     const thru = bet.auto?.thru ?? null;
     const score = formatScore(bet.auto?.scoreToPar ?? null);
-    const thruLabel = thru === null ? "—" : thru % 18 === 0 ? `${thru} (F)` : `${thru}`;
+    const thruLabel = thru === null || thru === 0 ? "—" : thru === 18 ? `${thru} (F)` : `${thru}`;
     return `${bet.auto?.position ?? "—"} · ${score} thru ${thruLabel}`;
   }
   if (p.label === "H2H" || p.label === "TIE") {
