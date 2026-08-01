@@ -841,9 +841,8 @@ export async function GET() {
   // against the live bets (post-sync) and the bet archive (which may have
   // just grown above), then file away any parlay that's now fully decided.
   const liveParlays = (await redis.get<Parlay[]>(PARLAYS_KEY)) || [];
+  const archiveForLegs = (await redis.get<Bet[]>(ARCHIVE_KEY)) || [];
   if (liveParlays.length > 0) {
-    const archiveForLegs = (await redis.get<Bet[]>(ARCHIVE_KEY)) || [];
-
     const stillOpen: Parlay[] = [];
     const nowDecided: Parlay[] = [];
     for (const p of liveParlays) {
@@ -870,6 +869,35 @@ export async function GET() {
     }
     await redis.set(PARLAYS_KEY, stillOpen);
   }
+
+  // A parlay's overall result locks in the instant any single leg is a
+  // confirmed loss - that's correct grading, a parlay doesn't need every
+  // leg to finish once one has already sunk it - but that also archives
+  // the parlay right then, and only still-open parlays get their legs
+  // re-checked above. Any leg that was still "live"/"pending" at that
+  // exact moment would otherwise be frozen there forever, permanently
+  // understating the X/Y legs counter in the recap even though that leg
+  // went on to actually win or lose. So keep re-resolving legs for
+  // already-archived parlays too, on every sync, until every leg has
+  // reached a final hit/miss/push - without touching the parlay's own
+  // already-decided overall status.
+  const archivedParlays = (await redis.get<Parlay[]>(PARLAY_ARCHIVE_KEY)) || [];
+  let archivedParlaysChanged = false;
+  for (const p of archivedParlays) {
+    const stillUnresolved = p.legs.some((l) => l.status !== "hit" && l.status !== "miss" && l.status !== "push");
+    if (!stillUnresolved) continue;
+    const legStatuses = resolveLegStatuses(p.legs, finalBets, archiveForLegs);
+    legStatuses.forEach((ls, i) => {
+      if (p.legs[i] && p.legs[i].status !== ls.status) {
+        p.legs[i].status = ls.status as any;
+        archivedParlaysChanged = true;
+      }
+    });
+  }
+  if (archivedParlaysChanged) {
+    await redis.set(PARLAY_ARCHIVE_KEY, archivedParlays);
+  }
+
 
   return noCacheJson({ ok: true, updated: updatedCount, archived: archivedCount, errors });
 }
