@@ -89,6 +89,13 @@ export default function AdminPage() {
   const [liveParlays, setLiveParlays] = useState<Parlay[]>([]);
   const [parlayArchiveList, setParlayArchiveList] = useState<Parlay[]>([]);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  // Lat/lng inputs need to track the raw string the person is typing,
+  // separately from the committed number - binding the input's value
+  // straight to the parsed number means typing "36." immediately snaps
+  // back to "36" on re-render (parseFloat("36.") === 36), silently
+  // eating the decimal point and making it impossible to type past a
+  // whole number or type a fresh negative sign.
+  const [coordDrafts, setCoordDrafts] = useState<Record<string, string>>({});
   const [renameValue, setRenameValue] = useState("");
   const [renameOdds, setRenameOdds] = useState("");
 
@@ -1528,11 +1535,13 @@ export default function AdminPage() {
                     type="text"
                     inputMode="decimal"
                     placeholder="42.3986"
-                    value={tm?.latitude ?? ""}
+                    value={coordDrafts[`${tourn}:lat`] ?? (tm?.latitude ?? "")}
                     onChange={(e) => {
                       const v = e.target.value;
-                      if (v === "" || v === "-") updateTourn({ latitude: undefined });
-                      else { const n = parseFloat(v); if (!isNaN(n)) updateTourn({ latitude: n }); }
+                      setCoordDrafts((prev) => ({ ...prev, [`${tourn}:lat`]: v }));
+                      if (v === "" || v === "-") { updateTourn({ latitude: undefined }); return; }
+                      const n = parseFloat(v);
+                      if (!isNaN(n)) updateTourn({ latitude: n });
                     }}
                     style={{
                       width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
@@ -1547,11 +1556,13 @@ export default function AdminPage() {
                     type="text"
                     inputMode="decimal"
                     placeholder="-83.0910"
-                    value={tm?.longitude ?? ""}
+                    value={coordDrafts[`${tourn}:lng`] ?? (tm?.longitude ?? "")}
                     onChange={(e) => {
                       const v = e.target.value;
-                      if (v === "" || v === "-") updateTourn({ longitude: undefined });
-                      else { const n = parseFloat(v); if (!isNaN(n)) updateTourn({ longitude: n }); }
+                      setCoordDrafts((prev) => ({ ...prev, [`${tourn}:lng`]: v }));
+                      if (v === "" || v === "-") { updateTourn({ longitude: undefined }); return; }
+                      const n = parseFloat(v);
+                      if (!isNaN(n)) updateTourn({ longitude: n });
                     }}
                     style={{
                       width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
