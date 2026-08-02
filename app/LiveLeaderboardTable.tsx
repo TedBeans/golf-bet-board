@@ -91,7 +91,7 @@ export default function LiveLeaderboardTable({ tournamentName }: { tournamentNam
         <span style={{ fontSize: 10, color: "var(--cream-dim)", marginLeft: "auto" }}>{filtered.length} players</span>
       </div>
 
-      <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 6, background: "rgba(0,0,0,0.15)", maxHeight: 420 }}>
+      <div style={{ border: "1px solid var(--line)", borderRadius: 6, background: "rgba(0,0,0,0.15)" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "'JetBrains Mono',monospace" }}>
           <thead>
             <tr>
@@ -104,7 +104,6 @@ export default function LiveLeaderboardTable({ tournamentName }: { tournamentNam
                     color: "var(--cream-dim)",
                     fontWeight: 600, letterSpacing: "0.03em", textTransform: "uppercase", fontSize: 10,
                     whiteSpace: "nowrap", borderBottom: "1px solid var(--line)",
-                    position: "sticky", top: 0,
                   }}
                 >
                   {label}
