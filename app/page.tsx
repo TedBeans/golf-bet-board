@@ -553,10 +553,15 @@ export default function Page() {
           // table stops being useful and the live leaderboard takes its place.
           // Checks the archive too, so this stays true across the entire
           // tournament rather than flipping back once a round's bets archive
-          // and the next round's haven't been pasted in yet.
+          // and the next round's haven't been pasted in yet. A manual admin
+          // override (Tournaments tab -> "Force leaderboard live") can also
+          // force this on for 24h, for whenever the automatic check hasn't
+          // caught up yet.
+          const overrideActive = !!tm?.leaderboardLiveUntil && new Date(tm.leaderboardLiveUntil) > new Date();
           const tournamentStarted =
-            tournBets.some((b) => !b.personal && b.status !== "pending") ||
-            archive.some((b) => b.t === tourn && !b.personal);
+            overrideActive ||
+            tournBets.some((b) => b.status !== "pending") ||
+            archive.some((b) => b.t === tourn);
           return (
           <div className="tourn" key={tourn}>
             <div className="tourn-head">

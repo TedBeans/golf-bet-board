@@ -468,6 +468,30 @@ export default function AdminPage() {
     });
   }
 
+  // Builds and posts the patched mapping directly, rather than calling
+  // setMapping (updateTourn) followed by saveMapping - those are two
+  // separate state updates, and saveMapping would otherwise read the
+  // mapping from a stale closure before React re-renders with the change.
+  function forceLeaderboardLive(tourn: string) {
+    const until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const nextMapping: Mapping = {
+      ...mapping,
+      tournaments: {
+        ...mapping.tournaments,
+        [tourn]: { ...mapping.tournaments[tourn], pgaId: mapping.tournaments[tourn]?.pgaId || "", leaderboardLiveUntil: until },
+      },
+    };
+    setMapping(nextMapping);
+    fetch("/api/mapping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, mapping: nextMapping }),
+    }).then((r) => {
+      setSaveMsg(r.ok ? `Leaderboard forced live for ${tourn} for the next 24h.` : "Save failed - check passcode.");
+      setTimeout(() => setSaveMsg(""), 4000);
+    });
+  }
+
   function submitWinnerBet() {
     const strokes = parseFloat(winnerStrokes);
     const coursePar = parseFloat(winnerCoursePar);
@@ -1354,6 +1378,24 @@ export default function AdminPage() {
                 Only switch this if PGA Tour's feed comes back empty for a tournament. On theopen.com, GIR bets won't auto-grade (check /api/debug-open first).
               </span>
             </label>
+            <div style={{ marginTop: 10 }}>
+              {tm?.leaderboardLiveUntil && new Date(tm.leaderboardLiveUntil) > new Date() ? (
+                <span className="subline" style={{ display: "block" }}>
+                  Leaderboard forced live until {new Date(tm.leaderboardLiveUntil).toLocaleString()}.
+                </span>
+              ) : (
+                <button
+                  className="add-btn-inline"
+                  onClick={() => forceLeaderboardLive(tourn)}
+                >
+                  Force leaderboard live (24h)
+                </button>
+              )}
+              <span className="subline" style={{ display: "block", marginTop: 4 }}>
+                Normally the live leaderboard swaps in for course history on its own once a
+                regular bet for this tournament goes live. Use this if that hasn't caught up yet.
+              </span>
+            </div>
             <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
               Dates (for the recap page, e.g. "July 9-12, 2026")
               <input

@@ -30,6 +30,11 @@ export type Mapping = {
                          // player's round 2 is fully finished; leave unset before the cut happens
                          // (nothing grades until it's set, same as any other bet missing a required input).
       courseType?: "parkland" | "links" | "desert" | "other"; // for filtering in the Analysis page
+      leaderboardLiveUntil?: string; // ISO timestamp - manual override that forces the live
+                                      // leaderboard to show (instead of course history) until this
+                                      // time, regardless of what the automatic "has this tournament
+                                      // started" bet-status check says. A one-click escape hatch for
+                                      // whenever that automatic check hasn't caught up yet.
     };
   };
 };
