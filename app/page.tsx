@@ -532,7 +532,18 @@ export default function Page() {
             </div>
             {Object.entries(mapping.tournaments)
               .filter(([, tm]) => tm.upcoming)
-              .map(([name, tm]) => <UpcomingTournamentCard key={name} name={name} meta={tm} />)}
+              .map(([name, tm]) => {
+                // Same signal used for the other rendering path (the one that
+                // takes over once this tournament has live bets of its own) -
+                // a tournament can sit in this "upcoming" list with zero live
+                // bets between rounds (everything archived, next round not
+                // pasted in yet) while still very much being underway, so
+                // check the archive and the manual override here too rather
+                // than assuming "upcoming" means "hasn't started".
+                const overrideActive = !!tm.leaderboardLiveUntil && new Date(tm.leaderboardLiveUntil) > new Date();
+                const showLeaderboard = overrideActive || archive.some((b) => b.t === name);
+                return <UpcomingTournamentCard key={name} name={name} meta={tm} showLeaderboard={showLeaderboard} />;
+              })}
           </>
         )}
 

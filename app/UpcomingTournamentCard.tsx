@@ -3,6 +3,7 @@
 import WeatherStrip from "./WeatherStrip";
 import CourseHistoryTable from "./CourseHistoryTable";
 import CourseFactsPanel from "./CourseFactsPanel";
+import LiveLeaderboardTable from "./LiveLeaderboardTable";
 
 type TournMeta = {
   venue?: string;
@@ -15,7 +16,7 @@ type TournMeta = {
   notes?: string;
 };
 
-export default function UpcomingTournamentCard({ name, meta }: { name: string; meta: TournMeta }) {
+export default function UpcomingTournamentCard({ name, meta, showLeaderboard }: { name: string; meta: TournMeta; showLeaderboard?: boolean }) {
   return (
     <div className="card live" style={{ marginBottom: 12, padding: "16px 18px 18px" }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
@@ -42,7 +43,11 @@ export default function UpcomingTournamentCard({ name, meta }: { name: string; m
       )}
 
       <CourseFactsPanel tournamentName={name} />
-      <CourseHistoryTable tournamentName={name} />
+      {showLeaderboard ? (
+        <LiveLeaderboardTable tournamentName={name} />
+      ) : (
+        <CourseHistoryTable tournamentName={name} />
+      )}
     </div>
   );
 }
