@@ -96,6 +96,39 @@ export function extractScorecardStats(json: any, roundNumber: number): Scorecard
   };
 }
 
+export type HoleScoreSummary = {
+  thru: number;
+  birdies: number;
+  eagles: number;
+  pars: number;
+  bogeys: number;
+  doubleBogeys: number;
+  birdiesOrBetter: number;
+  bogeysOrWorse: number;
+};
+
+// Same score-minus-par derivation used for grading (never the aggregate
+// stats section, which can lag or use inconsistent labels across API
+// versions) - just applied to an already-extracted HoleScorecard so the
+// leaderboard drill-down can reuse the exact hole data it already fetched
+// for the visual scorecard grid, instead of re-parsing the raw JSON a
+// second time.
+export function summarizeHoleScores(scorecard: HoleScorecard): HoleScoreSummary {
+  const allHoles = [...scorecard.firstNine, ...scorecard.secondNine];
+  let birdies = 0, eagles = 0, pars = 0, bogeys = 0, doubleBogeys = 0, thru = 0;
+  for (const h of allHoles) {
+    if (h.score === null) continue;
+    thru += 1;
+    const diff = h.score - h.par;
+    if (diff <= -2) eagles++;
+    else if (diff === -1) birdies++;
+    else if (diff === 0) pars++;
+    else if (diff === 1) bogeys++;
+    else doubleBogeys++;
+  }
+  return { thru, birdies, eagles, pars, bogeys, doubleBogeys, birdiesOrBetter: birdies + eagles, bogeysOrWorse: bogeys + doubleBogeys };
+}
+
 export function roundNumberFromLabel(label: string): number {
   const m = (label || "").match(/(\d+)/);
   return m ? parseInt(m[1], 10) : 1;

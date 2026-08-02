@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { redis, MAPPING_KEY } from "../../../lib/redis";
 import { Mapping } from "../../../lib/mapping";
-import { fetchPgaLeaderboard, fetchPlayerHoleScores } from "../../../lib/pgatour";
+import { fetchPgaLeaderboard, fetchPlayerHoleScores, fetchPlayerScorecardStats } from "../../../lib/pgatour";
 import { extractPlayers, findPlayerMatch } from "../../../lib/pgaMatch";
-import { extractHoleScores, roundNumberFromLabel } from "../../../lib/pgaScorecard";
+import { extractHoleScores, extractScorecardStats, summarizeHoleScores, roundNumberFromLabel } from "../../../lib/pgaScorecard";
 import { fetchOpenLeaderboard } from "../../../lib/theopen";
 import { extractOpenPlayers, findOpenPlayerMatch, extractOpenHoleScorecard, computeOpenStats } from "../../../lib/openMatch";
 import { computePositions, PositionEntry } from "../../../lib/positions";
@@ -61,7 +61,20 @@ export async function GET(req: NextRequest) {
           message: `No scorecard found for ${row.displayName} in ${round} yet.`,
         });
       }
-      return NextResponse.json({ available: true, player: row.displayName, position, totalToPar, scorecard });
+      const roundStats = computeOpenStats(row, roundNum);
+      const summary = {
+        thru: roundStats.thru ?? roundStats.holesPlayed,
+        birdies: roundStats.birdies,
+        eagles: roundStats.eagles,
+        pars: roundStats.pars,
+        bogeys: roundStats.bogeys,
+        doubleBogeys: roundStats.doubleBogeys,
+        birdiesOrBetter: roundStats.birdiesOrBetter,
+        bogeysOrWorse: roundStats.bogeysOrWorse,
+        gir: null, // not derivable from theopen.com's traditional feed
+        fairways: null,
+      };
+      return NextResponse.json({ available: true, player: row.displayName, position, totalToPar, scorecard, summary });
     } catch (e: any) {
       return NextResponse.json({ error: e.message || "Failed to load scorecard" }, { status: 500 });
     }
@@ -98,7 +111,24 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ available: true, player: row.displayName, position, totalToPar, scorecard });
+    // GIR/driving accuracy aren't derivable from hole-by-hole strokes vs
+    // par alone, so those two still come from the aggregate stats call -
+    // everything else (birdies/pars/bogeys/etc) is derived fresh from the
+    // hole data already fetched above, same as grading does.
+    let gir: string | null = null;
+    let fairways: string | null = null;
+    try {
+      const statsJson = await fetchPlayerScorecardStats(tournamentId, row.id);
+      const stats = extractScorecardStats(statsJson, roundNum);
+      gir = stats?.gir ?? null;
+      fairways = stats?.fairways ?? null;
+    } catch {
+      // GIR/fairways just won't be shown this round - not worth failing
+      // the whole scorecard over a secondary stat.
+    }
+    const summary = { ...summarizeHoleScores(scorecard), gir, fairways };
+
+    return NextResponse.json({ available: true, player: row.displayName, position, totalToPar, scorecard, summary });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Failed to load scorecard" }, { status: 500 });
   }

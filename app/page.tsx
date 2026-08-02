@@ -15,6 +15,7 @@ import UpcomingTournamentCard from "./UpcomingTournamentCard";
 import WeatherStrip from "./WeatherStrip";
 import CourseHistoryTable from "./CourseHistoryTable";
 import CourseFactsPanel from "./CourseFactsPanel";
+import LiveLeaderboardTable from "./LiveLeaderboardTable";
 
 
 const SYNC_INTERVAL_MS = 60000;
@@ -315,7 +316,7 @@ export default function Page() {
   const [liveParlays, setLiveParlays] = useState<Parlay[]>([]);
   const [expandedWeather, setExpandedWeather] = useState<Set<string>>(new Set());
   const [cutlineProbs, setCutlineProbs] = useState<{ score: number; prob: number }[]>([]);
-  const [scorecardModal, setScorecardModal] = useState<{ betId: string; tournament: string; round: string; player: string; loading: boolean; scorecard: any | null; position?: string | null; totalToPar?: number | null; message?: string } | null>(null);
+  const [scorecardModal, setScorecardModal] = useState<{ betId: string; tournament: string; round: string; player: string; loading: boolean; scorecard: any | null; position?: string | null; totalToPar?: number | null; message?: string; summary?: any } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function openScorecard(betId: string, tourn: string, round: string, player: string) {
@@ -337,6 +338,7 @@ export default function Page() {
           position: d.position ?? null,
           totalToPar: d.totalToPar ?? null,
           message: d.message || d.error,
+          summary: d.summary ?? null,
         });
       })
       .catch(() => setScorecardModal({ betId, tournament: tourn, round, player, loading: false, scorecard: null, message: "Couldn't load scorecard." }));
@@ -545,6 +547,16 @@ export default function Page() {
           const hasCourseHistory = !!tm; // CourseHistoryTable renders null if no data for this tournament
           const showWeatherSection = hasCoords || hasCourseHistory;
           const weatherOpen = expandedWeather.has(tourn);
+          // Same "has this tournament actually teed off" check used server-side
+          // for promoting personal plays out of TBD - once any regular bet for
+          // this tournament has gone live (or further), the course-history
+          // table stops being useful and the live leaderboard takes its place.
+          // Checks the archive too, so this stays true across the entire
+          // tournament rather than flipping back once a round's bets archive
+          // and the next round's haven't been pasted in yet.
+          const tournamentStarted =
+            tournBets.some((b) => !b.personal && b.status !== "pending") ||
+            archive.some((b) => b.t === tourn && !b.personal);
           return (
           <div className="tourn" key={tourn}>
             <div className="tourn-head">
@@ -573,7 +585,7 @@ export default function Page() {
                     })
                   }
                 >
-                  Weather + Course History {weatherOpen ? "▾" : "▸"}
+                  Weather + {tournamentStarted ? "Leaderboard" : "Course History"} {weatherOpen ? "▾" : "▸"}
                 </span>
                 {weatherOpen && (
                   <div style={{ marginTop: 8 }}>
@@ -587,7 +599,11 @@ export default function Page() {
                       />
                     )}
                     <CourseFactsPanel tournamentName={tourn} />
-                    <CourseHistoryTable tournamentName={tourn} />
+                    {tournamentStarted ? (
+                      <LiveLeaderboardTable tournamentName={tourn} />
+                    ) : (
+                      <CourseHistoryTable tournamentName={tourn} />
+                    )}
                   </div>
                 )}
               </div>

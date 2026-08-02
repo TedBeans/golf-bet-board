@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 
 type Hole = { hole: number; par: number; score: number | null; status?: string | null };
 type Scorecard = { firstNine: Hole[]; firstNineLabel: string; secondNine: Hole[]; secondNineLabel: string };
+type RoundSummary = {
+  thru: number; birdies: number; eagles: number; pars: number; bogeys: number;
+  doubleBogeys: number; birdiesOrBetter: number; bogeysOrWorse: number;
+  gir: string | null; fairways: string | null;
+} | null;
 
 function symbolClass(h: Hole): string {
   if (h.score === null || !h.status) return "par";
@@ -36,6 +41,29 @@ function formatToPar(n: number | null | undefined): string {
 
 function nineTotal(holes: Hole[]): number | null {
   return holes.every((h) => h.score !== null) ? holes.reduce((s, h) => s + (h.score ?? 0), 0) : null;
+}
+
+function StatChip({ label, value }: { label: string; value: string | number | null }) {
+  if (value === null || value === undefined) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 40 }}>
+      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace" }}>{value}</span>
+      <span style={{ fontSize: 8, color: "var(--cream-dim)", letterSpacing: "0.04em", textTransform: "uppercase" }}>{label}</span>
+    </div>
+  );
+}
+
+function RoundSummaryRow({ summary }: { summary: RoundSummary }) {
+  if (!summary) return null;
+  return (
+    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", padding: "8px 2px", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", marginBottom: 8 }}>
+      <StatChip label="Birdies+" value={summary.birdiesOrBetter} />
+      <StatChip label="Pars" value={summary.pars} />
+      <StatChip label="Bogeys+" value={summary.bogeysOrWorse} />
+      <StatChip label="GIR" value={summary.gir} />
+      <StatChip label="Fairways" value={summary.fairways} />
+    </div>
+  );
 }
 
 // Pulls the leading digit out of a round label ("Round 2" -> 2). Falls
@@ -80,6 +108,7 @@ export default function HoleScorecardModal({
   position,
   totalToPar,
   message,
+  summary,
   onClose,
 }: {
   player: string;
@@ -90,6 +119,7 @@ export default function HoleScorecardModal({
   position?: string | null;
   totalToPar?: number | null;
   message?: string;
+  summary?: RoundSummary;
   onClose: () => void;
 }) {
   const hasStandings = (position !== undefined && position !== null) || (totalToPar !== undefined && totalToPar !== null);
@@ -101,7 +131,7 @@ export default function HoleScorecardModal({
   // null, the modal just shows whatever the parent already fetched
   // (scorecard/loading/message props), avoiding a redundant refetch of the
   // round it opened with.
-  const [override, setOverride] = useState<{ loading: boolean; scorecard: Scorecard | null; message?: string } | null>(null);
+  const [override, setOverride] = useState<{ loading: boolean; scorecard: Scorecard | null; message?: string; summary?: RoundSummary } | null>(null);
 
   // A fresh player/tournament/round was opened (not just a tab click on the
   // same popover) - reset back to that bet's own current round rather than
@@ -121,13 +151,14 @@ export default function HoleScorecardModal({
     setOverride({ loading: true, scorecard: null });
     fetch(`/api/scorecard?tournament=${encodeURIComponent(tournament)}&round=${encodeURIComponent(`Round ${n}`)}&player=${encodeURIComponent(player)}`)
       .then((r) => r.json())
-      .then((d) => setOverride({ loading: false, scorecard: d.scorecard || null, message: d.message || d.error }))
+      .then((d) => setOverride({ loading: false, scorecard: d.scorecard || null, message: d.message || d.error, summary: d.summary ?? null }))
       .catch(() => setOverride({ loading: false, scorecard: null, message: "Couldn't load scorecard." }));
   }
 
   const activeLoading = override ? override.loading : loading;
   const activeScorecard = override ? override.scorecard : scorecard;
   const activeMessage = override ? override.message : message;
+  const activeSummary = override ? override.summary : summary;
 
   return (
     <div
@@ -135,7 +166,7 @@ export default function HoleScorecardModal({
       style={{
         position: "absolute", bottom: "calc(100% - 6px)", left: 28, zIndex: 20,
         background: "#0F1216", border: "1px solid var(--line)", borderRadius: 4,
-        padding: "10px 12px", minWidth: 300, boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
+        padding: "10px 12px", minWidth: 320, boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: hasStandings ? 4 : 6, gap: 8 }}>
@@ -186,6 +217,7 @@ export default function HoleScorecardModal({
 
       {!activeLoading && activeScorecard && (
         <div>
+          <RoundSummaryRow summary={activeSummary ?? null} />
           <NineRow holes={activeScorecard.firstNine} label={activeScorecard.firstNineLabel} />
           <div style={{ height: 6 }} />
           <NineRow holes={activeScorecard.secondNine} label={activeScorecard.secondNineLabel} />

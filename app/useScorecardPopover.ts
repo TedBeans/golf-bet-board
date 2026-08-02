@@ -2,7 +2,18 @@
 
 import { useState } from "react";
 
-type ScorecardState = { loading: boolean; scorecard: any; position?: string | null; totalToPar?: number | null; message?: string } | null;
+type ScorecardState = {
+  loading: boolean;
+  scorecard: any;
+  position?: string | null;
+  totalToPar?: number | null;
+  message?: string;
+  summary?: {
+    thru: number; birdies: number; eagles: number; pars: number; bogeys: number;
+    doubleBogeys: number; birdiesOrBetter: number; bogeysOrWorse: number;
+    gir: string | null; fairways: string | null;
+  } | null;
+} | null;
 
 export function useScorecardPopover() {
   const [state, setState] = useState<ScorecardState>(null);
@@ -29,6 +40,7 @@ export function useScorecardPopover() {
           position: d.position ?? null,
           totalToPar: d.totalToPar ?? null,
           message: d.message || d.error,
+          summary: d.summary ?? null,
         });
       })
       .catch(() => setState({ loading: false, scorecard: null, message: "Couldn't load scorecard." }));
