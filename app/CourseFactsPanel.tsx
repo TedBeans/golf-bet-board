@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 // Course facts from Betsperts/Ron Klos "The Rabbit Hole" at BetspertsGolf.com.
 // Add a new entry here whenever you receive a course facts screenshot.
 // Key must match exactly the tournament name used in Admin → Tournaments.
@@ -140,44 +142,55 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 
 export default function CourseFactsPanel({ tournamentName }: { tournamentName: string }) {
   const f = COURSE_FACTS[tournamentName];
+  const [expanded, setExpanded] = useState(false);
   if (!f) return null;
 
   return (
     <div style={{ marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-      <div className="subline" style={{ marginBottom: 8 }}>Course facts · {f.courseName}</div>
+      <span
+        className="subline"
+        style={{ marginBottom: 8, display: "block", cursor: "pointer" }}
+        onClick={() => setExpanded((e) => !e)}
+      >
+        Course facts · {f.courseName} {expanded ? "▾" : "▸"}
+      </span>
 
-      {f.notes && (
-        <div style={{ fontSize: 11, color: "var(--gold-bright)", marginBottom: 10, lineHeight: 1.5 }}>
-          ⚠ {f.notes}
-        </div>
+      {expanded && (
+        <>
+          {f.notes && (
+            <div style={{ fontSize: 11, color: "var(--gold-bright)", marginBottom: 10, lineHeight: 1.5 }}>
+              ⚠ {f.notes}
+            </div>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
+            <div>
+              <Stat label="Par / Yards" value={`Par ${f.par} · ${f.yards.toLocaleString()} yds`} />
+              <Stat label="Course type" value={f.courseType} />
+              <Stat label="Architect" value={f.architect} />
+              {f.redesign && <Stat label="Redesign" value={f.redesign} />}
+              <Stat label="Length rank" value={f.lengthRank} />
+              <Stat label="Bunkers" value={`${f.bunkers} (${f.bunkersRank})`} />
+              <Stat label="Water holes" value={f.waterHoles === 0 ? "None" : String(f.waterHoles)} />
+              <Stat label="Difficulty" value={f.scoreDifficulty} />
+            </div>
+            <div>
+              <Stat label="Fairways" value={f.fairways} />
+              <Stat label="Fairway width" value={`${f.avgFairwayWidth} (${f.fairwayWidthRank})`} />
+              <Stat label="Rough" value={f.rough} />
+              <Stat label="Greens" value={f.greens} />
+              <Stat label="Greens size" value={`${f.greensSize} (${f.greensSizeRank})`} />
+              <Stat label="Stimpmeter" value={f.greensStimpmeter} />
+              <Stat label="Greens speed" value={f.greensSpeed} />
+            </div>
+          </div>
+
+          <div style={{ marginTop: 8, fontSize: 11 }}>
+            <span style={{ color: "var(--cream-dim)" }}>Correlated courses: </span>
+            <span style={{ color: "var(--cream)" }}>{f.correlated.join(", ")}</span>
+          </div>
+        </>
       )}
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
-        <div>
-          <Stat label="Par / Yards" value={`Par ${f.par} · ${f.yards.toLocaleString()} yds`} />
-          <Stat label="Course type" value={f.courseType} />
-          <Stat label="Architect" value={f.architect} />
-          {f.redesign && <Stat label="Redesign" value={f.redesign} />}
-          <Stat label="Length rank" value={f.lengthRank} />
-          <Stat label="Bunkers" value={`${f.bunkers} (${f.bunkersRank})`} />
-          <Stat label="Water holes" value={f.waterHoles === 0 ? "None" : String(f.waterHoles)} />
-          <Stat label="Difficulty" value={f.scoreDifficulty} />
-        </div>
-        <div>
-          <Stat label="Fairways" value={f.fairways} />
-          <Stat label="Fairway width" value={`${f.avgFairwayWidth} (${f.fairwayWidthRank})`} />
-          <Stat label="Rough" value={f.rough} />
-          <Stat label="Greens" value={f.greens} />
-          <Stat label="Greens size" value={`${f.greensSize} (${f.greensSizeRank})`} />
-          <Stat label="Stimpmeter" value={f.greensStimpmeter} />
-          <Stat label="Greens speed" value={f.greensSpeed} />
-        </div>
-      </div>
-
-      <div style={{ marginTop: 8, fontSize: 11 }}>
-        <span style={{ color: "var(--cream-dim)" }}>Correlated courses: </span>
-        <span style={{ color: "var(--cream)" }}>{f.correlated.join(", ")}</span>
-      </div>
     </div>
   );
 }
