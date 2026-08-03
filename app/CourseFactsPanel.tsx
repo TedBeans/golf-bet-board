@@ -30,6 +30,13 @@ type CourseFacts = {
   scoreDifficulty: string;
   correlated: string[];
   notes?: string;
+  location?: string;
+  season?: string;
+  eventType?: string;
+  elevation?: string;
+  elevationRank?: string;
+  roughLength?: string;
+  lengthDescriptor?: string;
 };
 
 const COURSE_FACTS: Record<string, CourseFacts> = {
@@ -129,6 +136,37 @@ const COURSE_FACTS: Record<string, CourseFacts> = {
     scoreDifficulty: "Score RTP: +1.85 (2017) · 11th hardest major since 2015",
     correlated: ["Royal Liverpool", "Royal Troon", "Royal St. George's", "Carnoustie", "The Renaissance Club", "St. Andrews (Old Course)", "Royal Portrush", "Shinnecock Hills", "Kiawah Island", "Erin Hills"],
   },
+  "Wyndham Championship": {
+    courseName: "Sedgefield Country Club",
+    tournament: "Wyndham Championship (2008-2025)",
+    par: 70,
+    yards: 7131,
+    courseType: "Tree-lined Parkland",
+    architect: "Donald Ross (1926)",
+    redesign: "Kris Spence (2007)",
+    lengthRank: "19th shortest/44",
+    bunkers: 52,
+    bunkersRank: "7th fewest/44",
+    waterHoles: 6,
+    fairways: "Bermuda",
+    avgFairwayWidth: "29.0 yds",
+    fairwayWidthRank: "9th narrowest/44",
+    rough: "Bermuda 2.5\"",
+    greens: "Bermuda",
+    greensSize: "6,000 sq ft",
+    greensSizeRank: "18th smallest/44",
+    greensStimpmeter: 12.5,
+    greensSpeed: "Fast",
+    scoreDifficulty: "Score RTP: -0.85 · 20th toughest/44",
+    correlated: ["Detroit GC", "TPC River Highlands", "Colonial CC", "Waialae CC", "TPC Potomac", "TPC Sawgrass", "Sea Island (Seaside)", "Innisbrook", "Harbour Town"],
+    location: "North Carolina / Southeast",
+    season: "Summer",
+    eventType: "36-hole Cut / Full Field",
+    elevation: "830 feet",
+    elevationRank: "7th highest/44",
+    roughLength: "Average",
+    lengthDescriptor: "Average (101.9 yds/par)",
+  },
 };
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -165,11 +203,15 @@ export default function CourseFactsPanel({ tournamentName }: { tournamentName: s
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
             <div>
+              {f.location && <Stat label="Location" value={f.location} />}
+              {f.season && <Stat label="Season" value={f.season} />}
+              {f.eventType && <Stat label="Event type" value={f.eventType} />}
               <Stat label="Par / Yards" value={`Par ${f.par} · ${f.yards.toLocaleString()} yds`} />
               <Stat label="Course type" value={f.courseType} />
               <Stat label="Architect" value={f.architect} />
               {f.redesign && <Stat label="Redesign" value={f.redesign} />}
-              <Stat label="Length rank" value={f.lengthRank} />
+              <Stat label="Length rank" value={f.lengthDescriptor ? `${f.lengthDescriptor} (${f.lengthRank})` : f.lengthRank} />
+              {f.elevation && <Stat label="Elevation" value={f.elevationRank ? `${f.elevation} (${f.elevationRank})` : f.elevation} />}
               <Stat label="Bunkers" value={`${f.bunkers} (${f.bunkersRank})`} />
               <Stat label="Water holes" value={f.waterHoles === 0 ? "None" : String(f.waterHoles)} />
               <Stat label="Difficulty" value={f.scoreDifficulty} />
@@ -177,7 +219,7 @@ export default function CourseFactsPanel({ tournamentName }: { tournamentName: s
             <div>
               <Stat label="Fairways" value={f.fairways} />
               <Stat label="Fairway width" value={`${f.avgFairwayWidth} (${f.fairwayWidthRank})`} />
-              <Stat label="Rough" value={f.rough} />
+              <Stat label="Rough" value={f.roughLength ? `${f.rough} · ${f.roughLength} length` : f.rough} />
               <Stat label="Greens" value={f.greens} />
               <Stat label="Greens size" value={`${f.greensSize} (${f.greensSizeRank})`} />
               <Stat label="Stimpmeter" value={f.greensStimpmeter} />
