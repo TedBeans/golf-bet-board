@@ -496,6 +496,20 @@ export default function RecapPage() {
 
         {view === "tournament" && archive.length > 0 && (
           <div>
+            {(() => {
+              const allRegular = archive.filter((b) => !b.personal);
+              const overallAgg = aggregate(allRegular);
+              return (
+                <div className="tourn-head" style={{ marginBottom: 16 }}>
+                  <h2>All straight plays</h2>
+                  <div className="tourn-summary">
+                    <span className="tsum win">{overallAgg.wins}W</span>
+                    <span className="tsum loss">{overallAgg.losses}L</span>
+                    <span className={overallAgg.units >= 0 ? "tsum win" : "tsum loss"}>{formatUnits(overallAgg.units)}</span>
+                  </div>
+                </div>
+              );
+            })()}
             {Object.keys(tournMap).map((t) => {
               const bets = tournMap[t];
               const agg = aggregate(bets);
