@@ -781,6 +781,15 @@ export async function GET() {
         bet.stat = row.score;
       } else if (parsed.label === "GIR" && scorecard?.girCount !== null && scorecard?.girCount !== undefined) {
         bet.stat = scorecard.girCount;
+        // GIR updates the moment an approach shot lands, which can be a
+        // beat ahead of the hole-completion counter - use PGA Tour's own
+        // GIR-specific holes-played count instead, so we never show a
+        // greens count that's mathematically impossible for the thru
+        // shown (e.g. "4 greens thru 3").
+        if (scorecard.girThru !== null && scorecard.girThru !== undefined) {
+          bet.thru = scorecard.girThru;
+          bet.auto.thru = scorecard.girThru;
+        }
       } else if (parsed.label === "FAIRWAYS" && scorecard?.fairwaysCount !== null && scorecard?.fairwaysCount !== undefined) {
         bet.stat = scorecard.fairwaysCount;
         // Fairway opportunities (par-4s/5s only) played so far, not total

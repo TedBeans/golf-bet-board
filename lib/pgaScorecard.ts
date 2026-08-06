@@ -8,6 +8,12 @@ export type ScorecardRoundStats = {
   pars: number | null;
   gir: string | null; // raw display, e.g. "72.22% (13/18)"
   girCount: number | null; // e.g. 13
+  girThru: number | null; // holes played so far per PGA Tour's own GIR stat
+                           // (denominator of the fraction above) - use this
+                           // instead of the general holes-played thru for GIR
+                           // bets, since GIR updates the instant an approach
+                           // shot lands, which can be a beat ahead of the
+                           // hole-completion counter used elsewhere
   fairways: string | null; // raw display, e.g. "64.29% (9/14)"
   fairwaysCount: number | null; // e.g. 9
   fairwaysThru: number | null; // fairway opportunities played so far (par-4s/5s
@@ -99,6 +105,7 @@ export function extractScorecardStats(json: any, roundNumber: number): Scorecard
     pars: parseCountValue(parsStr),
     gir: fractionOnly(girDisplay),
     girCount: numeratorOf(girDisplay),
+    girThru: denominatorOf(girDisplay),
     fairways: fractionOnly(fairwaysDisplay),
     fairwaysCount: numeratorOf(fairwaysDisplay),
     fairwaysThru: denominatorOf(fairwaysDisplay),
