@@ -205,10 +205,10 @@ export function computeOpenGirFairways(
   player: OpenPlayerRow,
   roundNumber: number,
   statsJson: any
-): { gir: string | null; girCount: number | null; fairways: string | null; fairwaysCount: number | null } {
+): { gir: string | null; girCount: number | null; fairways: string | null; fairwaysCount: number | null; fairwaysThru: number | null } {
   const stats = computeOpenStats(player, roundNumber);
   const thru = stats.thru;
-  if (thru === null || thru === 0) return { gir: null, girCount: null, fairways: null, fairwaysCount: null };
+  if (thru === null || thru === 0) return { gir: null, girCount: null, fairways: null, fairwaysCount: null, fairwaysThru: null };
 
   const round = findOpenStatsRound(statsJson, roundNumber);
   const girPct = round ? findOpenStatValue(round.greensInRegulation, player.id) : null;
@@ -235,7 +235,7 @@ export function computeOpenGirFairways(
   }
   const fairways = fairwaysCount !== null ? `${fairwaysCount}/${fairwayEligible}` : null;
 
-  return { gir, girCount, fairways, fairwaysCount };
+  return { gir, girCount, fairways, fairwaysCount, fairwaysThru: fairwayEligible };
 }
 
 // Tournament leader (lowest total-to-par across all rounds played so far) -

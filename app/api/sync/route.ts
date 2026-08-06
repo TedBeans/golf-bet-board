@@ -557,11 +557,12 @@ export async function GET() {
           parsed.segment === "front9" ? [1, 9] : parsed.segment === "back9" ? [10, 18] : undefined;
         const stats = computeOpenStats(row, roundNum, holeRange);
 
-        let girFairways: { gir: string | null; girCount: number | null; fairways: string | null; fairwaysCount: number | null } = {
+        let girFairways: { gir: string | null; girCount: number | null; fairways: string | null; fairwaysCount: number | null; fairwaysThru: number | null } = {
           gir: null,
           girCount: null,
           fairways: null,
           fairwaysCount: null,
+          fairwaysThru: null,
         };
         // Fetched for every straight bet on a theopen.com tournament, not
         // just GIR bets - it's useful context for any bet on that player's
@@ -598,6 +599,10 @@ export async function GET() {
           bet.stat = girFairways.girCount;
         } else if (parsed.label === "FAIRWAYS" && girFairways.fairwaysCount !== null) {
           bet.stat = girFairways.fairwaysCount;
+          if (girFairways.fairwaysThru !== null) {
+            bet.thru = girFairways.fairwaysThru;
+            bet.auto.thru = girFairways.fairwaysThru;
+          }
         }
 
         if (bet.status === "live") {
@@ -778,6 +783,13 @@ export async function GET() {
         bet.stat = scorecard.girCount;
       } else if (parsed.label === "FAIRWAYS" && scorecard?.fairwaysCount !== null && scorecard?.fairwaysCount !== undefined) {
         bet.stat = scorecard.fairwaysCount;
+        // Fairway opportunities (par-4s/5s only) played so far, not total
+        // holes played - a player thru 4 holes with one par-3 among them
+        // has only had 3 chances to hit a fairway.
+        if (scorecard.fairwaysThru !== null && scorecard.fairwaysThru !== undefined) {
+          bet.thru = scorecard.fairwaysThru;
+          bet.auto.thru = scorecard.fairwaysThru;
+        }
       } else if (parsed.label === "BIRDIES") {
         bet.stat = holeBirdiesOrBetter ?? scorecard?.birdiesOrBetter ?? null;
       } else if (parsed.label === "BOGEYS") {

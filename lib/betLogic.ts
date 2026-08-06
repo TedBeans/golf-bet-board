@@ -177,7 +177,8 @@ export function trendClassName(
   thru: number | null,
   holesTotal?: number
 ): string {
-  const effectiveHolesTotal = holesTotal ?? (parsed.segment ? HOLES_IN_NINE : HOLES_IN_ROUND);
+  const effectiveHolesTotal =
+    holesTotal ?? (parsed.segment ? HOLES_IN_NINE : (parsed.label === "FAIRWAYS" ? 14 : HOLES_IN_ROUND));
   if (PACE_LABELS.includes(parsed.label)) {
     return `pace-${smartTrend(parsed, stat, thru, effectiveHolesTotal)}`;
   }

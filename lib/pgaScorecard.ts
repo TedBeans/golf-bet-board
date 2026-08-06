@@ -10,6 +10,10 @@ export type ScorecardRoundStats = {
   girCount: number | null; // e.g. 13
   fairways: string | null; // raw display, e.g. "64.29% (9/14)"
   fairwaysCount: number | null; // e.g. 9
+  fairwaysThru: number | null; // fairway opportunities played so far (par-4s/5s
+                                // only), e.g. 14 - use this instead of the
+                                // general holes-played thru for FAIRWAYS bets,
+                                // since par-3s have no fairway to hit
   thruCount: number | null; // holes completed this round, derived from hole-by-hole data;
                              // 18 when the round is fully finished even if the leaderboard
                              // returns "-" (null) for thru (see parseThru in pgaMatch.ts)
@@ -45,7 +49,17 @@ function numeratorOf(display: string | null): number | null {
   return isNaN(n) ? null : n;
 }
 
-// Strips the leading percentage off "72.22% (13/18)", leaving just "13/18".
+// Pulls the denominator out of PGA Tour's "72.22% (13/18)" style display
+// strings - for Driving Accuracy this is fairway *opportunities* played so
+// far (par-4s/par-5s only), not total holes played, since par-3s never
+// have a fairway to hit.
+function denominatorOf(display: string | null): number | null {
+  if (!display) return null;
+  const trimmed = display.trim();
+  if (trimmed === "-" || trimmed === "\u2014") return 0;
+  const m = trimmed.match(/\((?:\d+)\s*\/\s*(\d+)\)/) || trimmed.match(/(?:\d+)\s*\/\s*(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
 function fractionOnly(display: string | null): string | null {
   if (!display) return null;
   const m = display.match(/\((\d+\s*\/\s*\d+)\)/) || display.match(/(\d+\s*\/\s*\d+)/);
@@ -87,6 +101,7 @@ export function extractScorecardStats(json: any, roundNumber: number): Scorecard
     girCount: numeratorOf(girDisplay),
     fairways: fractionOnly(fairwaysDisplay),
     fairwaysCount: numeratorOf(fairwaysDisplay),
+    fairwaysThru: denominatorOf(fairwaysDisplay),
     // Count finalized holes directly from the scoring data - this is 18
     // for a player who has finished, even if the leaderboard returns "-"
     // for thru (which parseThru converts to null). Derived from the
