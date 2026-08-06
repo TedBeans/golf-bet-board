@@ -822,7 +822,9 @@ export default function Page() {
                                 Greens {b.auto.gir ?? "—"}
                               </span>
                               {" · "}
-                              <span>Fairways {b.auto.fairways ?? "—"}</span>
+                              <span className={parsed.label === "FAIRWAYS" ? "detail-hi" : ""}>
+                                Fairways {b.auto.fairways ?? "—"}
+                              </span>
                               {" · "}
                               <span className={parsed.label === "BIRDIES" ? "detail-hi" : ""}>
                                 Birdies {b.auto.birdies ?? "—"}
