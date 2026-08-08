@@ -115,10 +115,10 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
   animation-name: raindrop-fall; animation-timing-function: linear; animation-iteration-count: infinite;
 }
 @keyframes raindrop-fall{
-  0%{ transform: translateY(-20px); opacity:0; }
+  0%{ top:-6%; opacity:0; }
   12%{ opacity:0.7; }
   85%{ opacity:0.7; }
-  100%{ transform: translateY(480px); opacity:0; }
+  100%{ top:112%; opacity:0; }
 }
 .bolt-svg{ position:absolute; opacity:0; }
 .bolt-svg.b1{ top:8%; left:20%; animation: bolt-flicker 13s infinite; }
