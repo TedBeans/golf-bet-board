@@ -1465,7 +1465,6 @@ export default function AdminPage() {
               nothing grades until it's set.
               <input
                 type="text"
-                inputMode="decimal"
                 placeholder="e.g. 2"
                 value={coordDrafts[`${tourn}:cutLine`] ?? (tm?.cutLine ?? "")}
                 onChange={(e) => {
@@ -1541,7 +1540,6 @@ export default function AdminPage() {
                   Latitude
                   <input
                     type="text"
-                    inputMode="decimal"
                     placeholder="42.3986"
                     value={coordDrafts[`${tourn}:lat`] ?? (tm?.latitude ?? "")}
                     onChange={(e) => {
@@ -1562,7 +1560,6 @@ export default function AdminPage() {
                   Longitude
                   <input
                     type="text"
-                    inputMode="decimal"
                     placeholder="-83.0910"
                     value={coordDrafts[`${tourn}:lng`] ?? (tm?.longitude ?? "")}
                     onChange={(e) => {
