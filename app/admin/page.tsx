@@ -1465,7 +1465,7 @@ export default function AdminPage() {
               nothing grades until it's set.
               <input
                 type="text"
-                inputMode="numeric"
+                inputMode="decimal"
                 placeholder="e.g. 2"
                 value={coordDrafts[`${tourn}:cutLine`] ?? (tm?.cutLine ?? "")}
                 onChange={(e) => {
