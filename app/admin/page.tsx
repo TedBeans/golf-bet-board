@@ -89,12 +89,12 @@ export default function AdminPage() {
   const [liveParlays, setLiveParlays] = useState<Parlay[]>([]);
   const [parlayArchiveList, setParlayArchiveList] = useState<Parlay[]>([]);
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  // Lat/lng inputs need to track the raw string the person is typing,
-  // separately from the committed number - binding the input's value
-  // straight to the parsed number means typing "36." immediately snaps
-  // back to "36" on re-render (parseFloat("36.") === 36), silently
-  // eating the decimal point and making it impossible to type past a
-  // whole number or type a fresh negative sign.
+  // Numeric-ish inputs (lat/lng, cut line) need to track the raw string
+  // the person is typing, separately from the committed number - binding
+  // the input's value straight to the parsed number means typing "36."
+  // or "-" immediately snaps back to the last valid number (or NaN) on
+  // re-render, silently eating the decimal point/minus sign and making
+  // it impossible to type past a whole number or type a fresh negative.
   const [coordDrafts, setCoordDrafts] = useState<Record<string, string>>({});
   const [renameValue, setRenameValue] = useState("");
   const [renameOdds, setRenameOdds] = useState("");
@@ -1464,9 +1464,17 @@ export default function AdminPage() {
               "Make Cut" plays. Leave blank until the real cut is announced;
               nothing grades until it's set.
               <input
+                type="text"
+                inputMode="numeric"
                 placeholder="e.g. 2"
-                value={tm?.cutLine ?? ""}
-                onChange={(e) => updateTourn({ cutLine: e.target.value === "" ? (undefined as any) : parseInt(e.target.value, 10) })}
+                value={coordDrafts[`${tourn}:cutLine`] ?? (tm?.cutLine ?? "")}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setCoordDrafts((prev) => ({ ...prev, [`${tourn}:cutLine`]: v }));
+                  if (v === "" || v === "-") { updateTourn({ cutLine: undefined as any }); return; }
+                  const n = parseInt(v, 10);
+                  if (!isNaN(n)) updateTourn({ cutLine: n });
+                }}
                 style={{
                   width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
                   color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
