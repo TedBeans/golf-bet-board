@@ -18,6 +18,7 @@ type CourseFacts = {
   bunkers: number;
   bunkersRank: string;
   waterHoles: number;
+  waterHolesRank?: string;
   fairways: string;
   avgFairwayWidth: string;
   fairwayWidthRank: string;
@@ -167,6 +168,38 @@ const COURSE_FACTS: Record<string, CourseFacts> = {
     roughLength: "Average",
     lengthDescriptor: "Average (101.9 yds/par)",
   },
+  "FedEx St. Jude Championship": {
+    courseName: "TPC Southwind",
+    tournament: "FedEx St. Jude Championship (1989-2025)",
+    par: 70,
+    yards: 7288,
+    courseType: "Tree-lined Parkland",
+    architect: "Ron Pritchard (1988)",
+    redesign: "2024-2025 renovation",
+    lengthRank: "13th longest/44",
+    bunkers: 75,
+    bunkersRank: "21st most/44",
+    waterHoles: 11,
+    waterHolesRank: "7th most/44",
+    fairways: "Zoysia",
+    avgFairwayWidth: "28.0 yds",
+    fairwayWidthRank: "7th narrowest/44",
+    rough: "Bermuda 3\"",
+    greens: "Bermuda",
+    greensSize: "4,500 sq ft",
+    greensSizeRank: "3rd smallest/44",
+    greensStimpmeter: 12,
+    greensSpeed: "Average",
+    scoreDifficulty: "Score RTP: -1.02 · 20th easiest/44",
+    correlated: ["TPC Sawgrass", "PGA National", "Innisbrook", "East Lake", "CC of Jackson", "Sedgefield CC", "Sea Island (Plantation)", "Waialae CC", "Colonial CC", "TPC River Highlands"],
+    location: "Tennessee / Southeast",
+    season: "FedExCup Playoffs",
+    eventType: "No-Cut / Small Field / Playoffs",
+    elevation: "350 feet",
+    elevationRank: "18th highest/44",
+    roughLength: "Average",
+    lengthDescriptor: "Average (104.1 yds/par)",
+  },
 };
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -213,7 +246,7 @@ export default function CourseFactsPanel({ tournamentName }: { tournamentName: s
               <Stat label="Length rank" value={f.lengthDescriptor ? `${f.lengthDescriptor} (${f.lengthRank})` : f.lengthRank} />
               {f.elevation && <Stat label="Elevation" value={f.elevationRank ? `${f.elevation} (${f.elevationRank})` : f.elevation} />}
               <Stat label="Bunkers" value={`${f.bunkers} (${f.bunkersRank})`} />
-              <Stat label="Water holes" value={f.waterHoles === 0 ? "None" : String(f.waterHoles)} />
+              <Stat label="Water holes" value={f.waterHoles === 0 ? "None" : f.waterHolesRank ? `${f.waterHoles} (${f.waterHolesRank})` : String(f.waterHoles)} />
               <Stat label="Difficulty" value={f.scoreDifficulty} />
             </div>
             <div>
