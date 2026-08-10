@@ -6,7 +6,7 @@ import { useState } from "react";
 // Add a new entry here whenever you receive a course facts screenshot.
 // Key must match exactly the tournament name used in Admin → Tournaments.
 
-type CourseFacts = {
+export type CourseFacts = {
   courseName: string;
   tournament: string;
   par: number;
@@ -40,7 +40,7 @@ type CourseFacts = {
   lengthDescriptor?: string;
 };
 
-const COURSE_FACTS: Record<string, CourseFacts> = {
+export const COURSE_FACTS: Record<string, CourseFacts> = {
   "3M Open": {
     courseName: "TPC Twin Cities",
     tournament: "3M Open (2019-2025)",

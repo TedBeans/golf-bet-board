@@ -14,6 +14,7 @@ import { Settings, DEFAULT_SETTINGS } from "../../lib/settings";
 import GolfFlagIcon from "../GolfFlagIcon";
 import HoleScorecardModal from "../HoleScorecardModal";
 import { useScorecardPopover } from "../useScorecardPopover";
+import { COURSE_FACTS } from "../CourseFactsPanel";
 
 function ArchivedRoundBets({ bets }: { bets: Bet[] }) {
   const { openKey, state, open, openTournament, openRound } = useScorecardPopover();
@@ -496,6 +497,53 @@ export default function AdminPage() {
     }).then((r) => {
       setSaveMsg(r.ok ? `Leaderboard forced live for ${tourn} for the next 24h.` : "Save failed - check passcode.");
       setTimeout(() => setSaveMsg(""), 4000);
+    });
+  }
+
+  // Maps the free-text courseType from CourseFactsPanel's data ("Tree-lined
+  // Parkland", "Hybrid Links", "Ocean Links", ...) onto the constrained set
+  // the Analysis page filters by. Simple keyword match - course facts
+  // entries have always described type in plain English with "parkland"/
+  // "links"/"desert" somewhere in the phrase, so this covers everything
+  // currently loaded and should keep working as more courses get added.
+  function classifyCourseType(raw: string): "parkland" | "links" | "desert" | "other" {
+    const s = raw.toLowerCase();
+    if (s.includes("link")) return "links";
+    if (s.includes("desert")) return "desert";
+    if (s.includes("parkland")) return "parkland";
+    return "other";
+  }
+
+  // One-click backfill: for every tournament that has a CourseFactsPanel
+  // entry loaded, set its Admin course-type dropdown from that data instead
+  // of setting each one by hand. Only touches tournaments that don't already
+  // have a course type set, so it won't clobber a deliberate manual
+  // override - re-running it later (once more course facts get added) is
+  // always safe.
+  function autoFillCourseTypes() {
+    const nextTournaments = { ...mapping.tournaments };
+    const filled: string[] = [];
+    for (const [name, facts] of Object.entries(COURSE_FACTS)) {
+      const tm = nextTournaments[name];
+      if (!tm) continue; // no such tournament in the mapping yet - nothing to set
+      if (tm.courseType) continue; // don't override a value already set by hand
+      nextTournaments[name] = { ...tm, courseType: classifyCourseType(facts.courseType) };
+      filled.push(name);
+    }
+    if (filled.length === 0) {
+      setSaveMsg("Nothing to fill - every tournament with course facts already has a course type set.");
+      setTimeout(() => setSaveMsg(""), 4000);
+      return;
+    }
+    const nextMapping: Mapping = { ...mapping, tournaments: nextTournaments };
+    setMapping(nextMapping);
+    fetch("/api/mapping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, mapping: nextMapping }),
+    }).then((r) => {
+      setSaveMsg(r.ok ? `Course type filled for: ${filled.join(", ")}.` : "Save failed - check passcode.");
+      setTimeout(() => setSaveMsg(""), 5000);
     });
   }
 
@@ -1301,10 +1349,21 @@ export default function AdminPage() {
       </div>
 
       <h1 style={{ marginBottom: 4 }}>Auto-sync setup</h1>
-      <div className="subline" style={{ marginBottom: 20 }}>
+      <div className="subline" style={{ marginBottom: 8 }}>
         One number per tournament. Open the tournament's leaderboard on pgatour.com
         and copy the "Rxxxxxxx" segment from the URL - for example
         pgatour.com/tournaments/2026/isco-championship/<b>R2026518</b>/leaderboard.
+      </div>
+      <div style={{ marginBottom: 20 }}>
+        <button className="add-btn-inline" onClick={autoFillCourseTypes}>
+          Auto-fill course types from Course Facts
+        </button>
+        <span className="subline" style={{ display: "block", marginTop: 4 }}>
+          Sets each tournament's course type below from its CourseFactsPanel data
+          (parkland/links/desert), for the Analysis page filter. Only fills
+          tournaments that don't already have one set - safe to re-run anytime
+          more course facts get added.
+        </span>
       </div>
 
       {tournaments.map((tourn) => {
