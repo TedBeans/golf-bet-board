@@ -101,7 +101,8 @@ export function parseCombinedText(
     if (headerMatch) {
       currentTournament = headerMatch[1]
         .replace(/[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{E0000}-\u{E007F}\uFE0F]/gu, "")
-        .trim();
+        .trim()
+        .replace(/[:.\s]+$/, "");
       currentRound = `Round ${headerMatch[2]}`;
       continue;
     }

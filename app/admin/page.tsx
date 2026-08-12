@@ -547,6 +547,36 @@ export default function AdminPage() {
     });
   }
 
+  function fixTournamentNamePunctuation() {
+    fetch("/api/fix-tournament-names", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.ok) {
+          setSaveMsg(d.error || "Fix failed - check passcode.");
+          setTimeout(() => setSaveMsg(""), 4000);
+          return;
+        }
+        const totalChanged = d.betsChanged + d.archiveChanged + d.parlayLegsChanged;
+        if (totalChanged === 0) {
+          setSaveMsg("Nothing to merge - no duplicate-by-punctuation tournament names found.");
+        } else {
+          setSaveMsg(`Merged ${totalChanged} record(s): ${d.renamed.join("; ")}`);
+          // Refetch everything this could have touched, rather than trying
+          // to patch local state field-by-field for four different
+          // collections.
+          fetch("/api/bets").then((r) => r.json()).then((d2) => setBets(d2.bets || []));
+          fetch("/api/archive").then((r) => r.json()).then((d2) => setArchive(d2.archive || []));
+          fetch("/api/parlays").then((r) => r.json()).then((d2) => setLiveParlays(d2.parlays || []));
+          fetch("/api/parlay-archive").then((r) => r.json()).then((d2) => setParlayArchiveList(d2.archive || []));
+        }
+        setTimeout(() => setSaveMsg(""), 8000);
+      });
+  }
+
   function submitWinnerBet() {
     const strokes = parseFloat(winnerStrokes);
     const coursePar = parseFloat(winnerCoursePar);
@@ -1135,6 +1165,18 @@ export default function AdminPage() {
         straight bet only removes it from the live board's straight-bets
         list; it keeps syncing and grading normally in the background, and
         still works exactly the same as a parlay leg.
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <button className="add-btn-inline" onClick={fixTournamentNamePunctuation}>
+          Merge duplicate tournament buckets (punctuation)
+        </button>
+        <span className="subline" style={{ display: "block", marginTop: 4 }}>
+          If the same tournament shows up as two separate groups below - e.g.
+          "FedEx St. Jude Championship:" and "FedEx St. Jude Championship" -
+          this merges them by stripping the stray trailing punctuation. Safe
+          to click even if nothing needs fixing.
+        </span>
       </div>
 
       {Object.entries(

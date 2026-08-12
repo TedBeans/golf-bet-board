@@ -80,17 +80,23 @@ export function parsePersonalText(text: string, forDate: string | undefined, map
   for (const line of rawLines) {
     if (!ODDS_RE.test(line)) {
       // Header line - strip trailing "Round N" if present so "3M Open Round 1"
-      // correctly sets tournament = "3M Open" and default round = 1.
+      // correctly sets tournament = "3M Open" and default round = 1. Also
+      // strips trailing punctuation (":", ".", etc) some people naturally
+      // type after a header - "FedEx St. Jude Championship:" and "FedEx St.
+      // Jude Championship" need to land in the exact same tournament
+      // bucket, not two different ones that only differ by a colon.
       const roundHeaderMatch = line.match(/^(.*?)\s+Round\s+(\d+)\s*$/i);
       if (roundHeaderMatch) {
         currentTournament = roundHeaderMatch[1]
           .replace(/[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{E0000}-\u{E007F}\uFE0F]/gu, "")
-          .trim();
+          .trim()
+          .replace(/[:.\s]+$/, "");
         currentDefaultRound = parseInt(roundHeaderMatch[2], 10);
       } else {
         currentTournament = line
           .replace(/[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{E0000}-\u{E007F}\uFE0F]/gu, "")
-          .trim();
+          .trim()
+          .replace(/[:.\s]+$/, "");
         currentDefaultRound = 1;
       }
       continue;
