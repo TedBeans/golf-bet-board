@@ -64,6 +64,18 @@ export type Bet = {
                                  // demotion half would otherwise silently flip a manual click
                                  // back to pending on the very next sync pass. This flag tells
                                  // that demotion logic "this was chosen on purpose, leave it".
+  deadHeatDivisor?: number | null; // R1_LEADER bets only - how many players were tied for the
+                                    // Round 1 lead when this graded a win. DraftKings' dead heat
+                                    // rule: the win payout gets divided by this, the stake at
+                                    // risk on a miss never does. 1 or unset means sole leader,
+                                    // normal full payout.
+  r1LockCandidateSince?: string | null; // R1_LEADER bets only - ISO timestamp of the first sync
+                                         // pass where the field-wide Round 1 result looked settled
+                                         // (see findRound1Leaders). Grading waits a few minutes
+                                         // past this before actually committing hit/miss, as a
+                                         // buffer against a very late tee time that simply hadn't
+                                         // shown up in the data yet - see the R1_LEADER block in
+                                         // the sync route for the full reasoning.
 };
 
 export const SEED: Bet[] = [

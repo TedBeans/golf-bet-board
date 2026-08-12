@@ -82,7 +82,7 @@ export default function AnalysisPage() {
     const byDate: Record<string, number> = {};
     filtered.forEach((b) => {
       const d = b.loadedDate || (b.archivedAt ? centralDateFromISO(b.archivedAt) : "unknown");
-      const u = computeUnitResult(b.oddsPrice, b.oddsUnits, b.status);
+      const u = computeUnitResult(b.oddsPrice, b.oddsUnits, b.status, b.deadHeatDivisor);
       if (u !== null) byDate[d] = (byDate[d] || 0) + u;
     });
     const dates = Object.keys(byDate).filter((d) => d !== "unknown").sort();
@@ -102,7 +102,7 @@ export default function AnalysisPage() {
       else if (barGroupBy === "tournament") key = b.t;
       else key = COURSE_TYPE_LABELS[getCourseType(b.t) || ""] || "Unknown";
       if (!groups[key]) groups[key] = { units: 0, wins: 0, losses: 0 };
-      const u = computeUnitResult(b.oddsPrice, b.oddsUnits, b.status);
+      const u = computeUnitResult(b.oddsPrice, b.oddsUnits, b.status, b.deadHeatDivisor);
       if (u !== null) groups[key].units += u;
       if (b.status === "hit") groups[key].wins += 1;
       if (b.status === "miss") groups[key].losses += 1;

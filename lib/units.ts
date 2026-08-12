@@ -24,10 +24,18 @@ export function defaultUnitsToWinOne(oddsPrice: string | null | undefined): numb
 // Converts a resolved bet's DK price + units risked into a net unit result.
 // Positive = units won, negative = units lost. Returns null for anything
 // that isn't actually decided yet, or missing odds data.
+//
+// deadHeatDivisor handles DraftKings' dead heat reduction rule (used for
+// R1 Leader-style bets, where multiple players can tie for the lead): when
+// N players are tied, each gets 1/N of the normal win payout instead of the
+// full amount. Only the win side is divided - a dead heat still means you
+// picked correctly, so a miss is always a full loss of the stake regardless
+// of what this is set to.
 export function computeUnitResult(
   oddsPrice: string | null | undefined,
   oddsUnits: string | null | undefined,
-  status: string
+  status: string,
+  deadHeatDivisor?: number | null
 ): number | null {
   if (status !== "hit" && status !== "miss") return null;
 
@@ -38,7 +46,9 @@ export function computeUnitResult(
 
   const multiplier = oddsMultiplier(oddsPrice);
   if (multiplier === null) return null;
-  return units * multiplier;
+  const fullWin = units * multiplier;
+  const divisor = deadHeatDivisor && deadHeatDivisor > 1 ? deadHeatDivisor : 1;
+  return fullWin / divisor;
 }
 
 export function formatUnits(n: number | null): string {

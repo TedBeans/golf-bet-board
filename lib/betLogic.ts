@@ -49,6 +49,11 @@ export function parseBetType(text: string): ParsedBet {
   if ((m = t.match(/^make\s*cut$/i))) {
     return { type: "generic", label: "MAKE_CUT", target: null, targetDisplay: "—" };
   }
+  // Accepts "R1 Leader", "Round 1 Leader", "End of R1 Leader", "End of
+  // Round 1 Leader" - all stored as the canonical "R1 Leader" phrase.
+  if ((m = t.match(/^(?:end of\s+)?(?:r1|round\s*1)\s+leader$/i))) {
+    return { type: "generic", label: "R1_LEADER", target: null, targetDisplay: "—" };
+  }
 
   if ((m = t.match(/^front 9:\s*([+-]?\d+|E)\s+or better$/i))) {
     const val = /^E$/i.test(m[1]) ? 0 : parseInt(m[1], 10);
@@ -201,6 +206,7 @@ export function friendlyLabel(label: string, segment?: "front9" | "back9"): stri
     case "WINNER": return "Winner";
     case "TOP_N": return "Top N";
     case "MAKE_CUT": return "Make Cut";
+    case "R1_LEADER": return "R1 Leader";
     case "H2H": return "H2H";
     case "TIE": return "Tie";
     default: return "Stat";

@@ -46,6 +46,9 @@ const WINNER_RE = /^(.*?)\s+(?:outright\s+)?winner$/i;
 // Accepts "Make Cut", "make the cut", "to make the cut", "to make cut" -
 // all stored as the same canonical "Make Cut" phrase.
 const MAKECUT_RE = /^(.*?)\s+(?:to\s+)?make\s+(?:the\s+)?cut$/i;
+// Accepts "R1 Leader", "Round 1 Leader", "End of R1 Leader", "End of
+// Round 1 Leader" - all stored as the same canonical "R1 Leader" phrase.
+const R1LEADER_RE = /^(.*?)\s+(?:end of\s+)?(?:r1|round\s*1)\s+leader$/i;
 
 // Round-scoped stat bets: "Player [Round N] Over/Under X.X [Category]"
 // e.g. "Tommy Fleetwood Round 1 Over 11.5 Pars"
@@ -132,6 +135,9 @@ export function parsePersonalText(text: string, forDate: string | undefined, map
     } else if ((m = descriptor.match(MAKECUT_RE))) {
       player = m[1].trim();
       phrase = "Make Cut";
+    } else if ((m = descriptor.match(R1LEADER_RE))) {
+      player = m[1].trim();
+      phrase = "R1 Leader";
     } else if ((m = descriptor.match(ROUND_STAT_RE))) {
       player = m[1].trim();
       // Use Round N from the bet line if present, otherwise fall back to
@@ -203,7 +209,7 @@ export function parsePersonalText(text: string, forDate: string | undefined, map
     }
 
     if (!player || !phrase) {
-      warnings.push(`Couldn't recognize a bet type in: "${line}"\nSupported: Top N / Winner / Make Cut / H2H ("vs ... Round N" / "vs ... Tournament") / Tie ("and ... to tie") / Stat ("Player Round N Over/Under X.X [Greens/Fairways/Birdies/Bogeys/Pars]")`);
+      warnings.push(`Couldn't recognize a bet type in: "${line}"\nSupported: Top N / Winner / Make Cut / R1 Leader / H2H ("vs ... Round N" / "vs ... Tournament") / Tie ("and ... to tie") / Stat ("Player Round N Over/Under X.X [Greens/Fairways/Birdies/Bogeys/Pars]")`);
       continue;
     }
 

@@ -4,7 +4,7 @@ import { Bet } from "../../../lib/seed";
 import { Mapping } from "../../../lib/mapping";
 import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../../../lib/parlay";
 import { fetchPgaLeaderboard, fetchPlayerScorecardStats, fetchPlayerHoleScores, fetchPgaTeeTimes, extractPgaTeeTimes, PgaTeeTimeRow } from "../../../lib/pgatour";
-import { extractPlayers, findPlayerMatch, findLeader, PgaPlayerRow } from "../../../lib/pgaMatch";
+import { extractPlayers, findPlayerMatch, findLeader, findRound1Leaders, Round1LeaderInfo, PgaPlayerRow } from "../../../lib/pgaMatch";
 import { extractScorecardStats, roundNumberFromLabel, computeSegmentStats, computeFullRoundStats } from "../../../lib/pgaScorecard";
 import { fetchOpenLeaderboard, fetchOpenStatistics } from "../../../lib/theopen";
 import { extractOpenPlayers, findOpenPlayerMatch, findOpenLeader, computeOpenStats, computeOpenGirFairways, OpenPlayerRow } from "../../../lib/openMatch";
@@ -151,6 +151,9 @@ export async function GET() {
   // once per tournament per sync pass (several personal bets often share
   // the same tournament), not once per bet.
   const positionsCache = new Map<string, Map<string, string>>();
+  // undefined = not computed yet this sync pass, null = computed but not
+  // settled yet (still mid-Round-1 somewhere in the field)
+  const r1LeaderCache = new Map<string, Round1LeaderInfo | undefined>();
   let updatedCount = 0;
   const { dateStr: todayCentral, minutes: nowMinutes, dateTimeStr: nowCentralDT } = nowInCentral();
 
@@ -427,6 +430,76 @@ export async function GET() {
           if (graded) bet.status = graded;
 
           updatedCount += 1;
+          continue;
+        }
+
+        if (parsed.label === "R1_LEADER") {
+          if (useOpen) {
+            errors.push(`${bet.player}: R1 Leader grading isn't supported yet for theopen.com tournaments`);
+            continue;
+          }
+
+          const match = findPlayerMatch(bet.player, pgaPlayers!);
+          if (!match) {
+            errors.push(`${bet.player}: no match on leaderboard (personal play)`);
+            continue;
+          }
+
+          // Live position reuses the same whole-field standings as WINNER/
+          // TOP_N above - while Round 1 is the only round played, "current
+          // position" and "Round 1 position" are the same thing, so this
+          // reads correctly even before the field-wide lock below fires.
+          let positions = positionsCache.get(bet.t);
+          if (!positions) {
+            const entries: PositionEntry[] = pgaPlayers!.map((p) => ({ id: p.id, totalToPar: p.total }));
+            positions = computePositions(entries);
+            positionsCache.set(bet.t, positions);
+          }
+
+          bet.thru = match.thru;
+          bet.stat = match.total;
+          bet.auto = {
+            thru: match.thru,
+            scoreToPar: match.total,
+            birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
+            updatedAt: new Date().toISOString(),
+            position: positions.get(match.id) ?? null,
+          };
+          updatedCount += 1;
+
+          // Field-wide Round 1 lock - computed once per tournament per sync
+          // pass (see findRound1Leaders for exactly what this waits on).
+          let r1Info = r1LeaderCache.get(bet.t);
+          if (r1Info === undefined) {
+            r1Info = findRound1Leaders(pgaPlayers!);
+            r1LeaderCache.set(bet.t, r1Info);
+          }
+          if (!r1Info) {
+            bet.r1LockCandidateSince = null; // not settled - reset the confirmation window if one was running
+            continue;
+          }
+
+          // Don't commit the grade off the very first sync pass that looks
+          // settled - a genuinely late tee time that hasn't shown up in the
+          // data yet (see findRound1Leaders' known limitation) would look
+          // identical to "everyone's done" for exactly one pass. Waiting a
+          // few sync cycles for the same settled read to hold steady costs
+          // a few minutes of latency in exchange for real protection
+          // against locking in a wrong grade that never self-corrects.
+          const CONFIRMATION_WINDOW_MS = 3 * 60 * 1000;
+          if (!bet.r1LockCandidateSince) {
+            bet.r1LockCandidateSince = new Date().toISOString();
+            continue;
+          }
+          const settledForMs = Date.now() - new Date(bet.r1LockCandidateSince).getTime();
+          if (settledForMs < CONFIRMATION_WINDOW_MS) continue;
+
+          if (r1Info.tiedIds.has(match.id)) {
+            bet.status = "hit";
+            bet.deadHeatDivisor = r1Info.divisor;
+          } else if (match.thru === 18 && match.total !== null) {
+            bet.status = "miss";
+          }
           continue;
         }
 

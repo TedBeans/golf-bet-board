@@ -33,7 +33,7 @@ const RAINDROPS = Array.from({ length: 18 }).map((_, i) => ({
 // everything else falls back to the existing value-and-thru display.
 function legLiveDetail(bet: Bet): string {
   const p = parseBetType(bet.bet);
-  if (p.label === "TOP_N" || p.label === "WINNER") {
+  if (p.label === "TOP_N" || p.label === "WINNER" || p.label === "R1_LEADER") {
     const thru = bet.auto?.thru ?? null;
     const score = formatScore(bet.auto?.scoreToPar ?? null);
     const thruLabel = thru === null || thru === 0 ? "—" : thru === 18 ? `${thru} (F)` : `${thru}`;
@@ -81,6 +81,10 @@ function legStatusClass(bet: Bet): "win" | "loss" | "live" {
   }
   if (p.label === "WINNER") {
     return bet.auto?.position === "1" ? "win" : "live";
+  }
+  if (p.label === "R1_LEADER") {
+    const rank = positionRank(bet.auto?.position ?? null);
+    return rank !== null && rank <= 1 ? "win" : "live";
   }
   if (p.label === "H2H") {
     const s = bet.auto?.scoreToPar ?? null;
@@ -901,7 +905,8 @@ export default function Page() {
                 {personalGroups[tourn].map((b) => {
                   const parsed = parseBetType(b.bet);
                   const posRank = positionRank(b.auto?.position ?? null);
-                  const inTopN = parsed.label === "TOP_N" && parsed.topN !== undefined && posRank !== null && posRank <= parsed.topN;
+                  const inTopN = (parsed.label === "TOP_N" && parsed.topN !== undefined && posRank !== null && posRank <= parsed.topN)
+                    || (parsed.label === "R1_LEADER" && posRank !== null && posRank <= 1);
                   const cutLine = mapping.tournaments[tourn]?.cutLine;
                   return (
                     <div className={`card ${b.status}`} key={b.id}>
@@ -1038,6 +1043,11 @@ export default function Page() {
                                 Position {b.auto?.position ?? "—"} ({formatScore(b.auto?.scoreToPar ?? null)})
                               </span>
                               {" · "}thru {b.auto?.thru ?? "—"}
+                              {parsed.label === "R1_LEADER" && b.deadHeatDivisor && b.deadHeatDivisor > 1 && (
+                                <span style={{ color: "var(--gold-bright)" }}>
+                                  {" · "}dead heat, split {b.deadHeatDivisor} ways
+                                </span>
+                              )}
                             </>
                           )}
                         </span>

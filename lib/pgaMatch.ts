@@ -51,6 +51,40 @@ export function findLeader(players: PgaPlayerRow[]): PgaPlayerRow | null {
 }
 
 
+export type Round1LeaderInfo = { tiedIds: Set<string>; divisor: number; minScore: number } | null;
+
+// Determines who's tied for the Round 1 lead across the whole field, from
+// the already-fetched leaderboard snapshot alone - no extra per-player
+// fetches needed. This only works within a specific window: for anyone
+// who's finished a round (thru === 18), their cumulative total equals that
+// round's score only when exactly one round has been played tournament-wide
+// so far. So "total === score" is a cheap proxy for "we're still looking at
+// Round 1 data, Round 2 hasn't started for the field yet".
+//
+// Returns null ("not settled, don't grade yet") if anyone with that Round-1
+// signature is still mid-round (thru between 1 and 17) - the leader group
+// can still change. Once nobody fits that description, returns the tied
+// leader set from whoever's finished.
+//
+// Known limitation: a player who hasn't teed off *at all* yet shows
+// total === null, thru === null - indistinguishable here from a genuine
+// withdrawal/no-show. This function can't wait on a player it has no way to
+// know is still coming, so a very late tee time finishing after this has
+// already locked in a grade is a real (if narrow) risk. Sync re-checks
+// continuously, but once a bet is graded hit/miss it's never revisited.
+export function findRound1Leaders(players: PgaPlayerRow[]): Round1LeaderInfo {
+  const round1Snapshot = players.filter((p) => p.total !== null && p.total === p.score);
+  const stillMidRound = round1Snapshot.some((p) => p.thru !== null && p.thru < 18);
+  if (stillMidRound) return null;
+
+  const finished = round1Snapshot.filter((p) => p.thru === 18);
+  if (finished.length === 0) return null;
+
+  const minScore = Math.min(...finished.map((p) => p.total as number));
+  const tied = finished.filter((p) => p.total === minScore);
+  return { tiedIds: new Set(tied.map((p) => p.id)), divisor: tied.length, minScore };
+}
+
 function norm(s: string): string {
   return normalizeName(s);
 }

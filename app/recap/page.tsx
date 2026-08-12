@@ -22,7 +22,7 @@ function aggregate(bets: Bet[]): { wins: number; losses: number; units: number }
   for (const b of bets) {
     if (b.status === "hit") wins++;
     if (b.status === "miss") losses++;
-    const u = computeUnitResult(b.oddsPrice, b.oddsUnits, b.status);
+    const u = computeUnitResult(b.oddsPrice, b.oddsUnits, b.status, b.deadHeatDivisor);
     if (u !== null) units += u;
   }
   return { wins, losses, units: Math.round(units * 100) / 100 };
@@ -31,7 +31,7 @@ function aggregate(bets: Bet[]): { wins: number; losses: number; units: number }
 function BetDetailCard({ b, compact = false, mapping }: { b: Bet; compact?: boolean; mapping?: Mapping }) {
   const parsed = parseBetType(b.bet);
   const cls = trendClassName(parsed, b.stat, b.thru);
-  const unitResult = computeUnitResult(b.oddsPrice, b.oddsUnits, b.status);
+  const unitResult = computeUnitResult(b.oddsPrice, b.oddsUnits, b.status, b.deadHeatDivisor);
   const { openKey, state: scorecardState, open: openScorecard, openTournament, openRound } = useScorecardPopover();
   const isOpen = openKey === b.id;
   const isPersonal = !!b.personal;
@@ -590,7 +590,7 @@ export default function RecapPage() {
 
             {personalArchive.length > 0 && (() => {
               const totalUnits = Math.round(
-                personalArchive.reduce((sum, b) => sum + (computeUnitResult(b.oddsPrice, b.oddsUnits, b.status) || 0), 0) * 100
+                personalArchive.reduce((sum, b) => sum + (computeUnitResult(b.oddsPrice, b.oddsUnits, b.status, b.deadHeatDivisor) || 0), 0) * 100
               ) / 100;
               return (
                 <div className="tourn-head" style={{ marginBottom: 16 }}>
@@ -608,7 +608,7 @@ export default function RecapPage() {
               const tBets = personalTournMap[t];
               const isOpen = expandedTourn === `tedbeans:${t}`;
               const tUnits = Math.round(
-                tBets.reduce((sum, b) => sum + (computeUnitResult(b.oddsPrice, b.oddsUnits, b.status) || 0), 0) * 100
+                tBets.reduce((sum, b) => sum + (computeUnitResult(b.oddsPrice, b.oddsUnits, b.status, b.deadHeatDivisor) || 0), 0) * 100
               ) / 100;
               return (
                 <div key={t} className="tourn" style={{ marginBottom: 14 }}>
