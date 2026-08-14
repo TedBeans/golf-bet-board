@@ -395,7 +395,7 @@ function norm(s: string): string {
 // (already reordered into displayName by fetchDataGolfPredictions above).
 export function findDataGolfPlayerMatch(betPlayerName: string, players: DataGolfPlayerRow[]): DataGolfPlayerRow | null {
   const target = norm(betPlayerName);
-  const tokens = target.split(/\s+/);
+  const tokens = target.split(/\s+/).filter(Boolean);
   const lastToken = tokens[tokens.length - 1];
 
   let match = players.find((p) => norm(p.displayName) === target);
@@ -411,5 +411,14 @@ export function findDataGolfPlayerMatch(betPlayerName: string, players: DataGolf
   if (match) return match;
 
   match = players.find((p) => norm(p.displayName).includes(target) || target.includes(norm(p.lastName)));
-  return match || null;
+  if (match) return match;
+
+  const candidates = players.filter((p) => {
+    const pTokens = norm(p.displayName).split(/\s+/).filter(Boolean);
+    if (pTokens.length === 0) return false;
+    return tokens.every((t) => pTokens.includes(t)) || pTokens.every((pt) => tokens.includes(pt));
+  });
+  if (candidates.length === 1) return candidates[0];
+
+  return null;
 }

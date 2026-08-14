@@ -12,6 +12,7 @@ import { parseBetType, autoGradeStatus, timeToMinutes, gradeMakeCut } from "../.
 import { fetchDataGolfData, findDataGolfPlayerMatch, DataGolfPlayerRow } from "../../../lib/datagolf";
 import { computePositions, PositionEntry } from "../../../lib/positions";
 import { nowInCentral } from "../../../lib/centralTime";
+import { normalizeName } from "../../../lib/nameNorm";
 
 const SYNC_LOCK_MS = 45000;
 
@@ -70,7 +71,7 @@ export async function GET() {
   const teeTimeCache = new Map<string, PgaTeeTimeRow[]>();
   let teeTimesChanged = false;
   function normTT(s: string): string {
-    return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim();
+    return normalizeName(s).replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim();
   }
   function matchTeeTime(name: string, rows: PgaTeeTimeRow[]): PgaTeeTimeRow | null {
     const t = normTT(name);

@@ -91,10 +91,11 @@ function norm(s: string): string {
 
 // Matches a bet's free-text player name (e.g. "Koivun", "Chan Kim", "Matt
 // Fitz") against the live leaderboard rows. Tries exact matches first, then
-// falls back to last-name prefix matching to catch common nicknames.
+// progressively more forgiving fallbacks to catch nicknames, missing/extra
+// tokens, and near-misses that are still obviously the same person.
 export function findPlayerMatch(betPlayerName: string, players: PgaPlayerRow[]): PgaPlayerRow | null {
   const target = norm(betPlayerName);
-  const tokens = target.split(/\s+/);
+  const tokens = target.split(/\s+/).filter(Boolean);
   const lastToken = tokens[tokens.length - 1];
 
   let match = players.find((p) => norm(p.displayName) === target);
@@ -110,5 +111,20 @@ export function findPlayerMatch(betPlayerName: string, players: PgaPlayerRow[]):
   if (match) return match;
 
   match = players.find((p) => norm(p.displayName).includes(target) || target.includes(norm(p.lastName)));
-  return match || null;
+  if (match) return match;
+
+  // Token-set fallback: every word in the bet's name shows up somewhere in
+  // the player's full name, or vice versa - regardless of order, and
+  // tolerant of a missing/extra middle name or suffix. Catches things an
+  // exact or prefix match won't, as long as there's exactly one such player
+  // (if it's ambiguous - e.g. two players who share a last name - this
+  // deliberately refuses to guess between them).
+  const candidates = players.filter((p) => {
+    const pTokens = norm(p.displayName).split(/\s+/).filter(Boolean);
+    if (pTokens.length === 0) return false;
+    return tokens.every((t) => pTokens.includes(t)) || pTokens.every((pt) => tokens.includes(pt));
+  });
+  if (candidates.length === 1) return candidates[0];
+
+  return null;
 }
