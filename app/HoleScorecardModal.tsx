@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fetchFresh } from "../lib/fetchFresh";
 
 type Hole = { hole: number; par: number; score: number | null; status?: string | null };
 type Scorecard = { firstNine: Hole[]; firstNineLabel: string; secondNine: Hole[]; secondNineLabel: string };
@@ -149,7 +150,7 @@ export default function HoleScorecardModal({
       return;
     }
     setOverride({ loading: true, scorecard: null });
-    fetch(`/api/scorecard?tournament=${encodeURIComponent(tournament)}&round=${encodeURIComponent(`Round ${n}`)}&player=${encodeURIComponent(player)}`)
+    fetchFresh(`/api/scorecard?tournament=${encodeURIComponent(tournament)}&round=${encodeURIComponent(`Round ${n}`)}&player=${encodeURIComponent(player)}`)
       .then((r) => r.json())
       .then((d) => setOverride({ loading: false, scorecard: d.scorecard || null, message: d.message || d.error, summary: d.summary ?? null }))
       .catch(() => setOverride({ loading: false, scorecard: null, message: "Couldn't load scorecard." }));

@@ -16,6 +16,7 @@ import WeatherStrip from "./WeatherStrip";
 import CourseHistoryTable from "./CourseHistoryTable";
 import CourseFactsPanel from "./CourseFactsPanel";
 import LiveLeaderboardTable from "./LiveLeaderboardTable";
+import { fetchFresh } from "../lib/fetchFresh";
 
 
 const SYNC_INTERVAL_MS = 60000;
@@ -329,7 +330,7 @@ export default function Page() {
       return;
     }
     setScorecardModal({ betId, tournament: tourn, round, player, loading: true, scorecard: null });
-    fetch(`/api/scorecard?tournament=${encodeURIComponent(tourn)}&round=${encodeURIComponent(round)}&player=${encodeURIComponent(player)}`)
+    fetchFresh(`/api/scorecard?tournament=${encodeURIComponent(tourn)}&round=${encodeURIComponent(round)}&player=${encodeURIComponent(player)}`)
       .then((r) => r.json())
       .then((d) => {
         setScorecardModal({
@@ -349,14 +350,14 @@ export default function Page() {
   }
 
   function loadBets() {
-    return fetch("/api/bets")
+    return fetchFresh("/api/bets")
       .then((r) => r.json())
       .then((d) => setBets(d.bets))
       .catch(() => {});
   }
 
   function runSync() {
-    fetch("/api/sync")
+    fetchFresh("/api/sync")
       .then((r) => r.json())
       .then((d) => {
         setLastSynced(new Date());
@@ -371,8 +372,8 @@ export default function Page() {
   }
 
   function loadParlaysAndArchive() {
-    fetch("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
-    fetch("/api/parlays").then((r) => r.json()).then((d) => {
+    fetchFresh("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
+    fetchFresh("/api/parlays").then((r) => r.json()).then((d) => {
       setLiveParlays(d.parlays || []);
       setCutlineProbs(d.cutlineProbs || []);
     });
@@ -380,7 +381,7 @@ export default function Page() {
 
   useEffect(() => {
     loadBets().then(() => runSync());
-    fetch("/api/mapping").then((r) => r.json()).then((d) => setMapping(d.mapping || EMPTY_MAPPING));
+    fetchFresh("/api/mapping").then((r) => r.json()).then((d) => setMapping(d.mapping || EMPTY_MAPPING));
     loadParlaysAndArchive();
     const interval = setInterval(runSync, SYNC_INTERVAL_MS);
     const parlayInterval = setInterval(loadParlaysAndArchive, SYNC_INTERVAL_MS);
@@ -403,7 +404,7 @@ export default function Page() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setSaving(true);
     saveTimer.current = setTimeout(() => {
-      fetch("/api/bets", {
+      fetchFresh("/api/bets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ passcode, bets: next }),

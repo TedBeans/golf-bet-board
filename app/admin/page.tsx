@@ -15,6 +15,7 @@ import GolfFlagIcon from "../GolfFlagIcon";
 import HoleScorecardModal from "../HoleScorecardModal";
 import { useScorecardPopover } from "../useScorecardPopover";
 import { COURSE_FACTS } from "../CourseFactsPanel";
+import { fetchFresh } from "../../lib/fetchFresh";
 
 function ArchivedRoundBets({ bets }: { bets: Bet[] }) {
   const { openKey, state, open, openTournament, openRound } = useScorecardPopover();
@@ -122,9 +123,9 @@ export default function AdminPage() {
   function downloadBackup() {
     setBackupMsg("Preparing backup…");
     Promise.all([
-      fetch("/api/bets").then((r) => r.json()),
-      fetch("/api/archive").then((r) => r.json()),
-      fetch("/api/mapping").then((r) => r.json()),
+      fetchFresh("/api/bets").then((r) => r.json()),
+      fetchFresh("/api/archive").then((r) => r.json()),
+      fetchFresh("/api/mapping").then((r) => r.json()),
     ]).then(([betsData, archiveData, mappingData]) => {
       const payload = {
         exportedAt: new Date().toISOString(),
@@ -153,17 +154,17 @@ export default function AdminPage() {
       setPasscode(stored);
       setUnlocked(true);
     }
-    fetch("/api/bets").then((r) => r.json()).then((d) => setBets(d.bets || []));
-    fetch("/api/mapping").then((r) => r.json()).then((d) => setMapping(d.mapping || EMPTY_MAPPING));
-    fetch("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
-    fetch("/api/settings").then((r) => r.json()).then((d) => setSettings(d.settings || DEFAULT_SETTINGS));
-    fetch("/api/parlays").then((r) => r.json()).then((d) => setLiveParlays(d.parlays || []));
-    fetch("/api/parlay-archive").then((r) => r.json()).then((d) => setParlayArchiveList(d.archive || []));
+    fetchFresh("/api/bets").then((r) => r.json()).then((d) => setBets(d.bets || []));
+    fetchFresh("/api/mapping").then((r) => r.json()).then((d) => setMapping(d.mapping || EMPTY_MAPPING));
+    fetchFresh("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
+    fetchFresh("/api/settings").then((r) => r.json()).then((d) => setSettings(d.settings || DEFAULT_SETTINGS));
+    fetchFresh("/api/parlays").then((r) => r.json()).then((d) => setLiveParlays(d.parlays || []));
+    fetchFresh("/api/parlay-archive").then((r) => r.json()).then((d) => setParlayArchiveList(d.archive || []));
   }, []);
 
   function tryUnlock() {
     setLockError("");
-    fetch("/api/mapping", {
+    fetchFresh("/api/mapping", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, mapping }),
@@ -214,7 +215,7 @@ export default function AdminPage() {
   const [expandedArchiveTourn, setExpandedArchiveTourn] = useState<string | null>(null);
 
   function restoreArchiveGroup(tourn: string, round: string) {
-    fetch("/api/archive", {
+    fetchFresh("/api/archive", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, tournament: tourn, round }),
@@ -235,7 +236,7 @@ export default function AdminPage() {
 
   function fixArchiveGroupDate(tourn: string, round: string, newDate: string) {
     if (!newDate) return;
-    fetch("/api/archive", {
+    fetchFresh("/api/archive", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, tournament: tourn, round, fixDate: newDate }),
@@ -254,7 +255,7 @@ export default function AdminPage() {
 
   function deleteArchiveGroup(tourn: string, round: string) {
     if (!confirm(`Permanently remove ${tourn} · ${round} from the recap? This can't be undone.`)) return;
-    fetch("/api/archive", {
+    fetchFresh("/api/archive", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, tournament: tourn, round }),
@@ -272,7 +273,7 @@ export default function AdminPage() {
   }
 
   function saveSettings() {
-    fetch("/api/settings", {
+    fetchFresh("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, settings }),
@@ -312,7 +313,7 @@ export default function AdminPage() {
     const label = renameValue.trim();
     const oddsPrice = renameOdds.trim();
     if (!label || !oddsPrice) return;
-    fetch("/api/parlays", {
+    fetchFresh("/api/parlays", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, parlayId, label, oddsPrice }),
@@ -334,7 +335,7 @@ export default function AdminPage() {
   // already archived, corrects it in place - e.g. a leg that auto-graded
   // wrong, or a leg that turned out to be a push on the sportsbook's end.
   function settleParlay(parlay: Parlay, result: "hit" | "miss" | "push") {
-    fetch("/api/parlays", {
+    fetchFresh("/api/parlays", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, parlayId: parlay.id, manualStatus: result }),
@@ -353,7 +354,7 @@ export default function AdminPage() {
   }
 
   function reopenParlay(parlay: Parlay) {
-    fetch("/api/parlays", {
+    fetchFresh("/api/parlays", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, parlayId: parlay.id, reopen: true }),
@@ -370,7 +371,7 @@ export default function AdminPage() {
 
   function deleteParlay(parlay: Parlay) {
     if (!confirm(`Delete "${parlay.label}"? This cannot be undone.`)) return;
-    fetch("/api/parlays", {
+    fetchFresh("/api/parlays", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, parlayId: parlay.id }),
@@ -410,7 +411,7 @@ export default function AdminPage() {
       personal: allLegsPersonal,
     };
 
-    fetch("/api/parlays", {
+    fetchFresh("/api/parlays", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, parlay }),
@@ -431,7 +432,7 @@ export default function AdminPage() {
   }
 
   function forceArchive(tourn: string, round: string) {
-    fetch("/api/archive", {
+    fetchFresh("/api/archive", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, tournament: tourn, round }),
@@ -450,7 +451,7 @@ export default function AdminPage() {
 
   function deleteSingleBet(betId: string) {
     const updated = bets.filter((b) => b.id !== betId);
-    fetch("/api/bets", {
+    fetchFresh("/api/bets", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, bets: updated }),
@@ -466,7 +467,7 @@ export default function AdminPage() {
   }
 
   function saveMapping() {
-    fetch("/api/mapping", {
+    fetchFresh("/api/mapping", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, mapping }),
@@ -490,7 +491,7 @@ export default function AdminPage() {
       },
     };
     setMapping(nextMapping);
-    fetch("/api/mapping", {
+    fetchFresh("/api/mapping", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, mapping: nextMapping }),
@@ -537,7 +538,7 @@ export default function AdminPage() {
     }
     const nextMapping: Mapping = { ...mapping, tournaments: nextTournaments };
     setMapping(nextMapping);
-    fetch("/api/mapping", {
+    fetchFresh("/api/mapping", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, mapping: nextMapping }),
@@ -548,7 +549,7 @@ export default function AdminPage() {
   }
 
   function fixTournamentNamePunctuation() {
-    fetch("/api/fix-tournament-names", {
+    fetchFresh("/api/fix-tournament-names", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode }),
@@ -568,10 +569,10 @@ export default function AdminPage() {
           // Refetch everything this could have touched, rather than trying
           // to patch local state field-by-field for four different
           // collections.
-          fetch("/api/bets").then((r) => r.json()).then((d2) => setBets(d2.bets || []));
-          fetch("/api/archive").then((r) => r.json()).then((d2) => setArchive(d2.archive || []));
-          fetch("/api/parlays").then((r) => r.json()).then((d2) => setLiveParlays(d2.parlays || []));
-          fetch("/api/parlay-archive").then((r) => r.json()).then((d2) => setParlayArchiveList(d2.archive || []));
+          fetchFresh("/api/bets").then((r) => r.json()).then((d2) => setBets(d2.bets || []));
+          fetchFresh("/api/archive").then((r) => r.json()).then((d2) => setArchive(d2.archive || []));
+          fetchFresh("/api/parlays").then((r) => r.json()).then((d2) => setLiveParlays(d2.parlays || []));
+          fetchFresh("/api/parlay-archive").then((r) => r.json()).then((d2) => setParlayArchiveList(d2.archive || []));
         }
         setTimeout(() => setSaveMsg(""), 8000);
       });
@@ -607,12 +608,12 @@ export default function AdminPage() {
       loadedDate: winnerDate,
     };
 
-    fetch("/api/bets")
+    fetchFresh("/api/bets")
       .then((r) => r.json())
       .then((d) => {
         const current: Bet[] = d.bets || [];
         const merged = [...current, newBet];
-        return fetch("/api/bets", {
+        return fetchFresh("/api/bets", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ passcode, bets: merged }),
@@ -648,12 +649,12 @@ export default function AdminPage() {
     if (!preview || preview.bets.length === 0) return;
 
     const liveIds = new Set(bets.map((b) => b.id));
-    fetch("/api/bets")
+    fetchFresh("/api/bets")
       .then((r) => r.json())
       .then((d) => {
         const current: Bet[] = d.bets || [];
         const merged = [...current, ...preview.bets];
-        return fetch("/api/bets", {
+        return fetchFresh("/api/bets", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ passcode, bets: merged }),
@@ -680,12 +681,12 @@ export default function AdminPage() {
   function confirmPersonal() {
     if (!personalPreview || personalPreview.bets.length === 0) return;
 
-    fetch("/api/bets")
+    fetchFresh("/api/bets")
       .then((r) => r.json())
       .then((d) => {
         const current: Bet[] = d.bets || [];
         const merged = [...current, ...personalPreview.bets];
-        return fetch("/api/bets", {
+        return fetchFresh("/api/bets", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ passcode, bets: merged }),
@@ -724,7 +725,7 @@ export default function AdminPage() {
     const orderMap = new Map(reordered.map((b, i) => [b.id, i]));
     const updated = bets.map((b) => (orderMap.has(b.id) ? { ...b, personalOrder: orderMap.get(b.id) } : b));
     setBets(updated);
-    fetch("/api/bets", {
+    fetchFresh("/api/bets", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, bets: updated }),
@@ -737,7 +738,7 @@ export default function AdminPage() {
   function togglePersonalHidden(betId: string) {
     const updated = bets.map((b) => (b.id === betId ? { ...b, hidden: !b.hidden } : b));
     setBets(updated);
-    fetch("/api/bets", {
+    fetchFresh("/api/bets", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, bets: updated }),
@@ -745,7 +746,7 @@ export default function AdminPage() {
   }
 
   function archivePersonalBet(betId: string) {
-    fetch("/api/bets", {
+    fetchFresh("/api/bets", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, betId }),
@@ -770,7 +771,7 @@ export default function AdminPage() {
         : b
     );
     setBets(updated);
-    fetch("/api/bets", {
+    fetchFresh("/api/bets", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, bets: updated }),
@@ -789,7 +790,7 @@ export default function AdminPage() {
     const orderMap = new Map(reordered.map((p, i) => [p.id, i]));
     const updated = liveParlays.map((p) => (orderMap.has(p.id) ? { ...p, personalOrder: orderMap.get(p.id) } : p));
     setLiveParlays(updated);
-    fetch("/api/parlays", {
+    fetchFresh("/api/parlays", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passcode, parlays: updated }),
@@ -807,12 +808,12 @@ export default function AdminPage() {
     const archiveChanged = archiveFixed.filter((b, i) => b.oddsUnits !== archive[i]?.oddsUnits).length;
 
     Promise.all([
-      fetch("/api/bets", {
+      fetchFresh("/api/bets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ passcode, bets: liveFixed }),
       }),
-      fetch("/api/archive", {
+      fetchFresh("/api/archive", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ passcode, archive: archiveFixed }),

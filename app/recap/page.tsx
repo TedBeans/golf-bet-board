@@ -11,6 +11,7 @@ import { Parlay } from "../../lib/parlay";
 import GolfFlagIcon from "../GolfFlagIcon";
 import HoleScorecardModal from "../HoleScorecardModal";
 import { useScorecardPopover } from "../useScorecardPopover";
+import { fetchFresh } from "../../lib/fetchFresh";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const WEEKDAY_NAMES = ["S","M","T","W","T","F","S"];
@@ -261,9 +262,9 @@ export default function RecapPage() {
   const [parlayArchive, setParlayArchive] = useState<Parlay[]>([]);
 
   useEffect(() => {
-    fetch("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
-    fetch("/api/mapping").then((r) => r.json()).then((d) => setMapping(d.mapping || EMPTY_MAPPING));
-    fetch("/api/parlay-archive").then((r) => r.json()).then((d) => setParlayArchive(d.archive || []));
+    fetchFresh("/api/archive").then((r) => r.json()).then((d) => setArchive(d.archive || []));
+    fetchFresh("/api/mapping").then((r) => r.json()).then((d) => setMapping(d.mapping || EMPTY_MAPPING));
+    fetchFresh("/api/parlay-archive").then((r) => r.json()).then((d) => setParlayArchive(d.archive || []));
   }, []);
 
   const regularParlayArchive = useMemo(() => parlayArchive.filter((p) => !p.personal), [parlayArchive]);

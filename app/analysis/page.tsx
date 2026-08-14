@@ -12,6 +12,7 @@ import { parseBetType, friendlyLabel } from "../../lib/betLogic";
 import { computeUnitResult, formatUnits } from "../../lib/units";
 import { centralDateFromISO } from "../../lib/centralTime";
 import GolfFlagIcon from "../GolfFlagIcon";
+import { fetchFresh } from "../../lib/fetchFresh";
 
 const GREEN = "#4CAF6E";
 const RED = "#C06A4C";
@@ -55,8 +56,8 @@ export default function AnalysisPage() {
   const [barGroupBy, setBarGroupBy] = useState<"player" | "type" | "tournament" | "courseType">("player");
 
   useEffect(() => {
-    fetch("/api/archive").then((r) => r.json()).then((d) => setArchive((d.archive || []).filter((b: Bet) => !b.personal)));
-    fetch("/api/mapping").then((r) => r.json()).then((d) => setMapping(d.mapping || null));
+    fetchFresh("/api/archive").then((r) => r.json()).then((d) => setArchive((d.archive || []).filter((b: Bet) => !b.personal)));
+    fetchFresh("/api/mapping").then((r) => r.json()).then((d) => setMapping(d.mapping || null));
   }, []);
 
   const players = useMemo(() => Array.from(new Set(archive.map((b) => b.player))).sort(), [archive]);

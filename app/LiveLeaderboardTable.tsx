@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import HoleScorecardModal from "./HoleScorecardModal";
 import { useScorecardPopover } from "./useScorecardPopover";
+import { fetchFresh } from "../lib/fetchFresh";
 
 type LeaderboardRow = {
   id: string;
@@ -39,7 +40,7 @@ export default function LiveLeaderboardTable({ tournamentName }: { tournamentNam
   useEffect(() => {
     let cancelled = false;
     function load() {
-      fetch(`/api/leaderboard?tournament=${encodeURIComponent(tournamentName)}`)
+      fetchFresh(`/api/leaderboard?tournament=${encodeURIComponent(tournamentName)}`)
         .then((r) => r.json())
         .then((d) => {
           if (cancelled) return;

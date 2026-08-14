@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fetchFresh } from "../lib/fetchFresh";
 
 type ScorecardState = {
   loading: boolean;
@@ -31,7 +32,7 @@ export function useScorecardPopover() {
     setOpenTournament(tournament);
     setOpenRound(round);
     setState({ loading: true, scorecard: null });
-    fetch(`/api/scorecard?tournament=${encodeURIComponent(tournament)}&round=${encodeURIComponent(round)}&player=${encodeURIComponent(player)}`)
+    fetchFresh(`/api/scorecard?tournament=${encodeURIComponent(tournament)}&round=${encodeURIComponent(round)}&player=${encodeURIComponent(player)}`)
       .then((r) => r.json())
       .then((d) => {
         setState({
