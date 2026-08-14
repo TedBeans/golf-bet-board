@@ -2,6 +2,7 @@ import { Bet } from "./seed";
 import { defaultUnitsToWinOne } from "./units";
 import { deriveBetPhrase } from "./parseCombined";
 import { Mapping } from "./mapping";
+import { nowInCentral } from "./centralTime";
 
 export type ParsePersonalResult = { bets: Bet[]; warnings: string[] };
 
@@ -67,8 +68,7 @@ export function parsePersonalText(text: string, forDate: string | undefined, map
 
   let loadedDate = forDate;
   if (!loadedDate) {
-    const today = new Date();
-    loadedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    loadedDate = nowInCentral().dateStr;
   }
 
   let currentTournament = "";

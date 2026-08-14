@@ -26,7 +26,10 @@ function fingerprint(s: string): string {
 // any of the app's normal client state or caching in the way. Two people
 // with the same fingerprint are guaranteed to be looking at the exact same
 // underlying data, regardless of what either of their screens shows.
-export async function GET() {
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const playerQuery = searchParams.get("player")?.toLowerCase().trim();
+
   const [bets, archive] = await Promise.all([
     redis.get<Bet[]>(BETS_KEY),
     redis.get<Bet[]>(ARCHIVE_KEY),
@@ -52,6 +55,21 @@ export async function GET() {
     else groups[key].pending++;
   }
 
+  // Optional: raw records for a specific player, including every date
+  // field - useful for chasing a "shows up everywhere except Calendar"
+  // kind of bug, since Calendar buckets by loadedDate (falling back to
+  // archivedAt) while every other view just checks presence/status.
+  const matches = playerQuery
+    ? allBets
+        .filter((b) => b.player?.toLowerCase().includes(playerQuery))
+        .map((b) => ({
+          id: b.id, player: b.player, bet: b.bet, t: b.t, r: b.r, personal: !!b.personal,
+          status: b.status, loadedDate: b.loadedDate ?? null, archivedAt: b.archivedAt ?? null,
+          inLiveArray: (bets || []).some((x) => x.id === b.id),
+          inArchiveArray: (archive || []).some((x) => x.id === b.id),
+        }))
+    : undefined;
+
   return noCacheJson({
     generatedAt: new Date().toISOString(),
     betsInProgress: (bets || []).length,
@@ -59,5 +77,6 @@ export async function GET() {
     totalBets: allBets.length,
     fingerprint: fingerprint(summary),
     byTournamentRound: groups,
+    ...(matches ? { matches } : {}),
   });
 }

@@ -11,21 +11,29 @@ type VerifyData = {
   totalBets: number;
   fingerprint: string;
   byTournamentRound: Record<string, { wins: number; losses: number; live: number; pending: number }>;
+  matches?: {
+    id: string; player: string; bet: string; t: string; r: string; personal: boolean;
+    status: string; loadedDate: string | null; archivedAt: string | null;
+    inLiveArray: boolean; inArchiveArray: boolean;
+  }[];
 };
 
 export default function VerifyPage() {
   const [data, setData] = useState<VerifyData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [playerQuery, setPlayerQuery] = useState("");
 
-  function load() {
+  function load(query?: string) {
     setLoading(true);
-    fetchFresh("/api/verify")
+    const q = query !== undefined ? query : playerQuery;
+    const url = q.trim() ? `/api/verify?player=${encodeURIComponent(q.trim())}` : "/api/verify";
+    fetchFresh(url)
       .then((r) => r.json())
       .then((d) => { setData(d); setLoading(false); })
       .catch(() => setLoading(false));
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(""); }, []);
 
   return (
     <div className="wrap" style={{ maxWidth: 640, margin: "0 auto", padding: "16px 14px" }}>
@@ -43,9 +51,51 @@ export default function VerifyPage() {
         screen looks off for another reason.
       </div>
 
-      <button className="add-btn-inline" onClick={load} disabled={loading} style={{ marginBottom: 20 }}>
+      <button className="add-btn-inline" onClick={() => load()} disabled={loading} style={{ marginBottom: 20 }}>
         {loading ? "Checking…" : "Check again"}
       </button>
+
+      <div style={{ marginBottom: 20 }}>
+        <div className="subline" style={{ marginBottom: 6 }}>Look up a specific player's raw bet records</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            type="text"
+            placeholder="e.g. Aberg"
+            value={playerQuery}
+            onChange={(e) => setPlayerQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && load()}
+            style={{
+              flex: 1, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)", color: "var(--cream)",
+              fontFamily: "'JetBrains Mono',monospace", fontSize: 13, padding: "8px 10px", borderRadius: 3,
+            }}
+          />
+          <button className="add-btn-inline" onClick={() => load()}>Search</button>
+        </div>
+      </div>
+
+      {data?.matches && (
+        <div style={{ marginBottom: 20 }}>
+          <div className="subline" style={{ marginBottom: 8 }}>
+            {data.matches.length} match(es)
+          </div>
+          {data.matches.length === 0 && (
+            <div className="card" style={{ padding: 14, color: "var(--clay)" }}>
+              No bet found for that name anywhere in the live or archived data - it genuinely
+              doesn't exist in the database right now, not just a display issue.
+            </div>
+          )}
+          {data.matches.map((m) => (
+            <div key={m.id} className="card" style={{ marginBottom: 8, padding: 14, fontSize: 12 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>{m.player} · {m.bet}</div>
+              <div style={{ color: "var(--cream-dim)", marginBottom: 6 }}>{m.t} · {m.r} · {m.personal ? "personal" : "regular"}</div>
+              <div>status: <b>{m.status}</b></div>
+              <div>loadedDate: <b>{m.loadedDate ?? "(not set)"}</b></div>
+              <div>archivedAt: <b>{m.archivedAt ?? "(not archived - still live)"}</b></div>
+              <div>in live array: <b>{m.inLiveArray ? "yes" : "no"}</b> · in archive array: <b>{m.inArchiveArray ? "yes" : "no"}</b></div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {data && (
         <>

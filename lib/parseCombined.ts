@@ -1,6 +1,7 @@
 import { Bet } from "./seed";
 import { detectCategory } from "./parseOdds";
 import { defaultUnitsToWinOne } from "./units";
+import { nowInCentral } from "./centralTime";
 
 // A header line like "Scottish Open Round 4" - tournament and round
 // together on one line.
@@ -86,8 +87,7 @@ export function parseCombinedText(
 
   let loadedDate = forDate;
   if (!loadedDate) {
-    const today = new Date();
-    loadedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    loadedDate = nowInCentral().dateStr;
   }
 
   let currentTournament = "";
