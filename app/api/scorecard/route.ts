@@ -7,6 +7,7 @@ import { extractHoleScores, extractScorecardStats, summarizeHoleScores, roundNum
 import { fetchOpenLeaderboard } from "../../../lib/theopen";
 import { extractOpenPlayers, findOpenPlayerMatch, extractOpenHoleScorecard, computeOpenStats } from "../../../lib/openMatch";
 import { computePositions, PositionEntry } from "../../../lib/positions";
+import { noCacheJson } from "../../../lib/noCacheJson";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
   const round = searchParams.get("round") || "Round 1";
 
   if (!tournament || !player) {
-    return NextResponse.json({ error: "Missing tournament or player" }, { status: 400 });
+    return noCacheJson({ error: "Missing tournament or player" }, { status: 400 });
   }
 
   const mapping = (await redis.get<Mapping>(MAPPING_KEY)) || { tournaments: {} };
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
       const players = extractOpenPlayers(raw);
       const row = findOpenPlayerMatch(player, players);
       if (!row) {
-        return NextResponse.json({ error: `No match for ${player} on theopen.com's leaderboard` }, { status: 404 });
+        return noCacheJson({ error: `No match for ${player} on theopen.com's leaderboard` }, { status: 404 });
       }
 
       // Same field-wide ranking already used for personal Winner/Top N bets
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
 
       const scorecard = extractOpenHoleScorecard(row, roundNum);
       if (!scorecard) {
-        return NextResponse.json({
+        return noCacheJson({
           available: false,
           player: row.displayName,
           position,
@@ -74,15 +75,15 @@ export async function GET(req: NextRequest) {
         gir: null, // not derivable from theopen.com's traditional feed
         fairways: null,
       };
-      return NextResponse.json({ available: true, player: row.displayName, position, totalToPar, scorecard, summary });
+      return noCacheJson({ available: true, player: row.displayName, position, totalToPar, scorecard, summary });
     } catch (e: any) {
-      return NextResponse.json({ error: e.message || "Failed to load scorecard" }, { status: 500 });
+      return noCacheJson({ error: e.message || "Failed to load scorecard" }, { status: 500 });
     }
   }
 
   const tournamentId = tournamentMap?.pgaId;
   if (!tournamentId) {
-    return NextResponse.json({ error: "No PGA Tour ID mapped for this tournament" }, { status: 404 });
+    return noCacheJson({ error: "No PGA Tour ID mapped for this tournament" }, { status: 404 });
   }
 
   try {
@@ -90,7 +91,7 @@ export async function GET(req: NextRequest) {
     const players = extractPlayers(raw);
     const row = findPlayerMatch(player, players);
     if (!row) {
-      return NextResponse.json({ error: `No match for ${player} on the leaderboard` }, { status: 404 });
+      return noCacheJson({ error: `No match for ${player} on the leaderboard` }, { status: 404 });
     }
 
     const entries: PositionEntry[] = players.map((p) => ({ id: p.id, totalToPar: p.total }));
@@ -102,7 +103,7 @@ export async function GET(req: NextRequest) {
     const scorecard = extractHoleScores(holeJson, roundNum);
 
     if (!scorecard) {
-      return NextResponse.json({
+      return noCacheJson({
         available: false,
         player: row.displayName,
         position,
@@ -128,8 +129,8 @@ export async function GET(req: NextRequest) {
     }
     const summary = { ...summarizeHoleScores(scorecard), gir, fairways };
 
-    return NextResponse.json({ available: true, player: row.displayName, position, totalToPar, scorecard, summary });
+    return noCacheJson({ available: true, player: row.displayName, position, totalToPar, scorecard, summary });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Failed to load scorecard" }, { status: 500 });
+    return noCacheJson({ error: e.message || "Failed to load scorecard" }, { status: 500 });
   }
 }

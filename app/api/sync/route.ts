@@ -13,6 +13,7 @@ import { fetchDataGolfData, findDataGolfPlayerMatch, DataGolfPlayerRow } from ".
 import { computePositions, PositionEntry } from "../../../lib/positions";
 import { nowInCentral } from "../../../lib/centralTime";
 import { normalizeName } from "../../../lib/nameNorm";
+import { noCacheJson } from "../../../lib/noCacheJson";
 
 const SYNC_LOCK_MS = 45000;
 
@@ -25,17 +26,6 @@ const SYNC_LOCK_MS = 45000;
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
-
-// Belt-and-suspenders: the exports above stop Next.js/its own fetch cache
-// from serving anything stale, but an explicit Cache-Control header is
-// what a CDN edge layer in front of the function actually respects -
-// route-level dynamic/fetchCache exports don't necessarily reach that far.
-function noCacheJson(body: any, init?: { status?: number }) {
-  return NextResponse.json(body, {
-    ...init,
-    headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
-  });
-}
 
 // Triggered by the browser (not a server cron - see README) roughly once a
 // minute while the board is open. No passcode required: this route only

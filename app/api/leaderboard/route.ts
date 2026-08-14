@@ -6,6 +6,7 @@ import { extractPlayers } from "../../../lib/pgaMatch";
 import { fetchOpenLeaderboard } from "../../../lib/theopen";
 import { extractOpenPlayers, computeOpenStats } from "../../../lib/openMatch";
 import { computePositions, PositionEntry, positionRank } from "../../../lib/positions";
+import { noCacheJson } from "../../../lib/noCacheJson";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const tournament = searchParams.get("tournament");
   if (!tournament) {
-    return NextResponse.json({ error: "Missing tournament" }, { status: 400 });
+    return noCacheJson({ error: "Missing tournament" }, { status: 400 });
   }
 
   const mapping = (await redis.get<Mapping>(MAPPING_KEY)) || { tournaments: {} };
@@ -70,15 +71,15 @@ export async function GET(req: NextRequest) {
         };
       });
 
-      return NextResponse.json({ ok: true, players: sortByPosition(rows) });
+      return noCacheJson({ ok: true, players: sortByPosition(rows) });
     } catch (e: any) {
-      return NextResponse.json({ error: e.message || "Failed to load leaderboard" }, { status: 500 });
+      return noCacheJson({ error: e.message || "Failed to load leaderboard" }, { status: 500 });
     }
   }
 
   const tournamentId = tournamentMap?.pgaId;
   if (!tournamentId) {
-    return NextResponse.json({ error: "No PGA Tour ID mapped for this tournament" }, { status: 404 });
+    return noCacheJson({ error: "No PGA Tour ID mapped for this tournament" }, { status: 404 });
   }
 
   try {
@@ -96,8 +97,8 @@ export async function GET(req: NextRequest) {
       thru: p.thru,
     }));
 
-    return NextResponse.json({ ok: true, players: sortByPosition(rows) });
+    return noCacheJson({ ok: true, players: sortByPosition(rows) });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Failed to load leaderboard" }, { status: 500 });
+    return noCacheJson({ error: e.message || "Failed to load leaderboard" }, { status: 500 });
   }
 }

@@ -3,6 +3,7 @@ import { redis, PARLAYS_KEY, PARLAY_ARCHIVE_KEY, BETS_KEY, ARCHIVE_KEY, DG_CUTLI
 import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../../../lib/parlay";
 import { Bet } from "../../../lib/seed";
 import { CutlineProb } from "../../../lib/datagolf";
+import { noCacheJson } from "../../../lib/noCacheJson";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -34,7 +35,7 @@ export async function GET() {
     cutlineProbs = cutlineEntry.cutlineProbs;
   }
 
-  return NextResponse.json({ parlays: parlays || [], cutlineProbs });
+  return noCacheJson({ parlays: parlays || [], cutlineProbs });
 }
 
 export async function POST(req: NextRequest) {

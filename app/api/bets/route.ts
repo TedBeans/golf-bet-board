@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { redis, BETS_KEY } from "../../../lib/redis";
 import { SEED, Bet } from "../../../lib/seed";
+import { noCacheJson } from "../../../lib/noCacheJson";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -12,7 +13,7 @@ export async function GET() {
     bets = SEED;
     await redis.set(BETS_KEY, bets);
   }
-  return NextResponse.json({ bets });
+  return noCacheJson({ bets });
 }
 
 export async function POST(req: NextRequest) {
