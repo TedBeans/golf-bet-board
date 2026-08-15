@@ -167,11 +167,26 @@ export type DpwtTeeTimeEntry = { time: string; playerName: string };
 // hash-locked GraphQL system the shot feed turned out to use). Rather than
 // spend more time chasing that down, this parses the visible table text
 // directly - select the tee-time table on the page, copy, and paste the
-// result here. Deliberately forgiving about exact formatting since a
-// browser's table-copy behavior varies: looks for an "HH:MM" time at the
-// start of each row, then pulls every "Lastname, Firstname" name out of
-// the rest of that line (a tee time applies to every player in the
-// group, not just the first one listed).
+// result here.
+//
+// The browser's actual copy behavior for this table puts every field on
+// its own line, not one row per line - something like:
+//   02:50
+//   1
+//   17
+//   Flag for FRA
+//   GUILLAMOUNDEGUY, Oihan
+//   Flag for AUT
+//   WIESBERGER, Bernd
+//   Flag for ESP
+//   AYORA, Angel
+//   03:30
+//   ...
+// So this just scans line by line, tracking whichever time was most
+// recently seen on its own line, and pairs every "Lastname, Firstname"
+// line after that with it - "Flag for XXX" lines, bare tee/group numbers,
+// and the header row are all silently skipped since none of them match
+// either pattern.
 //
 // Times come through with no AM/PM marker on this site (24-hour-ish, but
 // only ever showing early-morning hours once displayed in the viewer's
@@ -182,21 +197,22 @@ export function parseDpwtTeeTimesText(raw: string): DpwtTeeTimeEntry[] {
   const entries: DpwtTeeTimeEntry[] = [];
   const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
 
-  for (const line of lines) {
-    const timeMatch = line.match(/^(\d{1,2}):(\d{2})\b/);
-    if (!timeMatch) continue;
-    let hour = parseInt(timeMatch[1], 10);
-    const minute = timeMatch[2];
-    if (hour === 0) hour = 12;
-    const time = `${hour}:${minute} AM`;
+  const timeOnlyRe = /^(\d{1,2}):(\d{2})$/;
+  const nameRe = /^([A-ZÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'\-]+(?:\s[A-ZÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'\-]+)*),\s*([A-ZÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'\-]+(?:\s[A-Za-zÀ-ÖØ-öø-ÿ'\-]+)*)$/;
 
-    // "Lastname, Firstname" pairs anywhere in the rest of the line -
-    // handles all three Player columns whether they're tab-separated,
-    // multi-space-separated, or on the same line some other way.
-    const nameMatches = line.matchAll(/([A-ZÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'\-]+(?:\s[A-ZÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'\-]+)*),\s*([A-ZÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'\-]+(?:\s[A-Za-zÀ-ÖØ-öø-ÿ'\-]+)*)/g);
-    for (const m of nameMatches) {
-      const [, lastName, firstName] = m;
-      entries.push({ time, playerName: `${firstName} ${lastName}` });
+  let currentTime: string | null = null;
+  for (const line of lines) {
+    const timeMatch = line.match(timeOnlyRe);
+    if (timeMatch) {
+      let hour = parseInt(timeMatch[1], 10);
+      if (hour === 0) hour = 12;
+      currentTime = `${hour}:${timeMatch[2]} AM`;
+      continue;
+    }
+    const nameMatch = line.match(nameRe);
+    if (nameMatch && currentTime) {
+      const [, lastName, firstName] = nameMatch;
+      entries.push({ time: currentTime, playerName: `${firstName} ${lastName}` });
     }
   }
 
