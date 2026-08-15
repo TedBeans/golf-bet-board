@@ -294,9 +294,10 @@ export async function GET() {
     if (bet.status === "pending") continue; // hasn't teed off yet - nothing to fetch
 
     const tournamentMap = mapping.tournaments[bet.t];
-    if (!tournamentMap?.pgaId) continue;
+    const isDpwt = tournamentMap?.dataSource === "dpwt";
+    if (!tournamentMap?.pgaId && !isDpwt) continue;
     if (tournamentMap.suspendedType && tournamentMap.suspendedType !== "none") continue; // play stopped - nothing new to fetch
-    const tournamentId = tournamentMap.pgaId;
+    const tournamentId = tournamentMap.pgaId; // unused on the dpwt branch below, which reads tournamentMap.dpwt.eventId instead
 
     try {
       const parsed = parseBetType(bet.bet);
