@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../../lib/seed";
-import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
+import { Mapping, EMPTY_MAPPING, tourLabel } from "../../lib/mapping";
 import { parseBetType, trendClassName, friendlyLabel, formatScore } from "../../lib/betLogic";
 import { computeUnitResult, computeParlayUnitResult, formatUnits } from "../../lib/units";
 import { centralDateFromISO } from "../../lib/centralTime";
@@ -511,7 +511,25 @@ export default function RecapPage() {
                 </div>
               );
             })()}
-            {Object.keys(tournMap).map((t) => {
+            {(() => {
+              const tournNames = Object.keys(tournMap);
+              const byTour: Record<string, string[]> = {};
+              for (const t of tournNames) {
+                const label = tourLabel(mapping.tournaments[t]?.dataSource);
+                (byTour[label] = byTour[label] || []).push(t);
+              }
+              const tourOrder = Object.keys(byTour).sort((a, b) => {
+                if (a === "PGA Tour") return -1;
+                if (b === "PGA Tour") return 1;
+                return a.localeCompare(b);
+              });
+
+              return tourOrder.map((tour) => (
+                <div key={tour} style={{ marginBottom: 20 }}>
+                  <div className="subline" style={{ marginBottom: 8, fontSize: 12, color: "var(--gold-bright)" }}>
+                    {tour.toUpperCase()}
+                  </div>
+                  {byTour[tour].map((t) => {
               const bets = tournMap[t];
               const agg = aggregate(bets);
               const rounds: Record<string, Bet[]> = {};
@@ -576,6 +594,9 @@ export default function RecapPage() {
                 </div>
               );
             })}
+                </div>
+              ));
+            })()}
           </div>
         )}
 
@@ -605,7 +626,25 @@ export default function RecapPage() {
               );
             })()}
 
-            {Object.keys(personalTournMap).map((t) => {
+            {(() => {
+              const tournNames = Object.keys(personalTournMap);
+              const byTour: Record<string, string[]> = {};
+              for (const t of tournNames) {
+                const label = tourLabel(mapping.tournaments[t]?.dataSource);
+                (byTour[label] = byTour[label] || []).push(t);
+              }
+              const tourOrder = Object.keys(byTour).sort((a, b) => {
+                if (a === "PGA Tour") return -1;
+                if (b === "PGA Tour") return 1;
+                return a.localeCompare(b);
+              });
+
+              return tourOrder.map((tour) => (
+                <div key={tour} style={{ marginBottom: 20 }}>
+                  <div className="subline" style={{ marginBottom: 8, fontSize: 12, color: "var(--gold-bright)" }}>
+                    {tour.toUpperCase()}
+                  </div>
+                  {byTour[tour].map((t) => {
               const tBets = personalTournMap[t];
               const isOpen = expandedTourn === `tedbeans:${t}`;
               const tUnits = Math.round(
@@ -631,7 +670,10 @@ export default function RecapPage() {
                   {isOpen && tBets.map((b) => <BetDetailCard key={b.id} b={b} mapping={mapping} />)}
                 </div>
               );
-            })}
+                  })}
+                </div>
+              ));
+            })()}
 
             {personalParlayArchive.length > 0 && (
               <div style={{ marginTop: 20 }}>

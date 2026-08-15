@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../lib/seed";
-import { Mapping, EMPTY_MAPPING } from "../lib/mapping";
+import { Mapping, EMPTY_MAPPING, tourLabel } from "../lib/mapping";
 import { parseBetType, trend, smartTrend, trendClassName, timeToMinutes, friendlyLabel, formatScore, parseScoreInput, matchPlayStatus } from "../lib/betLogic";
 import { positionRank } from "../lib/positions";
 import { sortByPersonalOrder } from "../lib/personalOrder";
@@ -583,6 +583,7 @@ export default function Page() {
             <div className="tourn-head">
               <div className="tourn-title-row">
                 <h2>{tourn}</h2>
+                <span className="tour-badge">{tourLabel(tm?.dataSource)}</span>
                 {isSuspended && <span className="susp-badge">SUSP</span>}
               </div>
               <div className="tourn-summary">

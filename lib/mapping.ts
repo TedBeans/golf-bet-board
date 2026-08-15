@@ -53,3 +53,12 @@ export type Mapping = {
 };
 
 export const EMPTY_MAPPING: Mapping = { tournaments: {} };
+
+// Short display label for whichever tour a tournament's data comes from -
+// used for the badge on the live board and for bucketing the recap pages
+// by tour. Defaults to PGA Tour since that's the dataSource default too.
+export function tourLabel(dataSource: string | undefined): string {
+  if (dataSource === "dpwt") return "DP World Tour";
+  if (dataSource === "theopen") return "The Open";
+  return "PGA Tour";
+}

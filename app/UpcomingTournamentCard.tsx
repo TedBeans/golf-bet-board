@@ -4,6 +4,7 @@ import WeatherStrip from "./WeatherStrip";
 import CourseHistoryTable from "./CourseHistoryTable";
 import CourseFactsPanel from "./CourseFactsPanel";
 import LiveLeaderboardTable from "./LiveLeaderboardTable";
+import { tourLabel } from "../lib/mapping";
 
 type TournMeta = {
   venue?: string;
@@ -14,6 +15,7 @@ type TournMeta = {
   startDate?: string;
   endDate?: string;
   notes?: string;
+  dataSource?: string;
 };
 
 export default function UpcomingTournamentCard({ name, meta, showLeaderboard }: { name: string; meta: TournMeta; showLeaderboard?: boolean }) {
@@ -26,6 +28,7 @@ export default function UpcomingTournamentCard({ name, meta, showLeaderboard }: 
         <span style={{ fontSize: 11, color: "var(--cream-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
           Upcoming
         </span>
+        <span className="tour-badge">{tourLabel(meta.dataSource)}</span>
       </div>
       <div className="subline" style={{ marginTop: 4, textTransform: "none", letterSpacing: 0 }}>
         {[meta.dateRange, meta.venue, meta.location].filter(Boolean).join(" · ")}
