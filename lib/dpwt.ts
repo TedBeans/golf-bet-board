@@ -158,3 +158,47 @@ export function parseDpwtRosterCapture(raw: string): DpwtRosterSeed {
 
   return { holePars, players };
 }
+
+export type DpwtTeeTimeEntry = { time: string; playerName: string };
+
+// DP World Tour tee times: no confirmed API for this (the tee-times page
+// is client-rendered same as everywhere else on this site, and it's
+// unclear whether the real data comes from a plain REST call or the same
+// hash-locked GraphQL system the shot feed turned out to use). Rather than
+// spend more time chasing that down, this parses the visible table text
+// directly - select the tee-time table on the page, copy, and paste the
+// result here. Deliberately forgiving about exact formatting since a
+// browser's table-copy behavior varies: looks for an "HH:MM" time at the
+// start of each row, then pulls every "Lastname, Firstname" name out of
+// the rest of that line (a tee time applies to every player in the
+// group, not just the first one listed).
+//
+// Times come through with no AM/PM marker on this site (24-hour-ish, but
+// only ever showing early-morning hours once displayed in the viewer's
+// local time) - assumed AM below to match what's actually been observed.
+// If DP World Tour ever shows a PM group this way, that assumption would
+// need revisiting.
+export function parseDpwtTeeTimesText(raw: string): DpwtTeeTimeEntry[] {
+  const entries: DpwtTeeTimeEntry[] = [];
+  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    const timeMatch = line.match(/^(\d{1,2}):(\d{2})\b/);
+    if (!timeMatch) continue;
+    let hour = parseInt(timeMatch[1], 10);
+    const minute = timeMatch[2];
+    if (hour === 0) hour = 12;
+    const time = `${hour}:${minute} AM`;
+
+    // "Lastname, Firstname" pairs anywhere in the rest of the line -
+    // handles all three Player columns whether they're tab-separated,
+    // multi-space-separated, or on the same line some other way.
+    const nameMatches = line.matchAll(/([A-ZÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'\-]+(?:\s[A-ZÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'\-]+)*),\s*([A-ZÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'\-]+(?:\s[A-Za-zÀ-ÖØ-öø-ÿ'\-]+)*)/g);
+    for (const m of nameMatches) {
+      const [, lastName, firstName] = m;
+      entries.push({ time, playerName: `${firstName} ${lastName}` });
+    }
+  }
+
+  return entries;
+}

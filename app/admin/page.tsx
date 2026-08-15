@@ -16,7 +16,8 @@ import HoleScorecardModal from "../HoleScorecardModal";
 import { useScorecardPopover } from "../useScorecardPopover";
 import { COURSE_FACTS } from "../CourseFactsPanel";
 import { fetchFresh } from "../../lib/fetchFresh";
-import { parseDpwtRosterCapture } from "../../lib/dpwt";
+import { parseDpwtRosterCapture, parseDpwtTeeTimesText } from "../../lib/dpwt";
+import { normalizeName } from "../../lib/nameNorm";
 
 function ArchivedRoundBets({ bets }: { bets: Bet[] }) {
   const { openKey, state, open, openTournament, openRound } = useScorecardPopover();
@@ -563,6 +564,63 @@ export default function AdminPage() {
       body: JSON.stringify({ passcode, mapping: nextMapping }),
     }).then((r) => {
       if (!r.ok) { setSaveMsg("Save failed - check passcode."); setTimeout(() => setSaveMsg(""), 4000); }
+    });
+  }
+
+  // Keyed by tournament name - the tee-time table text pasted from the
+  // DP World Tour site before it's parsed and applied.
+  const [dpwtTeeTimeDrafts, setDpwtTeeTimeDrafts] = useState<Record<string, string>>({});
+
+  // Matches parsed (time, playerName) entries against every live bet in
+  // this tournament that's missing a time - regular and personal alike,
+  // since this tour has no automated tee-time source to gate on the way
+  // the PGA Tour auto-fill does. Same normalizeName-based fuzzy match
+  // (exact, then last-name-only, then substring) as every other name
+  // matcher in this app.
+  function applyDpwtTeeTimes(tourn: string) {
+    const raw = dpwtTeeTimeDrafts[tourn] || "";
+    const entries = parseDpwtTeeTimesText(raw);
+    if (entries.length === 0) {
+      setSaveMsg("Couldn't find any time+player rows in that paste - make sure it includes lines like '02:50 ... Lastname, Firstname'.");
+      setTimeout(() => setSaveMsg(""), 6000);
+      return;
+    }
+
+    function norm(s: string) { return normalizeName(s).toLowerCase(); }
+    function findEntry(betPlayer: string) {
+      const target = norm(betPlayer);
+      const targetLast = target.split(" ").pop()!;
+      let m = entries.find((e) => norm(e.playerName) === target);
+      if (m) return m;
+      const byLast = entries.filter((e) => norm(e.playerName).split(" ").pop() === targetLast);
+      if (byLast.length === 1) return byLast[0];
+      return entries.find((e) => norm(e.playerName).includes(target) || target.includes(norm(e.playerName))) || null;
+    }
+
+    let filled = 0;
+    const nextBets = bets.map((b) => {
+      if (b.t !== tourn || b.time) return b;
+      const match = findEntry(b.player);
+      if (!match) return b;
+      filled++;
+      return { ...b, time: match.time };
+    });
+
+    if (filled === 0) {
+      setSaveMsg("Parsed the paste fine, but no bets in this tournament matched any of those names (or they already had times set).");
+      setTimeout(() => setSaveMsg(""), 6000);
+      return;
+    }
+
+    setBets(nextBets);
+    setDpwtTeeTimeDrafts((prev) => ({ ...prev, [tourn]: "" }));
+    fetchFresh("/api/bets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, bets: nextBets }),
+    }).then((r) => {
+      setSaveMsg(r.ok ? `Set tee times for ${filled} bet(s) in ${tourn}.` : "Save failed - check passcode.");
+      setTimeout(() => setSaveMsg(""), 5000);
     });
   }
 
@@ -1593,6 +1651,31 @@ export default function AdminPage() {
                     ? `${Object.keys(tm.dpwt.players).length} player(s) in roster: ${Object.keys(tm.dpwt.players).join(", ")}`
                     : "No players seeded yet."}
                   {tm?.dpwt?.holePars?.length === 18 && ` · Hole pars: ${tm.dpwt.holePars.join(",")}`}
+                </div>
+
+                <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid var(--line)" }}>
+                  <label style={{ display: "block", fontSize: 12 }}>
+                    Paste tee times (select the table on the DP World Tour tee-times page and copy it)
+                    <textarea
+                      value={dpwtTeeTimeDrafts[tourn] || ""}
+                      onChange={(e) => setDpwtTeeTimeDrafts((prev) => ({ ...prev, [tourn]: e.target.value }))}
+                      placeholder={"02:50  1  17  GUILLAMOUNDEGUY, Oihan  WIESBERGER, Bernd  AYORA, Angel\n03:30  1  21  LINDELL, Oliver  ..."}
+                      rows={4}
+                      style={{
+                        display: "block", width: "100%", marginTop: 4, background: "rgba(0,0,0,0.25)",
+                        border: "1px solid var(--line)", color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace",
+                        fontSize: 11, padding: "6px 8px", borderRadius: 3,
+                      }}
+                    />
+                  </label>
+                  <button className="add-btn-inline" style={{ marginTop: 6 }} onClick={() => applyDpwtTeeTimes(tourn)}>
+                    Parse & apply times
+                  </button>
+                  <span className="subline" style={{ display: "block", marginTop: 4 }}>
+                    Only fills bets that don't already have a time set - safe to paste again each round.
+                    No auto-fetch for this tour yet (see the roster note above), so this needs a fresh
+                    paste whenever new tee times post.
+                  </span>
                 </div>
               </div>
             )}
