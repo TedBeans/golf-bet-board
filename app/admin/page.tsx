@@ -1482,9 +1482,10 @@ export default function AdminPage() {
               >
                 <option value="pgatour">PGA Tour (default)</option>
                 <option value="theopen">theopen.com (Open Championship fallback)</option>
+                <option value="dpwt">DP World Tour</option>
               </select>
               <span className="subline" style={{ display: "block", marginTop: 4 }}>
-                Only switch this if PGA Tour's feed comes back empty for a tournament. On theopen.com, GIR bets won't auto-grade (check /api/debug-open first).
+                Only switch this if PGA Tour's feed comes back empty for a tournament. On theopen.com, GIR bets won't auto-grade (check /api/debug-open first). On DP World Tour, neither Fairways nor GIR bets auto-grade - the live feed for those isn't accessible yet, so grade those by hand with the WIN/LOSS buttons, same as Tournament Score bets already work.
               </span>
             </label>
             <div style={{ marginTop: 10 }}>

@@ -21,7 +21,7 @@ export type Mapping = {
       front9Par?: number; // holes 1-9 only - needed for "Front 9 Score" bets (often != roundPar/2,
                            // e.g. Royal Birkdale plays 34 out / 36 in)
       back9Par?: number; // holes 10-18 only
-      dataSource?: "pgatour" | "theopen"; // which live feed to pull from - defaults to pgatour.
+      dataSource?: "pgatour" | "theopen" | "dpwt"; // which live feed to pull from - defaults to pgatour.
                                            // theopen.com relays its own data for The Open Championship;
                                            // PGA Tour's feed may or may not carry it - this lets you
                                            // flip a single tournament over to the fallback with no code change.
