@@ -61,17 +61,20 @@ export type DpwtScorecardResponse = {
 };
 
 // Confirmed via DevTools capture - plain GET, no auth. Getting a 403 on a
-// bare fetch() from a server (no Referer/User-Agent a browser would send)
-// even though the same URL works fine from a browser - added a Referer
-// header matching the site's own domain, same pattern already proven to
-// work for PGA Tour and theopen.com's fetchers in this codebase (both
-// needed one too).
+// bare fetch() from a server even though the same URL works fine from a
+// browser - a Referer header alone wasn't enough to clear it, so this
+// also sends a realistic browser User-Agent and Accept-Language, in case
+// whatever's fronting this endpoint is blocking on the request not
+// looking browser-like at all (common with Akamai/similar bot protection,
+// which the domain naming elsewhere on this site suggests is in play).
 export async function fetchDpwtPlayerScorecard(eventId: string, playerId: number): Promise<DpwtScorecardResponse> {
   const url = `https://www.europeantour.com/api/sportdata/Scorecard/Strokeplay/Event/${eventId}/Player/${playerId}`;
   const res = await fetch(url, {
     headers: {
       Accept: "application/json",
+      "Accept-Language": "en-US,en;q=0.9",
       Referer: "https://www.europeantour.com/",
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
     },
     cache: "no-store",
   });
