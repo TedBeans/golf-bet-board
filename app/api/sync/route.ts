@@ -14,8 +14,6 @@ import { computePositions, PositionEntry } from "../../../lib/positions";
 import { nowInCentral } from "../../../lib/centralTime";
 import { normalizeName } from "../../../lib/nameNorm";
 import { noCacheJson } from "../../../lib/noCacheJson";
-import { fetchDpwtPlayerScorecard, findDpwtRound, summarizeDpwtRound, DpwtScorecardResponse } from "../../../lib/dpwt";
-import { findDpwtPlayerId } from "../../../lib/dpwtMatch";
 
 const SYNC_LOCK_MS = 45000;
 
@@ -99,7 +97,6 @@ export async function GET() {
 
   const errors: string[] = [];
   const leaderboardCache = new Map<string, PgaPlayerRow[]>();
-  const dpwtScorecardCache = new Map<number, DpwtScorecardResponse>();
   const scorecardCache = new Map<string, any>();
   let openPlayersCache: OpenPlayerRow[] | null = null;
   // Lazily fetched - only GIR bets need the statistics feed at all, so
@@ -596,79 +593,21 @@ export async function GET() {
       }
 
       if (tournamentMap.dataSource === "dpwt") {
-        // DP World Tour: per-player REST scorecard only (see lib/dpwt.ts
-        // header comment for why - no confirmed full-field feed). Needs a
-        // seeded roster (Admin -> paste a getGolfTournamentGroupScores
-        // capture) before any of this can resolve a player or hole pars.
-        const dpwtConfig = tournamentMap.dpwt;
-        if (!dpwtConfig?.eventId || !dpwtConfig?.holePars?.length || !dpwtConfig?.players) {
-          errors.push(`${bet.t}: DP World Tour roster not set up yet in Admin (need event id, hole pars, and player list)`);
-          continue;
-        }
-
-        if (parsed.label === "WINNER_SCORE") {
-          errors.push(`${bet.t}: Tournament Score bets aren't supported for DP World Tour (no full-field feed to find the leader)`);
-          continue;
-        }
-        if (parsed.label === "GIR" || parsed.label === "FAIRWAYS") {
-          // No live fairways/GIR feed we could decode (shot-by-shot data
-          // is sent as compressed binary over a WebSocket) - grade these
-          // by hand with the board's WIN/LOSS buttons, same as
-          // WINNER_SCORE already works everywhere. Deliberately don't
-          // touch bet.stat/bet.thru/bet.status here.
-          continue;
-        }
-
-        const playerId = findDpwtPlayerId(bet.player, dpwtConfig.players);
-        if (!playerId) {
-          errors.push(`${bet.player}: not in this tournament's DP World Tour roster yet - add them in Admin`);
-          continue;
-        }
-
-        const roundNum = roundNumberFromLabel(bet.r);
-        let scorecard = dpwtScorecardCache.get(playerId);
-        if (!scorecard) {
-          scorecard = await fetchDpwtPlayerScorecard(dpwtConfig.eventId, playerId);
-          dpwtScorecardCache.set(playerId, scorecard);
-        }
-        const round = findDpwtRound(scorecard, roundNum);
-        if (!round) {
-          // Round hasn't started for this player yet (or hasn't loaded) -
-          // leave the bet as-is, not an error.
-          continue;
-        }
-        const stats = summarizeDpwtRound(round, dpwtConfig.holePars);
-
-        bet.thru = stats.thru;
-        bet.auto = {
-          thru: stats.thru,
-          scoreToPar: stats.scoreToPar,
-          birdies: stats.birdies,
-          bogeys: stats.bogeys,
-          pars: stats.pars,
-          eagles: stats.eagles,
-          doubleBogeys: stats.doubleBogeys,
-          gir: null,
-          fairways: null,
-          updatedAt: new Date().toISOString(),
-        };
-
-        if (parsed.label === "SCORE") {
-          bet.stat = stats.scoreToPar;
-        } else if (parsed.label === "BIRDIES") {
-          bet.stat = stats.birdiesOrBetter;
-        } else if (parsed.label === "BOGEYS") {
-          bet.stat = stats.bogeysOrWorse;
-        } else if (parsed.label === "PARS") {
-          bet.stat = stats.pars;
-        }
-
-        if (bet.status === "live") {
-          const graded = autoGradeStatus(parsed, bet.stat, bet.thru);
-          if (graded) bet.status = graded;
-        }
-
-        updatedCount += 1;
+        // DP World Tour: confirmed via a real curl test (full browser-
+        // matching headers, still blocked) that the scorecard endpoint
+        // sits behind Akamai Bot Manager - the "Access Denied" response
+        // comes straight from errors.edgesuite.net, Akamai's own domain.
+        // That's TLS/browser fingerprinting at a layer no HTTP header can
+        // influence, not a missing-header problem - a server-side fetch
+        // (ours, or a bare curl) fundamentally cannot get past it the way
+        // a real browser does. So every bet type on this tour is graded
+        // by hand with the board's WIN/LOSS buttons - Round Score/
+        // Birdies/Bogeys/Pars join Fairways/GIR/Tournament Score, which
+        // were already manual for unrelated reasons (no live shot feed,
+        // no full-field feed). Deliberately a silent no-op, not an error -
+        // this is the expected, by-design state for this tour right now,
+        // not a failure. See lib/dpwt.ts header comment for the full
+        // history if a workaround ever becomes worth chasing.
         continue;
       }
 

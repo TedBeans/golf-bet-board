@@ -1,31 +1,50 @@
 // DP World Tour (europeantour.com) integration.
 //
-// STRATEGY: the site's live GraphQL feed (getGolfTournamentGroupScores)
-// looked promising for a single call covering the whole field, but the
-// real captured request URL turned out to be
+// STATUS: not live-graded right now. Every bet type on this tour is
+// manual (WIN/LOSS buttons on the board), same as it always was for
+// Fairways/GIR/Tournament Score - see below for why.
+//
+// HISTORY, for whoever revisits this later:
+//
+// The site's live GraphQL feed (getGolfTournamentGroupScores) looked
+// promising for a single call covering the whole field, but the real
+// captured request URL turned out to be
 // "https://btec-http.services.srarena.io/?hash=3957876929" - a numeric
 // hash of the query+variables computed client-side by their JS, not a
-// stable parameterized endpoint. We can't reconstruct that hash for a
+// stable parameterized endpoint. Couldn't reconstruct that hash for a
 // different tournament/round/group without reverse-engineering their
-// hashing function, which isn't something to build live grading on.
+// hashing function.
 //
-// So instead: use the OTHER confirmed endpoint, a plain predictable REST
-// GET with no hash and no auth:
+// Found what looked like a clean fallback instead - a plain REST GET with
+// no hash and (apparently) no auth:
 //
 //   https://www.europeantour.com/api/sportdata/Scorecard/Strokeplay/Event/{eventId}/Player/{playerId}
 //
-// This returns one player's full tournament (every round, hole-by-hole
-// strokes + a ScoreClass label) in one call - same per-player-fetch shape
-// already used for PGA Tour's scorecard/GIR/fairways calls. Its only gaps
-// are (a) no hole-par data, and (b) it needs each player's numeric
-// playerId, which the free-text bet ("Ludvig Aberg") doesn't have.
+// Worked fine from a browser. From this app's server, it 403'd. Adding a
+// Referer header (matching the pattern that already worked for PGA Tour
+// and theopen.com in this codebase) didn't fix it. Adding a full
+// browser-realistic header set (User-Agent, Accept-Language, Referer)
+// didn't fix it either. Confirmed with a direct curl test using that
+// exact header set from outside this app entirely - still blocked, and
+// the response body gave the real answer: "Access Denied" served from
+// errors.edgesuite.net, which is Akamai's own domain. This endpoint sits
+// behind Akamai Bot Manager, which fingerprints things like the TLS
+// handshake itself - a layer no HTTP header can influence. A scripted
+// client (this app's fetch(), or curl) fundamentally can't pass that the
+// way a real browser does, no matter what headers it sends.
 //
-// Neither of those change during the week, so both get seeded ONCE per
-// tournament in Admin, from a pasted getGolfTournamentGroupScores capture
-// (the exact same kind of DevTools capture already used to build this
-// integration) - see parseDpwtRosterCapture below. After that, every sync
-// just calls the plain REST endpoint per player, same as every other data
-// source in this app.
+// So there's no clean path to live grading for this tour right now short
+// of running an actual headless browser (Puppeteer/Playwright) somewhere,
+// or paying for a bot-bypass proxy service - neither of which is
+// reasonable for this app. The functions below (fetchDpwtPlayerScorecard,
+// summarizeDpwtRound, findDpwtRound, parseDpwtRosterCapture) are kept
+// working and tested against real captured data, in case a workaround
+// becomes worth it later - they're just not called from sync/route.ts
+// right now.
+//
+// The tee-time paste tool (parseDpwtTeeTimesText) is unaffected by any of
+// this - it was already manual/paste-based from the start, not something
+// this Akamai block touches.
 
 export type DpwtHoleScore = {
   HoleNo: number;

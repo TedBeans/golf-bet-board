@@ -1608,13 +1608,18 @@ export default function AdminPage() {
                 <option value="dpwt">DP World Tour</option>
               </select>
               <span className="subline" style={{ display: "block", marginTop: 4 }}>
-                Only switch this if PGA Tour's feed comes back empty for a tournament. On theopen.com, GIR bets won't auto-grade (check /api/debug-open first). On DP World Tour, neither Fairways nor GIR bets auto-grade - the live feed for those isn't accessible yet, so grade those by hand with the WIN/LOSS buttons, same as Tournament Score bets already work.
+                Only switch this if PGA Tour's feed comes back empty for a tournament. On theopen.com, GIR bets won't auto-grade (check /api/debug-open first). On DP World Tour, nothing auto-grades right now - their scorecard endpoint is blocked by Akamai bot protection (confirmed via curl, not fixable with more headers), so grade every bet type by hand with the WIN/LOSS buttons.
               </span>
             </label>
 
             {tm?.dataSource === "dpwt" && (
               <div style={{ marginTop: 12, padding: 10, border: "1px solid var(--line)", borderRadius: 4 }}>
                 <div className="subline" style={{ marginBottom: 6 }}>DP World Tour roster setup</div>
+                <div className="subline" style={{ marginBottom: 8, color: "var(--cream-dim)" }}>
+                  Not currently used for live grading - their scorecard endpoint is blocked by Akamai
+                  bot protection (confirmed via curl). Kept here in case a workaround turns up later;
+                  for now every bet type on this tour is graded by hand.
+                </div>
                 <label style={{ display: "block", fontSize: 12 }}>
                   Event ID (from the Scorecard endpoint URL, e.g. "2026131")
                   <input
