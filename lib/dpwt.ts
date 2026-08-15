@@ -60,10 +60,21 @@ export type DpwtScorecardResponse = {
   Rounds: DpwtRound[];
 };
 
-// Confirmed via DevTools capture - plain GET, no auth, no hash.
+// Confirmed via DevTools capture - plain GET, no auth. Getting a 403 on a
+// bare fetch() from a server (no Referer/User-Agent a browser would send)
+// even though the same URL works fine from a browser - added a Referer
+// header matching the site's own domain, same pattern already proven to
+// work for PGA Tour and theopen.com's fetchers in this codebase (both
+// needed one too).
 export async function fetchDpwtPlayerScorecard(eventId: string, playerId: number): Promise<DpwtScorecardResponse> {
   const url = `https://www.europeantour.com/api/sportdata/Scorecard/Strokeplay/Event/${eventId}/Player/${playerId}`;
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      Referer: "https://www.europeantour.com/",
+    },
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error(`DPWT scorecard fetch failed (${res.status}) for player ${playerId}`);
   return res.json();
 }
