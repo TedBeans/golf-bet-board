@@ -1,50 +1,44 @@
 import { normalizeName } from "./nameNorm";
-import { DpwtGroupScore } from "./dpwt";
 
 function norm(s: string): string {
   return normalizeName(s);
 }
 
-function fullName(group: DpwtGroupScore): string {
-  const p = group.players[0];
-  return p ? `${p.firstName} ${p.lastName}` : "";
-}
-
-function lastName(group: DpwtGroupScore): string {
-  return group.players[0]?.lastName ?? "";
-}
-
 // Same tiered approach as findPlayerMatch/findOpenPlayerMatch/
 // findDataGolfPlayerMatch: exact full name, exact last name, last-name
-// prefix, substring, then an unambiguous token-set fallback. DP World
-// Tour's data gives first/last name as separate fields rather than one
-// displayName string, so fullName() joins them first.
-export function findDpwtPlayerMatch(betPlayerName: string, groups: DpwtGroupScore[]): DpwtGroupScore | null {
+// prefix, substring, then an unambiguous token-set fallback. Works against
+// the roster map seeded in Admin (see parseDpwtRosterCapture) rather than
+// a live leaderboard row, since there's no single-call full-field feed
+// for this tour - see lib/dpwt.ts header comment for why.
+export function findDpwtPlayerId(betPlayerName: string, players: Record<string, number>): number | null {
   const target = norm(betPlayerName);
   const tokens = target.split(/\s+/).filter(Boolean);
   const lastToken = tokens[tokens.length - 1];
+  const entries = Object.entries(players);
 
-  let match = groups.find((g) => norm(fullName(g)) === target);
-  if (match) return match;
+  const lastNameOf = (fullName: string) => fullName.split(/\s+/).slice(-1)[0] ?? "";
 
-  match = groups.find((g) => norm(lastName(g)) === lastToken);
-  if (match) return match;
+  let match = entries.find(([name]) => norm(name) === target);
+  if (match) return match[1];
 
-  match = groups.find((g) => {
-    const gLast = norm(lastName(g));
-    return gLast.length > 2 && lastToken.length > 2 && (gLast.startsWith(lastToken) || lastToken.startsWith(gLast));
+  match = entries.find(([name]) => norm(lastNameOf(name)) === lastToken);
+  if (match) return match[1];
+
+  match = entries.find(([name]) => {
+    const nLast = norm(lastNameOf(name));
+    return nLast.length > 2 && lastToken.length > 2 && (nLast.startsWith(lastToken) || lastToken.startsWith(nLast));
   });
-  if (match) return match;
+  if (match) return match[1];
 
-  match = groups.find((g) => norm(fullName(g)).includes(target) || target.includes(norm(lastName(g))));
-  if (match) return match;
+  match = entries.find(([name]) => norm(name).includes(target) || target.includes(norm(lastNameOf(name))));
+  if (match) return match[1];
 
-  const candidates = groups.filter((g) => {
-    const gTokens = norm(fullName(g)).split(/\s+/).filter(Boolean);
-    if (gTokens.length === 0) return false;
-    return tokens.every((t) => gTokens.includes(t)) || gTokens.every((gt) => tokens.includes(gt));
+  const candidates = entries.filter(([name]) => {
+    const nTokens = norm(name).split(/\s+/).filter(Boolean);
+    if (nTokens.length === 0) return false;
+    return tokens.every((t) => nTokens.includes(t)) || nTokens.every((nt) => tokens.includes(nt));
   });
-  if (candidates.length === 1) return candidates[0];
+  if (candidates.length === 1) return candidates[0][1];
 
   return null;
 }

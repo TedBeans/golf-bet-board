@@ -1,63 +1,72 @@
 // DP World Tour (europeantour.com) integration.
 //
-// CONFIRMED from a real DevTools capture (Danish Golf Championship 2026):
-// the site's GraphQL backend returns full-field, hole-by-hole scores with
-// par via a "getGolfTournamentGroupScores" query - one call for the whole
-// field, same shape whether it's a live round or a finished one:
+// STRATEGY: the site's live GraphQL feed (getGolfTournamentGroupScores)
+// looked promising for a single call covering the whole field, but the
+// real captured request URL turned out to be
+// "https://btec-http.services.srarena.io/?hash=3957876929" - a numeric
+// hash of the query+variables computed client-side by their JS, not a
+// stable parameterized endpoint. We can't reconstruct that hash for a
+// different tournament/round/group without reverse-engineering their
+// hashing function, which isn't something to build live grading on.
 //
-//   { groupId, l1Course, teamId, players: [{ id, lastName, firstName }],
-//     roundScores: [{ courseId, roundNo, toParToday: {value}, startHole,
-//       holes: [{ holePar, holeStrokes, holeOrder, holeNumber }], isPlayoff }],
-//     toPar: {value}, currentHole, tournamentPosition: {format, value, displayValue},
-//     status }
+// So instead: use the OTHER confirmed endpoint, a plain predictable REST
+// GET with no hash and no auth:
 //
-// NOT YET CONFIRMED: the actual request URL/endpoint this query is sent
-// to. The site defaults to a WebSocket subscription
-// (ShotTrackerSubscribeToGolfTournamentGroupScores) while a round is live,
-// which doesn't show up as a normal Fetch/XHR request - only the query
-// form's plain HTTP request (used for completed/historical rounds) would.
-// Per the project's standing rule, never guess an external API shape or
-// endpoint - fetchDpwtTournamentGroupScores below is a stub until a real
-// capture confirms the URL, method, and request body for that HTTP form.
+//   https://www.europeantour.com/api/sportdata/Scorecard/Strokeplay/Event/{eventId}/Player/{playerId}
 //
-// Fairways-hit and GIR are NOT covered by this endpoint at all - that data
-// only exists in a separate shot-by-shot feed (confirmed query name:
-// ShotFeedGetGolfTournamentTeamsShotFeed / its live subscription
-// counterpart) which is sent as compressed binary WebSocket frames we
-// haven't been able to decode from DevTools alone. Fairways/GIR bets on
-// this tour are graded by hand, same as WINNER_SCORE bets already are -
-// see the dataSource === "dpwt" checks in sync/route.ts.
+// This returns one player's full tournament (every round, hole-by-hole
+// strokes + a ScoreClass label) in one call - same per-player-fetch shape
+// already used for PGA Tour's scorecard/GIR/fairways calls. Its only gaps
+// are (a) no hole-par data, and (b) it needs each player's numeric
+// playerId, which the free-text bet ("Ludvig Aberg") doesn't have.
+//
+// Neither of those change during the week, so both get seeded ONCE per
+// tournament in Admin, from a pasted getGolfTournamentGroupScores capture
+// (the exact same kind of DevTools capture already used to build this
+// integration) - see parseDpwtRosterCapture below. After that, every sync
+// just calls the plain REST endpoint per player, same as every other data
+// source in this app.
 
-export type DpwtHole = {
-  holePar: number;
-  holeStrokes: number | null;
-  holeOrder: number;
-  holeNumber: number;
+export type DpwtHoleScore = {
+  HoleNo: number;
+  Strokes: number;
+  ScoreClass: string; // "bi" | "pa" | "bo" | "ea" | "tb" | ... - real values
+                       // confirmed from a capture, but not every possible
+                       // value has been seen yet. Birdies/pars/bogeys/
+                       // eagles/doubles are derived from Strokes - HolePar
+                       // instead of trusting this field, same score-minus-
+                       // par methodology used everywhere else in this app,
+                       // so an unfamiliar ScoreClass value can't cause a
+                       // silent mis-grade.
+  IsAmScore: boolean;
+  Penalty: number;
 };
 
-export type DpwtRoundScore = {
-  courseId: number;
-  roundNo: number;
-  toParToday: { value: number } | null;
-  holesThrough: { value: number } | null;
-  startHole: number;
-  holes: DpwtHole[];
-  isPlayoff: boolean;
+export type DpwtRound = {
+  RoundNo: number;
+  CourseNo: number;
+  StrokesIn: number;
+  StrokesOut: number;
+  Strokes: number;
+  ScoreToPar: number;
+  Holes: DpwtHoleScore[];
 };
 
-export type DpwtPlayer = { id: number; lastName: string; firstName: string };
-
-export type DpwtGroupScore = {
-  groupId: number;
-  l1Course: boolean;
-  teamId: number;
-  players: DpwtPlayer[];
-  roundScores: DpwtRoundScore[];
-  toPar: { value: number } | null;
-  currentHole: number;
-  tournamentPosition: { format: string; value: number; displayValue: string } | null;
-  status: string; // e.g. "Uncut", "Cut" - haven't seen every possible value yet
+export type DpwtScorecardResponse = {
+  EventId: number;
+  PlayerId: number;
+  LastUpdated: string;
+  TotalPenalty: number;
+  Rounds: DpwtRound[];
 };
+
+// Confirmed via DevTools capture - plain GET, no auth, no hash.
+export async function fetchDpwtPlayerScorecard(eventId: string, playerId: number): Promise<DpwtScorecardResponse> {
+  const url = `https://www.europeantour.com/api/sportdata/Scorecard/Strokeplay/Event/${eventId}/Player/${playerId}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`DPWT scorecard fetch failed (${res.status}) for player ${playerId}`);
+  return res.json();
+}
 
 export type DpwtRoundSummary = {
   thru: number;
@@ -71,16 +80,16 @@ export type DpwtRoundSummary = {
   bogeysOrWorse: number;
 };
 
-// Same score-minus-par derivation already used for PGA Tour (never the
-// aggregate stats section - there isn't one here anyway, this endpoint
-// only ever gives strokes+par per hole, so there's nothing else to derive
-// from).
-export function summarizeDpwtRound(round: DpwtRoundScore): DpwtRoundSummary {
+// Same score-minus-par derivation used for PGA Tour and the roster-capture
+// path below - holePars comes from the one-time Admin seed (see
+// parseDpwtRosterCapture), indexed by hole number (1-18).
+export function summarizeDpwtRound(round: DpwtRound, holePars: number[]): DpwtRoundSummary {
   let thru = 0, birdies = 0, eagles = 0, pars = 0, bogeys = 0, doubleBogeys = 0, scoreToPar = 0;
-  for (const h of round.holes) {
-    if (h.holeStrokes === null || h.holeStrokes === undefined) continue;
+  for (const h of round.Holes) {
+    const par = holePars[h.HoleNo - 1];
+    if (par === undefined || h.Strokes === null || h.Strokes === undefined) continue;
     thru += 1;
-    const diff = h.holeStrokes - h.holePar;
+    const diff = h.Strokes - par;
     scoreToPar += diff;
     if (diff <= -2) eagles++;
     else if (diff === -1) birdies++;
@@ -94,16 +103,58 @@ export function summarizeDpwtRound(round: DpwtRoundScore): DpwtRoundSummary {
   };
 }
 
-export function findDpwtRoundByNumber(group: DpwtGroupScore, roundNo: number): DpwtRoundScore | null {
-  return group.roundScores.find((r) => r.roundNo === roundNo && !r.isPlayoff) ?? null;
+export function findDpwtRound(scorecard: DpwtScorecardResponse, roundNo: number): DpwtRound | null {
+  return scorecard.Rounds.find((r) => r.RoundNo === roundNo) ?? null;
 }
 
-// STUB - see the file header comment. Needs a confirmed request URL/body
-// before this can actually fetch anything. Throws clearly rather than
-// guessing, so a caller can't accidentally ship on a silently-wrong URL.
-export async function fetchDpwtTournamentGroupScores(tournamentId: string): Promise<DpwtGroupScore[]> {
-  throw new Error(
-    "fetchDpwtTournamentGroupScores is not wired up yet - the getGolfTournamentGroupScores " +
-    "request URL hasn't been confirmed via DevTools capture. See lib/dpwt.ts header comment."
-  );
+export type DpwtRosterSeed = {
+  holePars: number[]; // index 0 = hole 1, length 18
+  players: Record<string, number>; // "Firstname Lastname" -> numeric playerId
+};
+
+// One-time setup helper: pulls hole pars + a name->playerId roster out of a
+// pasted getGolfTournamentGroupScores response (the exact JSON captured
+// via DevTools while building this integration). Accepts either the full
+// {"data":{"getGolfTournamentGroupScores":[...]}} wrapper or a bare
+// groups array, and tolerates multiple such captures pasted one after
+// another (e.g. one per tee-time group) - so Teddy can build up the
+// roster incrementally as he captures more groups covering the players
+// he's actually betting on, without needing the whole field at once.
+export function parseDpwtRosterCapture(raw: string): DpwtRosterSeed {
+  const parsed = JSON.parse(raw);
+  const groups: any[] = Array.isArray(parsed)
+    ? parsed
+    : parsed?.data?.getGolfTournamentGroupScores ?? parsed?.getGolfTournamentGroupScores ?? [];
+
+  if (!Array.isArray(groups) || groups.length === 0) {
+    throw new Error("Couldn't find a getGolfTournamentGroupScores array in that paste.");
+  }
+
+  const players: Record<string, number> = {};
+  let holePars: number[] | null = null;
+
+  for (const group of groups) {
+    for (const p of group.players ?? []) {
+      if (p?.id && p?.firstName && p?.lastName) {
+        players[`${p.firstName} ${p.lastName}`] = p.id;
+      }
+    }
+    if (!holePars) {
+      const round = (group.roundScores ?? []).find((r: any) => !r.isPlayoff && Array.isArray(r.holes) && r.holes.length === 18);
+      if (round) {
+        const pars = new Array(18).fill(undefined);
+        for (const h of round.holes) pars[h.holeNumber - 1] = h.holePar;
+        if (pars.every((p) => typeof p === "number")) holePars = pars;
+      }
+    }
+  }
+
+  if (!holePars) {
+    throw new Error("Found players but couldn't extract a complete set of 18 hole pars from that paste.");
+  }
+  if (Object.keys(players).length === 0) {
+    throw new Error("Found hole pars but no players with id/firstName/lastName in that paste.");
+  }
+
+  return { holePars, players };
 }

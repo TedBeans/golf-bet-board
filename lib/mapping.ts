@@ -22,6 +22,19 @@ export type Mapping = {
                            // e.g. Royal Birkdale plays 34 out / 36 in)
       back9Par?: number; // holes 10-18 only
       dataSource?: "pgatour" | "theopen" | "dpwt"; // which live feed to pull from - defaults to pgatour.
+      dpwt?: {
+        eventId: string; // numeric event id used in the Scorecard REST URL, e.g. "2026131" -
+                          // NOT the same id system as the "eventId" seen in this tour's
+                          // WebSocket traffic. Get this from a Network capture of the
+                          // Scorecard endpoint URL itself.
+        holePars: number[]; // index 0 = hole 1, length 18 - seeded once from a pasted
+                             // getGolfTournamentGroupScores capture (see parseDpwtRosterCapture
+                             // in lib/dpwt.ts), since the live per-player scorecard endpoint
+                             // doesn't include par.
+        players: Record<string, number>; // "Firstname Lastname" -> numeric playerId, seeded the
+                                          // same way. Only needs to cover players actually bet on,
+                                          // not the whole field.
+      };
                                            // theopen.com relays its own data for The Open Championship;
                                            // PGA Tour's feed may or may not carry it - this lets you
                                            // flip a single tournament over to the fallback with no code change.

@@ -16,6 +16,7 @@ import HoleScorecardModal from "../HoleScorecardModal";
 import { useScorecardPopover } from "../useScorecardPopover";
 import { COURSE_FACTS } from "../CourseFactsPanel";
 import { fetchFresh } from "../../lib/fetchFresh";
+import { parseDpwtRosterCapture } from "../../lib/dpwt";
 
 function ArchivedRoundBets({ bets }: { bets: Bet[] }) {
   const { openKey, state, open, openTournament, openRound } = useScorecardPopover();
@@ -498,6 +499,70 @@ export default function AdminPage() {
     }).then((r) => {
       setSaveMsg(r.ok ? `Leaderboard forced live for ${tourn} for the next 24h.` : "Save failed - check passcode.");
       setTimeout(() => setSaveMsg(""), 4000);
+    });
+  }
+
+  // Keyed by tournament name, holds whatever's currently typed into that
+  // tournament's "paste a capture" box before it's parsed.
+  const [dpwtPasteDrafts, setDpwtPasteDrafts] = useState<Record<string, string>>({});
+
+  // Parses a pasted getGolfTournamentGroupScores capture and merges it
+  // into that tournament's roster - players merge in (new ones added,
+  // existing ones left alone), hole pars only get set if this is the
+  // first capture for that tournament (they shouldn't change week to
+  // week within the same event, so a later paste's pars are just ignored
+  // rather than silently overwriting a possibly-more-complete earlier
+  // seed with a partial one).
+  function parseDpwtCapture(tourn: string) {
+    const raw = dpwtPasteDrafts[tourn] || "";
+    let seed;
+    try {
+      seed = parseDpwtRosterCapture(raw);
+    } catch (e: any) {
+      setSaveMsg(e.message || "Couldn't parse that paste - make sure it's the raw JSON response, not a screenshot description.");
+      setTimeout(() => setSaveMsg(""), 6000);
+      return;
+    }
+    const existing = mapping.tournaments[tourn]?.dpwt;
+    const nextDpwt = {
+      eventId: existing?.eventId || "",
+      holePars: existing?.holePars?.length ? existing.holePars : seed.holePars,
+      players: { ...existing?.players, ...seed.players },
+    };
+    const nextMapping: Mapping = {
+      ...mapping,
+      tournaments: { ...mapping.tournaments, [tourn]: { ...mapping.tournaments[tourn], dpwt: nextDpwt } },
+    };
+    setMapping(nextMapping);
+    setDpwtPasteDrafts((prev) => ({ ...prev, [tourn]: "" }));
+    fetchFresh("/api/mapping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, mapping: nextMapping }),
+    }).then((r) => {
+      setSaveMsg(r.ok ? `Added ${Object.keys(seed.players).length} player(s) to ${tourn}'s DP World Tour roster.` : "Save failed - check passcode.");
+      setTimeout(() => setSaveMsg(""), 5000);
+    });
+  }
+
+  function updateDpwtEventId(tourn: string, eventId: string) {
+    const nextMapping: Mapping = {
+      ...mapping,
+      tournaments: {
+        ...mapping.tournaments,
+        [tourn]: {
+          ...mapping.tournaments[tourn],
+          dpwt: { eventId, holePars: mapping.tournaments[tourn]?.dpwt?.holePars || [], players: mapping.tournaments[tourn]?.dpwt?.players || {} },
+        },
+      },
+    };
+    setMapping(nextMapping);
+    fetchFresh("/api/mapping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, mapping: nextMapping }),
+    }).then((r) => {
+      if (!r.ok) { setSaveMsg("Save failed - check passcode."); setTimeout(() => setSaveMsg(""), 4000); }
     });
   }
 
@@ -1488,6 +1553,49 @@ export default function AdminPage() {
                 Only switch this if PGA Tour's feed comes back empty for a tournament. On theopen.com, GIR bets won't auto-grade (check /api/debug-open first). On DP World Tour, neither Fairways nor GIR bets auto-grade - the live feed for those isn't accessible yet, so grade those by hand with the WIN/LOSS buttons, same as Tournament Score bets already work.
               </span>
             </label>
+
+            {tm?.dataSource === "dpwt" && (
+              <div style={{ marginTop: 12, padding: 10, border: "1px solid var(--line)", borderRadius: 4 }}>
+                <div className="subline" style={{ marginBottom: 6 }}>DP World Tour roster setup</div>
+                <label style={{ display: "block", fontSize: 12 }}>
+                  Event ID (from the Scorecard endpoint URL, e.g. "2026131")
+                  <input
+                    type="text"
+                    placeholder="e.g. 2026131"
+                    defaultValue={tm?.dpwt?.eventId || ""}
+                    onBlur={(e) => updateDpwtEventId(tourn, e.target.value.trim())}
+                    style={{
+                      display: "block", width: "100%", marginTop: 4, background: "rgba(0,0,0,0.25)",
+                      border: "1px solid var(--line)", color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace",
+                      fontSize: 13, padding: "6px 8px", borderRadius: 3,
+                    }}
+                  />
+                </label>
+                <label style={{ display: "block", fontSize: 12, marginTop: 10 }}>
+                  Paste a getGolfTournamentGroupScores capture (DevTools Response tab, raw JSON)
+                  <textarea
+                    value={dpwtPasteDrafts[tourn] || ""}
+                    onChange={(e) => setDpwtPasteDrafts((prev) => ({ ...prev, [tourn]: e.target.value }))}
+                    placeholder='{"data":{"getGolfTournamentGroupScores":[...]}}'
+                    rows={4}
+                    style={{
+                      display: "block", width: "100%", marginTop: 4, background: "rgba(0,0,0,0.25)",
+                      border: "1px solid var(--line)", color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace",
+                      fontSize: 11, padding: "6px 8px", borderRadius: 3,
+                    }}
+                  />
+                </label>
+                <button className="add-btn-inline" style={{ marginTop: 6 }} onClick={() => parseDpwtCapture(tourn)}>
+                  Parse & add to roster
+                </button>
+                <div className="subline" style={{ marginTop: 8 }}>
+                  {tm?.dpwt?.players && Object.keys(tm.dpwt.players).length > 0
+                    ? `${Object.keys(tm.dpwt.players).length} player(s) in roster: ${Object.keys(tm.dpwt.players).join(", ")}`
+                    : "No players seeded yet."}
+                  {tm?.dpwt?.holePars?.length === 18 && ` · Hole pars: ${tm.dpwt.holePars.join(",")}`}
+                </div>
+              </div>
+            )}
             <div style={{ marginTop: 10 }}>
               {tm?.leaderboardLiveUntil && new Date(tm.leaderboardLiveUntil) > new Date() ? (
                 <span className="subline" style={{ display: "block" }}>

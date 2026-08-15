@@ -14,6 +14,8 @@ import { computePositions, PositionEntry } from "../../../lib/positions";
 import { nowInCentral } from "../../../lib/centralTime";
 import { normalizeName } from "../../../lib/nameNorm";
 import { noCacheJson } from "../../../lib/noCacheJson";
+import { fetchDpwtPlayerScorecard, findDpwtRound, summarizeDpwtRound, DpwtScorecardResponse } from "../../../lib/dpwt";
+import { findDpwtPlayerId } from "../../../lib/dpwtMatch";
 
 const SYNC_LOCK_MS = 45000;
 
@@ -97,6 +99,7 @@ export async function GET() {
 
   const errors: string[] = [];
   const leaderboardCache = new Map<string, PgaPlayerRow[]>();
+  const dpwtScorecardCache = new Map<number, DpwtScorecardResponse>();
   const scorecardCache = new Map<string, any>();
   let openPlayersCache: OpenPlayerRow[] | null = null;
   // Lazily fetched - only GIR bets need the statistics feed at all, so
@@ -304,18 +307,31 @@ export async function GET() {
       // anything twice.
       if (bet.personal) {
         const useOpen = tournamentMap.dataSource === "theopen";
+        const useDpwt = tournamentMap.dataSource === "dpwt";
+
+        // Tournament-long personal plays (Winner/Top N/Make Cut/H2H/Tie/R1
+        // Leader) all need a full-field leaderboard to determine position
+        // or a tied-leader group - DP World Tour has no confirmed
+        // single-call full-field feed (see lib/dpwt.ts header comment), so
+        // these aren't supported there. Round-stat personal plays
+        // (Score/GIR/Birdies/etc) don't need the full field and fall
+        // through to the regular per-player pipeline below just fine.
+        if (useDpwt && ["WINNER", "TOP_N", "MAKE_CUT", "H2H", "TIE", "R1_LEADER"].includes(parsed.label)) {
+          errors.push(`${bet.player ?? bet.t}: ${parsed.label} isn't supported yet for DP World Tour tournaments (no full-field feed)`);
+          continue;
+        }
 
         if (useOpen) {
           if (!openPlayersCache) {
             const raw = await fetchOpenLeaderboard();
             openPlayersCache = extractOpenPlayers(raw);
           }
-        } else if (!leaderboardCache.get(tournamentId)) {
+        } else if (!useDpwt && !leaderboardCache.get(tournamentId)) {
           const raw = await fetchPgaLeaderboard(tournamentId);
           leaderboardCache.set(tournamentId, extractPlayers(raw));
         }
         const openPlayers = useOpen ? openPlayersCache! : null;
-        const pgaPlayers = useOpen ? null : leaderboardCache.get(tournamentId)!;
+        const pgaPlayers = useOpen || useDpwt ? null : leaderboardCache.get(tournamentId)!;
 
         if (parsed.label === "WINNER" || parsed.label === "TOP_N") {
           // Live position only - both settle by hand per TedBeans' own
@@ -576,6 +592,83 @@ export async function GET() {
           continue;
         }
         // Fall through to the regular stat/grading pipeline below.
+      }
+
+      if (tournamentMap.dataSource === "dpwt") {
+        // DP World Tour: per-player REST scorecard only (see lib/dpwt.ts
+        // header comment for why - no confirmed full-field feed). Needs a
+        // seeded roster (Admin -> paste a getGolfTournamentGroupScores
+        // capture) before any of this can resolve a player or hole pars.
+        const dpwtConfig = tournamentMap.dpwt;
+        if (!dpwtConfig?.eventId || !dpwtConfig?.holePars?.length || !dpwtConfig?.players) {
+          errors.push(`${bet.t}: DP World Tour roster not set up yet in Admin (need event id, hole pars, and player list)`);
+          continue;
+        }
+
+        if (parsed.label === "WINNER_SCORE") {
+          errors.push(`${bet.t}: Tournament Score bets aren't supported for DP World Tour (no full-field feed to find the leader)`);
+          continue;
+        }
+        if (parsed.label === "GIR" || parsed.label === "FAIRWAYS") {
+          // No live fairways/GIR feed we could decode (shot-by-shot data
+          // is sent as compressed binary over a WebSocket) - grade these
+          // by hand with the board's WIN/LOSS buttons, same as
+          // WINNER_SCORE already works everywhere. Deliberately don't
+          // touch bet.stat/bet.thru/bet.status here.
+          continue;
+        }
+
+        const playerId = findDpwtPlayerId(bet.player, dpwtConfig.players);
+        if (!playerId) {
+          errors.push(`${bet.player}: not in this tournament's DP World Tour roster yet - add them in Admin`);
+          continue;
+        }
+
+        const roundNum = roundNumberFromLabel(bet.r);
+        let scorecard = dpwtScorecardCache.get(playerId);
+        if (!scorecard) {
+          scorecard = await fetchDpwtPlayerScorecard(dpwtConfig.eventId, playerId);
+          dpwtScorecardCache.set(playerId, scorecard);
+        }
+        const round = findDpwtRound(scorecard, roundNum);
+        if (!round) {
+          // Round hasn't started for this player yet (or hasn't loaded) -
+          // leave the bet as-is, not an error.
+          continue;
+        }
+        const stats = summarizeDpwtRound(round, dpwtConfig.holePars);
+
+        bet.thru = stats.thru;
+        bet.auto = {
+          thru: stats.thru,
+          scoreToPar: stats.scoreToPar,
+          birdies: stats.birdies,
+          bogeys: stats.bogeys,
+          pars: stats.pars,
+          eagles: stats.eagles,
+          doubleBogeys: stats.doubleBogeys,
+          gir: null,
+          fairways: null,
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (parsed.label === "SCORE") {
+          bet.stat = stats.scoreToPar;
+        } else if (parsed.label === "BIRDIES") {
+          bet.stat = stats.birdiesOrBetter;
+        } else if (parsed.label === "BOGEYS") {
+          bet.stat = stats.bogeysOrWorse;
+        } else if (parsed.label === "PARS") {
+          bet.stat = stats.pars;
+        }
+
+        if (bet.status === "live") {
+          const graded = autoGradeStatus(parsed, bet.stat, bet.thru);
+          if (graded) bet.status = graded;
+        }
+
+        updatedCount += 1;
+        continue;
       }
 
       if (tournamentMap.dataSource === "theopen") {
