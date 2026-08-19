@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../lib/seed";
 import { Mapping, EMPTY_MAPPING, tourLabel } from "../lib/mapping";
-import { parseBetType, trend, smartTrend, trendClassName, timeToMinutes, friendlyLabel, formatScore, parseScoreInput, matchPlayStatus, holeScoreName } from "../lib/betLogic";
+import { parseBetType, trend, smartTrend, trendClassName, timeToMinutes, friendlyLabel, formatScore, parseScoreInput, matchPlayStatus, holeScoreName, holeScoreHitMissValues, ParsedBet } from "../lib/betLogic";
 import { positionRank } from "../lib/positions";
 import { sortByPersonalOrder } from "../lib/personalOrder";
 import { Parlay, ParlayLegRef, LegStatus, resolveLegStatuses, deriveParlayStatus } from "../lib/parlay";
@@ -423,6 +423,17 @@ export default function Page() {
     updateBet(id, { ...patch, autoEnabled: false });
   }
 
+  // HOLE_SCORE bets: tap-to-select Hit/Miss instead of typing a number -
+  // see holeScoreHitMissValues in lib/betLogic.ts for why. Sets a stat
+  // value consistent with the tap (for display/detail), thru=1 (the hole
+  // is complete the moment you're choosing an outcome for it), and the
+  // status directly, so the board reflects the tap immediately rather
+  // than waiting for the next sync pass to re-derive it.
+  function setHoleScoreOutcome(id: string, parsed: ParsedBet, hit: boolean) {
+    const { hit: hitVal, miss: missVal } = holeScoreHitMissValues(parsed);
+    updateBetManually(id, { stat: hit ? hitVal : missVal, thru: 1, status: hit ? "hit" : "miss" });
+  }
+
   function resumeAuto(id: string) {
     updateBet(id, { autoEnabled: true });
   }
@@ -749,6 +760,32 @@ export default function Page() {
                           </div>
                         </div>
 
+                        {parsed.label === "HOLE_SCORE" ? (
+                          <div className="scorecard">
+                            <div className="sc-cell">
+                              <div className="sc-label">Hole {parsed.holeNumber}</div>
+                              <div className="sc-target">{parsed.targetDisplay}</div>
+                            </div>
+                            <div className="sc-cell" style={{ flex: 2, flexDirection: "row", gap: 6 }}>
+                              <button
+                                disabled={!unlocked}
+                                className={`sbtn win ${b.stat !== null && b.stat === holeScoreHitMissValues(parsed).hit ? "active" : ""}`}
+                                onClick={() => setHoleScoreOutcome(b.id, parsed, true)}
+                                style={{ flex: 1 }}
+                              >
+                                HIT
+                              </button>
+                              <button
+                                disabled={!unlocked}
+                                className={`sbtn loss ${b.stat !== null && b.stat === holeScoreHitMissValues(parsed).miss ? "active" : ""}`}
+                                onClick={() => setHoleScoreOutcome(b.id, parsed, false)}
+                                style={{ flex: 1 }}
+                              >
+                                MISS
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
                         <div className="scorecard">
                           <div className="sc-cell">
                             <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
@@ -756,7 +793,7 @@ export default function Page() {
                           </div>
                           <div className="sc-cell">
                             <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
-                            {parsed.label === "SCORE" || parsed.label === "HOLE_SCORE" ? (
+                            {parsed.label === "SCORE" ? (
                               <input
                                 disabled={!unlocked}
                                 className={`sc-input ${cls}`}
@@ -798,6 +835,7 @@ export default function Page() {
                             />
                           </div>
                         </div>
+                        )}
 
                         <div className="auto-row">
                           <span className={`auto-badge ${isAuto ? "on" : "off"}`}>
@@ -988,7 +1026,32 @@ export default function Page() {
                           </button>
                         </div>
                       </div>
-                      {(["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "WINNER_SCORE", "HOLE_SCORE"].includes(parsed.label)) && (
+                      {parsed.label === "HOLE_SCORE" ? (
+                        <div className="scorecard">
+                          <div className="sc-cell">
+                            <div className="sc-label">Hole {parsed.holeNumber}</div>
+                            <div className="sc-target">{parsed.targetDisplay}</div>
+                          </div>
+                          <div className="sc-cell" style={{ flex: 2, flexDirection: "row", gap: 6 }}>
+                            <button
+                              disabled={!unlocked}
+                              className={`sbtn win ${b.stat !== null && b.stat === holeScoreHitMissValues(parsed).hit ? "active" : ""}`}
+                              onClick={() => setHoleScoreOutcome(b.id, parsed, true)}
+                              style={{ flex: 1 }}
+                            >
+                              HIT
+                            </button>
+                            <button
+                              disabled={!unlocked}
+                              className={`sbtn loss ${b.stat !== null && b.stat === holeScoreHitMissValues(parsed).miss ? "active" : ""}`}
+                              onClick={() => setHoleScoreOutcome(b.id, parsed, false)}
+                              style={{ flex: 1 }}
+                            >
+                              MISS
+                            </button>
+                          </div>
+                        </div>
+                      ) : (["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "WINNER_SCORE"].includes(parsed.label)) && (
                         <div className="scorecard">
                           <div className="sc-cell">
                             <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
@@ -996,7 +1059,7 @@ export default function Page() {
                           </div>
                           <div className="sc-cell">
                             <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
-                            {parsed.label === "SCORE" || parsed.label === "HOLE_SCORE" ? (
+                            {parsed.label === "SCORE" ? (
                               <input
                                 disabled={!unlocked}
                                 className={`sc-input ${trendClassName(parsed, b.stat, b.thru)}`}

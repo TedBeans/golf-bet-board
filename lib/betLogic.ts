@@ -238,6 +238,24 @@ export function holeScoreName(diff: number): string {
   return "Double Bogey+";
 }
 
+// For HOLE_SCORE bets specifically: a representative diff-to-par value
+// that satisfies ("hit") or fails ("miss") this bet's condition. Powers
+// the manual-entry Hit/Miss buttons on the board - tapping one sets a
+// stat value that grades the way the tap implies, without ever needing
+// to type a number (which for a value that can be negative ran into a
+// real bug: a controlled input whose displayed value is recomputed from
+// the parsed number every keystroke can't hold a lone "-" long enough
+// for the next digit to join it, since "-" alone doesn't parse to a
+// valid number and gets wiped immediately). A tap-to-select outcome is
+// also just a better fit for what this bet actually is - a discrete golf
+// result, not an arbitrary number - so this fixes the bug and matches
+// the bet type better at the same time.
+export function holeScoreHitMissValues(parsed: ParsedBet): { hit: number; miss: number } {
+  const target = parsed.target ?? 0;
+  if (parsed.type === "min") return { hit: target, miss: target - 1 }; // "or worse" - target itself satisfies it
+  return { hit: target, miss: target + 1 }; // "or better" / exact - target itself satisfies it
+}
+
 export function friendlyLabel(label: string, segment?: "front9" | "back9", holeNumber?: number): string {
   if (label === "SCORE" && segment === "front9") return "Front 9";
   if (label === "SCORE" && segment === "back9") return "Back 9";
