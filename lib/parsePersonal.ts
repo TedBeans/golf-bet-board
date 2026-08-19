@@ -51,6 +51,13 @@ const MAKECUT_RE = /^(.*?)\s+(?:to\s+)?make\s+(?:the\s+)?cut$/i;
 // Round 1 Leader" - all stored as the same canonical "R1 Leader" phrase.
 const R1LEADER_RE = /^(.*?)\s+(?:end of\s+)?(?:r1|round\s*1)\s+leader$/i;
 
+// Round-scoped single-hole outcome bets: "Player [Round N] Hole M Birdie
+// or Better" - same idea as ROUND_STAT_RE below (Round N optional,
+// defaults to the header's round), but for a specific hole's outcome
+// instead of a running stat. See lib/parseHoleScore.ts for why this is a
+// genuinely different shape from every Over/Under-based category.
+const PERSONAL_HOLE_SCORE_RE = /^(.*?)\s+(?:Round\s+(\d+)\s+)?hole\s+(\d{1,2})\s+(eagle|birdie|par|bogey|double bogey)(?:\s+or\s+(better|worse))?$/i;
+
 // Round-scoped stat bets: "Player [Round N] Over/Under X.X [Category]"
 // e.g. "Tommy Fleetwood Round 1 Over 11.5 Pars"
 //      "Maverick McNealy Over 8.5 Fairways" (Round defaults to 1)
@@ -144,6 +151,34 @@ export function parsePersonalText(text: string, forDate: string | undefined, map
     } else if ((m = descriptor.match(R1LEADER_RE))) {
       player = m[1].trim();
       phrase = "R1 Leader";
+    } else if ((m = descriptor.match(PERSONAL_HOLE_SCORE_RE))) {
+      player = m[1].trim();
+      const roundNum = m[2] ? parseInt(m[2], 10) : currentDefaultRound;
+      const holeNum = m[3];
+      const outcomeName = m[4].toLowerCase();
+      const properOutcome = outcomeName.replace(/\b\w/g, (c) => c.toUpperCase());
+      const direction = m[5] ? m[5].toLowerCase() : null;
+      const betPhrase = direction ? `Hole ${holeNum} ${properOutcome} or ${direction}` : `Hole ${holeNum} ${properOutcome}`;
+      bets.push({
+        id: "bp" + counter++ + "_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+        t: currentTournament,
+        r: `Round ${roundNum}`,
+        time: "",
+        player,
+        bet: betPhrase,
+        stat: null,
+        thru: null,
+        status: "pending",
+        autoEnabled: true,
+        auto: null,
+        oddsLine: null,
+        oddsPrice: price,
+        sportsbook,
+        oddsUnits: units,
+        loadedDate,
+        personal: true,
+      });
+      continue;
     } else if ((m = descriptor.match(ROUND_STAT_RE))) {
       player = m[1].trim();
       // Use Round N from the bet line if present, otherwise fall back to

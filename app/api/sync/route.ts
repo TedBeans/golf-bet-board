@@ -5,7 +5,7 @@ import { Mapping } from "../../../lib/mapping";
 import { Parlay, resolveLegStatuses, deriveParlayStatus } from "../../../lib/parlay";
 import { fetchPgaLeaderboard, fetchPlayerScorecardStats, fetchPlayerHoleScores, fetchPgaTeeTimes, extractPgaTeeTimes, PgaTeeTimeRow } from "../../../lib/pgatour";
 import { extractPlayers, findPlayerMatch, findLeader, findRound1Leaders, Round1LeaderInfo, PgaPlayerRow } from "../../../lib/pgaMatch";
-import { extractScorecardStats, roundNumberFromLabel, computeSegmentStats, computeFullRoundStats } from "../../../lib/pgaScorecard";
+import { extractScorecardStats, roundNumberFromLabel, computeSegmentStats, computeFullRoundStats, computeHoleScore } from "../../../lib/pgaScorecard";
 import { fetchOpenLeaderboard, fetchOpenStatistics } from "../../../lib/theopen";
 import { extractOpenPlayers, findOpenPlayerMatch, findOpenLeader, computeOpenStats, computeOpenGirFairways, OpenPlayerRow } from "../../../lib/openMatch";
 import { parseBetType, autoGradeStatus, timeToMinutes, gradeMakeCut } from "../../../lib/betLogic";
@@ -586,7 +586,7 @@ export async function GET() {
         // phrases, and the data fetching is keyed on tournamentId not round.
         // Only the true unrecognized types (which shouldn't happen given
         // the parser) are skipped entirely.
-        if (!["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "WINNER_SCORE"].includes(parsed.label)) {
+        if (!["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "WINNER_SCORE", "HOLE_SCORE"].includes(parsed.label)) {
           continue;
         }
         // Fall through to the regular stat/grading pipeline below.
@@ -602,12 +602,12 @@ export async function GET() {
         // (ours, or a bare curl) fundamentally cannot get past it the way
         // a real browser does. So every bet type on this tour is graded
         // by hand with the board's WIN/LOSS buttons - Round Score/
-        // Birdies/Bogeys/Pars join Fairways/GIR/Tournament Score, which
-        // were already manual for unrelated reasons (no live shot feed,
-        // no full-field feed). Deliberately a silent no-op, not an error -
-        // this is the expected, by-design state for this tour right now,
-        // not a failure. See lib/dpwt.ts header comment for the full
-        // history if a workaround ever becomes worth chasing.
+        // Birdies/Bogeys/Pars/Hole Score join Fairways/GIR/Tournament
+        // Score, which were already manual for unrelated reasons (no live
+        // shot feed, no full-field feed). Deliberately a silent no-op,
+        // not an error - this is the expected, by-design state for this
+        // tour right now, not a failure. See lib/dpwt.ts header comment
+        // for the full history if a workaround ever becomes worth chasing.
         continue;
       }
 
@@ -641,6 +641,15 @@ export async function GET() {
             leaderName: leader.player.displayName,
           };
           updatedCount += 1;
+          continue;
+        }
+
+        if (parsed.label === "HOLE_SCORE") {
+          // Not built yet for theopen.com - PGA Tour and DP World Tour
+          // roster/manual-grade only for now. Bail explicitly rather than
+          // fall through, since the full-round hole fetch below would
+          // otherwise set a misleading thru (whole round played, not
+          // "has this specific hole been played").
           continue;
         }
 
@@ -776,6 +785,40 @@ export async function GET() {
         bet.auto = {
           thru: segStats?.thru ?? null,
           scoreToPar: segStats?.scoreToPar ?? null,
+          birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (bet.status === "live") {
+          const graded = autoGradeStatus(parsed, bet.stat, bet.thru);
+          if (graded) bet.status = graded;
+        }
+        updatedCount += 1;
+        continue;
+      }
+
+      // Single-hole outcome bets ("Hole 1 Birdie or Better") - need the
+      // same hole-by-hole data as the segment branch above, just looking
+      // up one specific hole instead of a range. thru here means "has
+      // this hole been completed" (0 or 1), not holes played - see
+      // computeHoleScore and the HOLE_SCORE branch in autoGradeStatus.
+      if (parsed.label === "HOLE_SCORE" && parsed.holeNumber) {
+        const holeKey = `holes:${tournamentId}:${row.id}`;
+        let holeJson = scorecardCache.get(holeKey);
+        if (holeJson === undefined) {
+          try {
+            holeJson = await fetchPlayerHoleScores(tournamentId, row.id);
+          } catch {
+            holeJson = null;
+          }
+          scorecardCache.set(holeKey, holeJson);
+        }
+        const lookup = holeJson ? computeHoleScore(holeJson, roundNum, parsed.holeNumber) : { thru: 0 as const, diff: null };
+
+        bet.thru = lookup.thru;
+        bet.stat = lookup.diff;
+        bet.auto = {
+          thru: lookup.thru, scoreToPar: lookup.diff,
           birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
           updatedAt: new Date().toISOString(),
         };

@@ -2,6 +2,7 @@ import { Bet } from "./seed";
 import { detectCategory } from "./parseOdds";
 import { defaultUnitsToWinOne } from "./units";
 import { nowInCentral } from "./centralTime";
+import { isHoleScoreLine, parseHoleScoreLine } from "./parseHoleScore";
 
 // A header line like "Scottish Open Round 4" - tournament and round
 // together on one line.
@@ -77,7 +78,7 @@ export function parseCombinedText(
   // like one is starting (contains "**") rather than being a continuation.
   const lines: string[] = [];
   for (const line of rawLines) {
-    const looksLikeNewBet = HEADER_RE.test(line) || TIME_RE.test(line) || /\*\*(over|under)\*\*/i.test(line);
+    const looksLikeNewBet = HEADER_RE.test(line) || TIME_RE.test(line) || /\*\*(over|under)\*\*/i.test(line) || isHoleScoreLine(line);
     if (looksLikeNewBet || lines.length === 0) {
       lines.push(line);
     } else {
@@ -110,6 +111,42 @@ export function parseCombinedText(
     const timeMatch = line.match(TIME_RE);
     const time = timeMatch ? timeMatch[1] : "";
     const rest = timeMatch ? line.slice(timeMatch[0].length) : line;
+
+    // Single-hole outcome props ("Birdie or Better" on a specific hole)
+    // don't have an Over/Under side or numeric line at all - handled
+    // entirely separately from every other category. See
+    // lib/parseHoleScore.ts for why this needs its own line shape.
+    if (isHoleScoreLine(rest)) {
+      const hs = parseHoleScoreLine(rest);
+      if (!hs) {
+        warnings.push(`Couldn't parse hole-score line: "${line}"`);
+        continue;
+      }
+      if (!currentTournament || !currentRound) {
+        warnings.push(`Bet found before any tournament header: "${line}"`);
+        continue;
+      }
+      const units = hs.units || String(defaultUnitsToWinOne(hs.oddsPrice));
+      bets.push({
+        id: "b" + counter++ + "_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+        t: currentTournament,
+        r: currentRound,
+        time,
+        player: hs.player,
+        bet: hs.bet,
+        stat: null,
+        thru: null,
+        status: "pending",
+        autoEnabled: true,
+        auto: null,
+        oddsLine: null,
+        oddsPrice: hs.oddsPrice,
+        sportsbook: hs.sportsbook,
+        oddsUnits: units,
+        loadedDate,
+      });
+      continue;
+    }
 
     const sideAt = rest.search(/\*\*(\w+)\*\*/);
     if (sideAt === -1) {

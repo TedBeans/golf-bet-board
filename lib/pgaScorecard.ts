@@ -186,6 +186,26 @@ export function computeSegmentStats(
   return { thru, scoreToPar };
 }
 
+export type HoleScoreLookup = { thru: 0 | 1; diff: number | null };
+
+// Single-hole equivalent of computeSegmentStats/computeFullRoundStats
+// above - for HOLE_SCORE bets, which grade off exactly one hole's
+// score-to-par rather than a range or the full round. thru is repurposed
+// here to mean "has this specific hole been completed" (1) or not (0) -
+// HOLE_SCORE's own meaning of thru, matching what autoGradeStatus expects
+// for this bet type.
+export function computeHoleScore(json: any, roundNumber: number, holeNumber: number): HoleScoreLookup {
+  const rounds: any[] = json?.roundScores || [];
+  const round = rounds.find((r: any) => r.roundNumber === roundNumber);
+  if (!round) return { thru: 0, diff: null };
+
+  const allHoles = [...(round.firstNine?.holes || []), ...(round.secondNine?.holes || [])];
+  const h = allHoles.find((h: any) => h.holeNumber === holeNumber);
+  if (!h || !h.score || h.score === "-") return { thru: 0, diff: null };
+
+  return { thru: 1, diff: parseInt(h.score, 10) - h.par };
+}
+
 // Full-round (all 18 holes) equivalent of computeSegmentStats above - used
 // by personal Make Cut and round-scoped H2H bets, which need a specific
 // round's thru/score-to-par regardless of which round is currently "active"

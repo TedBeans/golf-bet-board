@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../lib/seed";
 import { Mapping, EMPTY_MAPPING, tourLabel } from "../lib/mapping";
-import { parseBetType, trend, smartTrend, trendClassName, timeToMinutes, friendlyLabel, formatScore, parseScoreInput, matchPlayStatus } from "../lib/betLogic";
+import { parseBetType, trend, smartTrend, trendClassName, timeToMinutes, friendlyLabel, formatScore, parseScoreInput, matchPlayStatus, holeScoreName } from "../lib/betLogic";
 import { positionRank } from "../lib/positions";
 import { sortByPersonalOrder } from "../lib/personalOrder";
 import { Parlay, ParlayLegRef, LegStatus, resolveLegStatuses, deriveParlayStatus } from "../lib/parlay";
@@ -756,7 +756,7 @@ export default function Page() {
                           </div>
                           <div className="sc-cell">
                             <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
-                            {parsed.label === "SCORE" ? (
+                            {parsed.label === "SCORE" || parsed.label === "HOLE_SCORE" ? (
                               <input
                                 disabled={!unlocked}
                                 className={`sc-input ${cls}`}
@@ -818,7 +818,14 @@ export default function Page() {
                               <span>Thru {b.auto.thru ?? "—"}</span>
                             </span>
                           )}
-                          {b.auto && parsed.label !== "WINNER_SCORE" && (
+                          {b.auto && parsed.label === "HOLE_SCORE" && (
+                            <span className="detail-strip">
+                              <span className="detail-hi">
+                                Hole {parsed.holeNumber}: {b.auto.scoreToPar === null || b.auto.scoreToPar === undefined ? "not played yet" : holeScoreName(b.auto.scoreToPar)}
+                              </span>
+                            </span>
+                          )}
+                          {b.auto && parsed.label !== "WINNER_SCORE" && parsed.label !== "HOLE_SCORE" && (
                             <span className="detail-strip">
                               <span className={parsed.label === "SCORE" ? "detail-hi" : ""}>
                                 Score {formatScore(b.auto.scoreToPar)}
@@ -982,7 +989,7 @@ export default function Page() {
                           </button>
                         </div>
                       </div>
-                      {(["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "WINNER_SCORE"].includes(parsed.label)) && (
+                      {(["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "WINNER_SCORE", "HOLE_SCORE"].includes(parsed.label)) && (
                         <div className="scorecard">
                           <div className="sc-cell">
                             <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
@@ -990,7 +997,7 @@ export default function Page() {
                           </div>
                           <div className="sc-cell">
                             <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
-                            {parsed.label === "SCORE" ? (
+                            {parsed.label === "SCORE" || parsed.label === "HOLE_SCORE" ? (
                               <input
                                 disabled={!unlocked}
                                 className={`sc-input ${trendClassName(parsed, b.stat, b.thru)}`}
@@ -1037,6 +1044,10 @@ export default function Page() {
                               {formatScore(b.auto?.opponentScoreToPar ?? null)}
                               {" · "}thru {b.auto?.thru ?? "—"}/{b.auto?.opponentThru ?? "—"}
                             </>
+                          ) : parsed.label === "HOLE_SCORE" ? (
+                            <span className="detail-hi">
+                              Hole {parsed.holeNumber}: {b.auto?.scoreToPar === null || b.auto?.scoreToPar === undefined ? "not played yet" : holeScoreName(b.auto.scoreToPar)}
+                            </span>
                           ) : (["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "WINNER_SCORE"].includes(parsed.label)) ? (
                             null
                           ) : (

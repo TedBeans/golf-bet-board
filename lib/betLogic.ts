@@ -2,13 +2,18 @@ export const HOLES_IN_ROUND = 18;
 export const HOLES_IN_NINE = 9;
 
 export type ParsedBet = {
-  type: "max" | "min" | "generic";
+  type: "max" | "min" | "exact" | "generic";
   label: string;
   target: number | null;
   targetDisplay: string;
   segment?: "front9" | "back9"; // set only for a 9-hole-segment SCORE bet -
                                  // holes 1-9 or 10-18 by literal hole number,
                                  // never "whichever nine was played first"
+  holeNumber?: number; // HOLE_SCORE bets only - which literal hole (1-18)
+                        // this bet is about. target/type follow the same
+                        // max/min/exact semantics as everywhere else, just
+                        // scoped to one hole's score-to-par instead of a
+                        // round-wide stat.
   topN?: number; // TOP_N personal bets only - the N in "Top N"
   h2hOpponent?: string; // H2H personal bets only - the other named player
   h2hScope?: "round" | "tournament"; // H2H personal bets only
@@ -117,6 +122,35 @@ export function parseBetType(text: string): ParsedBet {
     const val = /^E$/i.test(m[1]) ? 0 : parseFloat(m[1]);
     return { type: "min", label: "WINNER_SCORE", target: val, targetDisplay: "≥ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
   }
+  // Single-hole outcome props ("Casey Jarvis Hole Score - Hole 1: Birdie
+  // or Better") - a real DraftKings market, distinct from every other bet
+  // type here: those all grade off a round-wide stat (total birdies,
+  // round score, etc), this grades off exactly one specific hole's
+  // score-to-par. Canonical phrase: "Hole {N} {Eagle/Birdie/Par/Bogey/
+  // Double Bogey}[ or Better/Worse]". The bare form (no "or better/worse")
+  // is an exact-outcome market ("Hole 1 Birdie" = that hole is a birdie,
+  // nothing else) - "exact" is its own ParsedBet.type since it's neither
+  // a ceiling nor a floor.
+  const HOLE_SCORE_VALUES: Record<string, number> = { eagle: -2, birdie: -1, par: 0, bogey: 1, "double bogey": 2 };
+  if ((m = t.match(/^hole\s+(\d{1,2})\s+(eagle|birdie|par|bogey|double bogey)\s+or\s+(better|worse)$/i))) {
+    const hole = parseInt(m[1], 10);
+    const name = m[2].toLowerCase();
+    const val = HOLE_SCORE_VALUES[name];
+    const proper = name.replace(/\b\w/g, (c) => c.toUpperCase());
+    const better = /^better$/i.test(m[3]);
+    return {
+      type: better ? "max" : "min", label: "HOLE_SCORE", holeNumber: hole,
+      target: val, targetDisplay: (better ? "≤ " : "≥ ") + proper,
+    };
+  }
+  if ((m = t.match(/^hole\s+(\d{1,2})\s+(eagle|birdie|par|bogey|double bogey)$/i))) {
+    const hole = parseInt(m[1], 10);
+    const name = m[2].toLowerCase();
+    const val = HOLE_SCORE_VALUES[name];
+    const proper = name.replace(/\b\w/g, (c) => c.toUpperCase());
+    return { type: "exact", label: "HOLE_SCORE", holeNumber: hole, target: val, targetDisplay: proper };
+  }
+
   return { type: "generic", label: "STAT", target: null, targetDisplay: "—" };
 }
 
@@ -192,9 +226,22 @@ export function trendClassName(
 
 // Turns the internal category name into the word used in the UI - shared by
 // the target column, the stat column, and the detail strip so they all agree.
-export function friendlyLabel(label: string, segment?: "front9" | "back9"): string {
+// Readable name for a single hole's score-to-par diff - display only
+// (grading itself compares raw diff values, never this string). Used by
+// HOLE_SCORE bet cards to show e.g. "Birdie" instead of a raw "-1".
+export function holeScoreName(diff: number): string {
+  if (diff <= -3) return "Albatross or better";
+  if (diff === -2) return "Eagle";
+  if (diff === -1) return "Birdie";
+  if (diff === 0) return "Par";
+  if (diff === 1) return "Bogey";
+  return "Double Bogey+";
+}
+
+export function friendlyLabel(label: string, segment?: "front9" | "back9", holeNumber?: number): string {
   if (label === "SCORE" && segment === "front9") return "Front 9";
   if (label === "SCORE" && segment === "back9") return "Back 9";
+  if (label === "HOLE_SCORE" && holeNumber) return `Hole ${holeNumber}`;
   switch (label) {
     case "SCORE": return "Score";
     case "GIR": return "Greens";
@@ -202,6 +249,7 @@ export function friendlyLabel(label: string, segment?: "front9" | "back9"): stri
     case "BIRDIES": return "Birdies";
     case "BOGEYS": return "Bogeys";
     case "PARS": return "Pars";
+    case "HOLE_SCORE": return "Hole Score";
     case "WINNER_SCORE": return "Tournament Score";
     case "WINNER": return "Winner";
     case "TOP_N": return "Top N";
@@ -232,6 +280,21 @@ export function autoGradeStatus(
   if (thru === null || thru === undefined) return null;
 
   const effectiveHolesTotal = parsed.segment ? HOLES_IN_NINE : holesTotal;
+
+  // Single-hole outcome bets (HOLE_SCORE): stat here is that ONE hole's
+  // score-to-par, not a round aggregate - and thru is repurposed
+  // specifically for this bet type to mean "has the target hole been
+  // completed" (1) or not (0), set that way in the sync route. There's no
+  // early-grading question the way a running count has, since a single
+  // hole's result is either fully known or not known at all - no partial
+  // state in between.
+  if (parsed.label === "HOLE_SCORE") {
+    if (thru < 1) return null;
+    if (parsed.type === "max") return stat <= parsed.target ? "hit" : "miss";
+    if (parsed.type === "min") return stat >= parsed.target ? "hit" : "miss";
+    if (parsed.type === "exact") return stat === parsed.target ? "hit" : "miss";
+    return null;
+  }
 
   // Round score can move either direction on any hole, so it's only safe to
   // grade once the round (or the 9-hole segment) is actually finished - a
