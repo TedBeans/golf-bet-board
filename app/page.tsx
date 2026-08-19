@@ -761,7 +761,6 @@ export default function Page() {
                                 disabled={!unlocked}
                                 className={`sc-input ${cls}`}
                                 type="text"
-                                inputMode="numeric"
                                 placeholder="—"
                                 value={formatScore(b.stat, "")}
                                 onChange={(e) => updateBetManually(b.id, { stat: parseScoreInput(e.target.value) })}
@@ -1001,7 +1000,7 @@ export default function Page() {
                               <input
                                 disabled={!unlocked}
                                 className={`sc-input ${trendClassName(parsed, b.stat, b.thru)}`}
-                                type="text" inputMode="numeric" placeholder="—"
+                                type="text" placeholder="—"
                                 value={formatScore(b.stat, "")}
                                 onChange={(e) => updateBetManually(b.id, { stat: parseScoreInput(e.target.value) })}
                               />
