@@ -570,6 +570,12 @@ export default function AdminPage() {
   // Keyed by tournament name - the tee-time table text pasted from the
   // DP World Tour site before it's parsed and applied.
   const [dpwtTeeTimeDrafts, setDpwtTeeTimeDrafts] = useState<Record<string, string>>({});
+  // Off by default (only fills bets missing a time - safe to paste the
+  // same table repeatedly without clobbering anything). Turning this on
+  // is an explicit "yes, replace times that are already set too" - for
+  // correcting a bad paste (wrong source page, bad timezone shift, etc),
+  // not routine use.
+  const [dpwtTeeTimeOverwrite, setDpwtTeeTimeOverwrite] = useState<Record<string, boolean>>({});
 
   // Matches parsed (time, playerName) entries against every live bet in
   // this tournament that's missing a time - regular and personal alike,
@@ -579,6 +585,7 @@ export default function AdminPage() {
   // matcher in this app.
   function applyDpwtTeeTimes(tourn: string) {
     const raw = dpwtTeeTimeDrafts[tourn] || "";
+    const overwrite = !!dpwtTeeTimeOverwrite[tourn];
     const entries = parseDpwtTeeTimesText(raw);
     if (entries.length === 0) {
       setSaveMsg("Couldn't find any time+player rows in that paste - make sure it includes lines like '02:50 ... Lastname, Firstname'.");
@@ -599,7 +606,8 @@ export default function AdminPage() {
 
     let filled = 0;
     const nextBets = bets.map((b) => {
-      if (b.t !== tourn || b.time) return b;
+      if (b.t !== tourn) return b;
+      if (b.time && !overwrite) return b;
       const match = findEntry(b.player);
       if (!match) return b;
       filled++;
@@ -607,7 +615,9 @@ export default function AdminPage() {
     });
 
     if (filled === 0) {
-      setSaveMsg("Parsed the paste fine, but no bets in this tournament matched any of those names (or they already had times set).");
+      setSaveMsg(overwrite
+        ? "Parsed the paste fine, but no bets in this tournament matched any of those names."
+        : "Parsed the paste fine, but no bets in this tournament matched any of those names (or they already had times set - check 'Overwrite' to replace them).");
       setTimeout(() => setSaveMsg(""), 6000);
       return;
     }
@@ -1673,12 +1683,22 @@ export default function AdminPage() {
                       }}
                     />
                   </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={!!dpwtTeeTimeOverwrite[tourn]}
+                      onChange={(e) => setDpwtTeeTimeOverwrite((prev) => ({ ...prev, [tourn]: e.target.checked }))}
+                    />
+                    Overwrite times already set (use this to correct a bad paste, not routine re-pasting)
+                  </label>
                   <button className="add-btn-inline" style={{ marginTop: 6 }} onClick={() => applyDpwtTeeTimes(tourn)}>
                     Parse & apply times
                   </button>
                   <span className="subline" style={{ display: "block", marginTop: 4 }}>
-                    Only fills bets that don't already have a time set - safe to paste again each round.
-                    No auto-fetch for this tour yet (see the roster note above), so this needs a fresh
+                    {dpwtTeeTimeOverwrite[tourn]
+                      ? "Overwrite mode: will replace times on every matched bet, even ones already set."
+                      : "Only fills bets that don't already have a time set - safe to paste again each round."}
+                    {" "}No auto-fetch for this tour yet (see the roster note above), so this needs a fresh
                     paste whenever new tee times post.
                   </span>
                 </div>
