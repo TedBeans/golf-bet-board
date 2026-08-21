@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/leaderboard-stats",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

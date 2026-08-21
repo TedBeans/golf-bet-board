@@ -65,6 +65,8 @@ export default function LiveLeaderboardTable({ tournamentName }: { tournamentNam
 
   const [statsRows, setStatsRows] = useState<FieldPlayerStats[] | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [statsFetchedAt, setStatsFetchedAt] = useState<string | null>(null);
+  const [statsRefreshing, setStatsRefreshing] = useState(false);
   const [statsRound, setStatsRound] = useState<"1" | "2" | "3" | "4" | "total">("total");
 
   useEffect(() => {
@@ -93,31 +95,34 @@ export default function LiveLeaderboardTable({ tournamentName }: { tournamentNam
     };
   }, [tournamentName]);
 
+  // Greens & Fairways only refreshes once a day (~7pm Central, via a
+  // scheduled job - see app/api/cron/leaderboard-stats) since fetching
+  // the full field is one API call per player, unlike everything else on
+  // this board. So this just reads whatever's cached once when the tab
+  // opens - no polling interval, since the data won't have changed again
+  // a few minutes later the way live position does.
+  function loadStats(refresh: boolean) {
+    if (refresh) setStatsRefreshing(true);
+    const url = `/api/leaderboard-stats?tournament=${encodeURIComponent(tournamentName)}${refresh ? "&refresh=1" : ""}`;
+    return fetchFresh(url)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.error) {
+          setStatsError(d.error);
+          return;
+        }
+        setStatsRows(d.players || []);
+        setStatsFetchedAt(d.fetchedAt || null);
+        setStatsError(null);
+      })
+      .catch(() => setStatsError("Couldn't load Greens & Fairways stats."))
+      .finally(() => setStatsRefreshing(false));
+  }
+
   useEffect(() => {
-    if (tab !== "stats") return;
-    let cancelled = false;
-    function load() {
-      fetchFresh(`/api/leaderboard-stats?tournament=${encodeURIComponent(tournamentName)}`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (cancelled) return;
-          if (d.error) {
-            setStatsError(d.error);
-            return;
-          }
-          setStatsRows(d.players || []);
-          setStatsError(null);
-        })
-        .catch(() => {
-          if (!cancelled) setStatsError("Couldn't load Greens & Fairways stats.");
-        });
-    }
-    load();
-    const interval = setInterval(load, 3 * 60 * 1000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
+    if (tab !== "stats" || statsRows !== null || statsError !== null) return;
+    loadStats(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, tournamentName]);
 
   const q = query.trim().toLowerCase();
@@ -162,7 +167,7 @@ export default function LiveLeaderboardTable({ tournamentName }: { tournamentNam
           <span style={{ fontSize: 10, color: "var(--cream-dim)", marginLeft: "auto" }}>{filteredLeaderboard.length} players</span>
         )}
         {tab === "stats" && (
-          <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
+          <div style={{ display: "flex", gap: 4, marginLeft: "auto", alignItems: "center" }}>
             {(["1", "2", "3", "4", "total"] as const).map((r) => (
               <button
                 key={r}
@@ -177,9 +182,27 @@ export default function LiveLeaderboardTable({ tournamentName }: { tournamentNam
                 {r === "total" ? "Total" : `R${r}`}
               </button>
             ))}
+            <button
+              onClick={() => loadStats(true)}
+              disabled={statsRefreshing}
+              title="This normally refreshes once a day around 7pm Central - use this to force it sooner"
+              style={{
+                background: "rgba(0,0,0,0.25)", color: "var(--cream-dim)", border: "1px solid var(--line)",
+                borderRadius: 4, padding: "4px 9px", fontFamily: "'JetBrains Mono',monospace", fontSize: 11,
+                cursor: statsRefreshing ? "default" : "pointer", opacity: statsRefreshing ? 0.5 : 1,
+              }}
+            >
+              {statsRefreshing ? "…" : "↻"}
+            </button>
           </div>
         )}
       </div>
+      {tab === "stats" && statsFetchedAt && (
+        <div className="subline" style={{ marginTop: -4, marginBottom: 8 }}>
+          Updated {new Date(statsFetchedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+          {" "}· refreshes once daily around 7pm Central
+        </div>
+      )}
 
       {tab === "leaderboard" && (
         error ? (
