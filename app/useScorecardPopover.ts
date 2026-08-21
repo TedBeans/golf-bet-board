@@ -21,6 +21,7 @@ export function useScorecardPopover() {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [openTournament, setOpenTournament] = useState<string>("");
   const [openRound, setOpenRound] = useState<string>("");
+  const [openPlayer, setOpenPlayer] = useState<string>("");
 
   function open(key: string, tournament: string, round: string, player: string) {
     if (openKey === key) {
@@ -31,6 +32,7 @@ export function useScorecardPopover() {
     setOpenKey(key);
     setOpenTournament(tournament);
     setOpenRound(round);
+    setOpenPlayer(player);
     setState({ loading: true, scorecard: null });
     fetchFresh(`/api/scorecard?tournament=${encodeURIComponent(tournament)}&round=${encodeURIComponent(round)}&player=${encodeURIComponent(player)}`)
       .then((r) => r.json())
@@ -52,5 +54,5 @@ export function useScorecardPopover() {
     setState(null);
   }
 
-  return { openKey, state, open, close, openTournament, openRound };
+  return { openKey, state, open, close, openTournament, openRound, openPlayer };
 }

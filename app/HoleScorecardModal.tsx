@@ -111,6 +111,7 @@ export default function HoleScorecardModal({
   message,
   summary,
   onClose,
+  variant = "anchored",
 }: {
   player: string;
   tournament: string;
@@ -122,6 +123,19 @@ export default function HoleScorecardModal({
   message?: string;
   summary?: RoundSummary;
   onClose: () => void;
+  // "anchored" (default): positioned absolute relative to the nearest
+  // positioned ancestor, right next to whatever was clicked - the
+  // original/only behavior, used by every bet-card call site. Depends on
+  // that ancestor never being inside a horizontally-scrolled container,
+  // since a fixed-width absolute popover gets clipped by any ancestor
+  // that's forced into a scroll/clip context (see the Live Leaderboard's
+  // Greens & Fairways table, which needs horizontal scroll for its wider
+  // column set - this is exactly why "centered" exists).
+  // "centered": position:fixed, centered in the viewport with a dismiss-
+  // on-click backdrop behind it - escapes any ancestor's overflow/scroll
+  // clipping entirely, since fixed positioning is relative to the
+  // viewport, not any particular ancestor.
+  variant?: "anchored" | "centered";
 }) {
   const hasStandings = (position !== undefined && position !== null) || (totalToPar !== undefined && totalToPar !== null);
   const scoreColor = totalToPar === null || totalToPar === undefined ? "var(--cream)" : totalToPar < 0 ? "var(--clay)" : totalToPar > 0 ? "var(--steel)" : "var(--cream)";
@@ -161,14 +175,21 @@ export default function HoleScorecardModal({
   const activeMessage = override ? override.message : message;
   const activeSummary = override ? override.summary : summary;
 
-  return (
+  const card = (
     <div
       onClick={(e) => e.stopPropagation()}
-      style={{
-        position: "absolute", bottom: "calc(100% - 6px)", left: 28, zIndex: 20,
-        background: "#0F1216", border: "1px solid var(--line)", borderRadius: 4,
-        padding: "10px 12px", minWidth: 320, boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
-      }}
+      style={
+        variant === "centered"
+          ? {
+              background: "#0F1216", border: "1px solid var(--line)", borderRadius: 6,
+              padding: "10px 12px", width: 320, maxWidth: "calc(100vw - 32px)", boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
+            }
+          : {
+              position: "absolute", bottom: "calc(100% - 6px)", left: 28, zIndex: 20,
+              background: "#0F1216", border: "1px solid var(--line)", borderRadius: 4,
+              padding: "10px 12px", minWidth: 320, boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
+            }
+      }
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: hasStandings ? 4 : 6, gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -226,4 +247,20 @@ export default function HoleScorecardModal({
       )}
     </div>
   );
+
+  if (variant === "centered") {
+    return (
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+        }}
+      >
+        {card}
+      </div>
+    );
+  }
+
+  return card;
 }
