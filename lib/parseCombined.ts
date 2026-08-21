@@ -78,7 +78,7 @@ export function parseCombinedText(
   // like one is starting (contains "**") rather than being a continuation.
   const lines: string[] = [];
   for (const line of rawLines) {
-    const looksLikeNewBet = HEADER_RE.test(line) || TIME_RE.test(line) || /\*\*(over|under)\*\*/i.test(line) || isHoleScoreLine(line);
+    const looksLikeNewBet = HEADER_RE.test(line) || TIME_RE.test(line) || /\*\*\s*(over|under)\s*\*\*/i.test(line) || isHoleScoreLine(line);
     if (looksLikeNewBet || lines.length === 0) {
       lines.push(line);
     } else {
@@ -148,13 +148,13 @@ export function parseCombinedText(
       continue;
     }
 
-    const sideAt = rest.search(/\*\*(\w+)\*\*/);
+    const sideAt = rest.search(/\*\*\s*(\w+)\s*\*\*/);
     if (sideAt === -1) {
       warnings.push(`Couldn't find Over/Under in: "${line}"`);
       continue;
     }
     const preSide = rest.slice(0, sideAt).trim();
-    const sideMatch = rest.slice(sideAt).match(/^\*\*(\w+)\*\*/)!;
+    const sideMatch = rest.slice(sideAt).match(/^\*\*\s*(\w+)\s*\*\*/)!;
     const side: "Over" | "Under" = /^over$/i.test(sideMatch[1]) ? "Over" : "Under";
 
     // Strip a "Front 9 Score"/"Back 9 Score" suffix off the player name if
