@@ -221,11 +221,15 @@ export type DpwtTeeTimeEntry = { time: string; playerName: string };
 // and the header row are all silently skipped since none of them match
 // either pattern.
 //
-// Times come through with no AM/PM marker on this site (24-hour-ish, but
-// only ever showing early-morning hours once displayed in the viewer's
-// local time) - assumed AM below to match what's actually been observed.
-// If DP World Tour ever shows a PM group this way, that assumption would
-// need revisiting.
+// The site displays times in 24-hour format throughout (confirmed
+// elsewhere in the app - e.g. a live clock widget showing "04:40", not
+// "4:40 AM"), so this converts properly instead of assuming every time is
+// AM. An earlier version of this function did assume AM unconditionally,
+// which happened to work for the one tournament it was first tested
+// against (every tee time that day was genuinely before noon) but would
+// have silently mis-logged any 12:xx-and-later time as after-midnight AM
+// instead of the early-afternoon PM it actually was - caught when a
+// second tournament's tee times spanned into the 12:xx range.
 export function parseDpwtTeeTimesText(raw: string): DpwtTeeTimeEntry[] {
   const entries: DpwtTeeTimeEntry[] = [];
   const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -237,9 +241,11 @@ export function parseDpwtTeeTimesText(raw: string): DpwtTeeTimeEntry[] {
   for (const line of lines) {
     const timeMatch = line.match(timeOnlyRe);
     if (timeMatch) {
-      let hour = parseInt(timeMatch[1], 10);
-      if (hour === 0) hour = 12;
-      currentTime = `${hour}:${timeMatch[2]} AM`;
+      const hour24 = parseInt(timeMatch[1], 10);
+      const period = hour24 < 12 ? "AM" : "PM";
+      let hour12 = hour24 % 12;
+      if (hour12 === 0) hour12 = 12;
+      currentTime = `${hour12}:${timeMatch[2]} ${period}`;
       continue;
     }
     const nameMatch = line.match(nameRe);
