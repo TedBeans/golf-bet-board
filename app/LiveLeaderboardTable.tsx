@@ -48,12 +48,12 @@ function formatPct(count: number | null, total: number | null): string {
 const DEFAULT_ROUND = "Round 1";
 
 const thStyle = (align: "left" | "right"): React.CSSProperties => ({
-  textAlign: align, padding: "8px 10px", background: "rgba(0,0,0,0.25)",
+  textAlign: align, padding: "8px 6px", background: "rgba(0,0,0,0.25)",
   color: "var(--cream-dim)", fontWeight: 600, letterSpacing: "0.03em",
   textTransform: "uppercase", fontSize: 10, whiteSpace: "nowrap", borderBottom: "1px solid var(--line)",
 });
 const tdStyle = (align: "left" | "right"): React.CSSProperties => ({
-  padding: "6px 10px", borderBottom: "1px solid var(--line)", textAlign: align,
+  padding: "6px 6px", borderBottom: "1px solid var(--line)", textAlign: align,
 });
 
 export default function LiveLeaderboardTable({ tournamentName }: { tournamentName: string }) {
@@ -279,7 +279,7 @@ export default function LiveLeaderboardTable({ tournamentName }: { tournamentNam
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "'JetBrains Mono',monospace" }}>
               <thead>
                 <tr>
-                  {["Pos", "Player", "Score", "GIR %", "Greens", "Fairway %", "Fairways"].map((label, i) => (
+                  {["Pos", "Player", "Score", "GIR", "Fairways"].map((label, i) => (
                     <th key={label} style={thStyle(i === 1 ? "left" : "right")}>{label}</th>
                   ))}
                 </tr>
@@ -293,10 +293,12 @@ export default function LiveLeaderboardTable({ tournamentName }: { tournamentNam
                   return (
                     <tr key={r.id}>
                       <td style={{ ...tdStyle("right"), color: "var(--cream-dim)" }}>{lb?.position ?? "—"}</td>
-                      <td style={{ ...tdStyle("left"), whiteSpace: "nowrap" }}>
+                      <td style={{ ...tdStyle("left") }}>
                         <span style={{ position: "relative", display: "inline-block" }}>
                           <span
                             style={{
+                              display: "inline-block", maxWidth: 108, overflow: "hidden",
+                              textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "bottom",
                               color: "var(--cream)", fontWeight: 600, cursor: "pointer",
                               textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: "var(--cream-dim)",
                             }}
@@ -323,10 +325,12 @@ export default function LiveLeaderboardTable({ tournamentName }: { tournamentNam
                       <td style={{ ...tdStyle("right"), color: lb?.totalToPar == null ? "var(--cream-dim)" : lb.totalToPar < 0 ? "var(--clay)" : lb.totalToPar > 0 ? "var(--steel)" : "var(--cream)" }}>
                         {formatToPar(lb?.totalToPar ?? null)}
                       </td>
-                      <td style={{ ...tdStyle("right"), color: "var(--cream)" }}>{formatPct(s?.girCount ?? null, s?.girTotal ?? null)}</td>
-                      <td style={{ ...tdStyle("right"), color: "var(--cream-dim)" }}>{s?.girCount ?? "—"}/{s?.girTotal ?? "—"}</td>
-                      <td style={{ ...tdStyle("right"), color: "var(--cream)" }}>{formatPct(s?.fairwaysCount ?? null, s?.fairwaysTotal ?? null)}</td>
-                      <td style={{ ...tdStyle("right"), color: "var(--cream-dim)" }}>{s?.fairwaysCount ?? "—"}/{s?.fairwaysTotal ?? "—"}</td>
+                      <td style={{ ...tdStyle("right"), color: "var(--cream)", whiteSpace: "nowrap" }}>
+                        {formatPct(s?.girCount ?? null, s?.girTotal ?? null)}
+                      </td>
+                      <td style={{ ...tdStyle("right"), color: "var(--cream)", whiteSpace: "nowrap" }}>
+                        {formatPct(s?.fairwaysCount ?? null, s?.fairwaysTotal ?? null)}
+                      </td>
                     </tr>
                   );
                 })}
