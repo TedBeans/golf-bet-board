@@ -423,6 +423,39 @@ export default function Page() {
     updateBet(id, { ...patch, autoEnabled: false });
   }
 
+  // SCORE bets' manual stat input needs its own draft string, tracked
+  // separately from the committed b.stat value - same root bug already
+  // found and fixed for Hole Score (see holeScoreHitMissValues below),
+  // but SCORE can't just be replaced with tap-select buttons the way
+  // Hole Score was, since it needs a wide range of values, not a fixed
+  // handful of outcomes. The bug: this input's displayed value used to
+  // be computed directly from b.stat every keystroke - typing "-" alone
+  // doesn't parse to a valid number, so b.stat would go to null and the
+  // field would revert to empty before the next digit could ever join
+  // the minus sign. Tracking the raw typed text here instead means the
+  // field can hold a lone "-" on screen while waiting for the rest of
+  // the number, only committing to b.stat once there's something valid
+  // (or the field is cleared entirely).
+  const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
+  function scoreInputValue(b: Bet): string {
+    return scoreDrafts[b.id] !== undefined ? scoreDrafts[b.id] : formatScore(b.stat, "");
+  }
+  function handleScoreInputChange(id: string, raw: string) {
+    setScoreDrafts((prev) => ({ ...prev, [id]: raw }));
+    const parsed = parseScoreInput(raw);
+    if (raw.trim() === "" || parsed !== null) {
+      updateBetManually(id, { stat: parsed });
+    }
+  }
+  function clearScoreDraft(id: string) {
+    setScoreDrafts((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }
+
   // HOLE_SCORE bets: tap-to-select Hit/Miss instead of typing a number -
   // see holeScoreHitMissValues in lib/betLogic.ts for why. Sets a stat
   // value consistent with the tap (for display/detail), thru=1 (the hole
@@ -799,8 +832,9 @@ export default function Page() {
                                 className={`sc-input ${cls}`}
                                 type="text"
                                 placeholder="—"
-                                value={formatScore(b.stat, "")}
-                                onChange={(e) => updateBetManually(b.id, { stat: parseScoreInput(e.target.value) })}
+                                value={scoreInputValue(b)}
+                                onChange={(e) => handleScoreInputChange(b.id, e.target.value)}
+                                onBlur={() => clearScoreDraft(b.id)}
                               />
                             ) : (
                               <input
@@ -1064,8 +1098,9 @@ export default function Page() {
                                 disabled={!unlocked}
                                 className={`sc-input ${trendClassName(parsed, b.stat, b.thru)}`}
                                 type="text" placeholder="—"
-                                value={formatScore(b.stat, "")}
-                                onChange={(e) => updateBetManually(b.id, { stat: parseScoreInput(e.target.value) })}
+                                value={scoreInputValue(b)}
+                                onChange={(e) => handleScoreInputChange(b.id, e.target.value)}
+                                onBlur={() => clearScoreDraft(b.id)}
                               />
                             ) : (
                               <input
