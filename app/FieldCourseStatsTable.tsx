@@ -118,8 +118,8 @@ function fmtSigned(n: number): string {
   return n > 0 ? `+${n.toFixed(2)}` : n.toFixed(2);
 }
 function sgColor(n: number): string {
-  if (n > 0.05) return "var(--clay)";
-  if (n < -0.05) return "var(--steel)";
+  if (n > 0.05) return "var(--live)"; // positive = green, matches the app's own win-color convention
+  if (n < -0.05) return "var(--clay)"; // negative = red, matches the app's own loss-color convention
   return "var(--cream-dim)";
 }
 
