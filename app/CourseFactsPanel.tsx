@@ -26,7 +26,7 @@ export type CourseFacts = {
   greens: string;
   greensSize: string;
   greensSizeRank: string;
-  greensStimpmeter: number;
+  greensStimpmeter: number | string;
   greensSpeed: string;
   scoreDifficulty: string;
   correlated: string[];
@@ -231,6 +231,38 @@ export const COURSE_FACTS: Record<string, CourseFacts> = {
     elevationRank: "15th highest/44",
     roughLength: "Average",
     lengthDescriptor: "Long (106.4 yds/par)",
+  },
+  "Tour Championship": {
+    courseName: "East Lake Golf Club",
+    tournament: "Tour Championship",
+    par: 70,
+    yards: 7440,
+    courseType: "Tree-lined Parkland",
+    architect: "Tom Bendelow (1904), Donald Ross (1913)",
+    redesign: "Rees Jones (Multiple), Andrew Green (2023)",
+    lengthRank: "6th longest/44",
+    bunkers: 78,
+    bunkersRank: "18th most/44",
+    waterHoles: 8,
+    waterHolesRank: "11th most/44",
+    fairways: "Zoysia",
+    avgFairwayWidth: "30 yds",
+    fairwayWidthRank: "9th narrowest/44",
+    rough: "Bermuda 3.5\"",
+    greens: "Bermuda",
+    greensSize: "6,238 sq ft",
+    greensSizeRank: "21st largest/44",
+    greensStimpmeter: "12.5-13",
+    greensSpeed: "Fast",
+    scoreDifficulty: "Score RTP: -1.62 · 8th easiest/44",
+    correlated: ["Augusta National", "TPC Southwind", "Quail Hollow", "TPC Potomac", "Innisbrook", "Memorial Park", "CC of Jackson", "Bay Hill", "Bellerive"],
+    location: "Georgia / Southeast",
+    season: "FedExCup Playoffs",
+    eventType: "No-Cut / Small Field",
+    elevation: "1050 feet",
+    elevationRank: "4th highest/44",
+    roughLength: "Average",
+    lengthDescriptor: "Very Long (106.3 yds/par)",
   },
 };
 
