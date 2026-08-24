@@ -3,6 +3,7 @@
 import WeatherStrip from "./WeatherStrip";
 import CourseHistoryTable from "./CourseHistoryTable";
 import CourseFactsPanel from "./CourseFactsPanel";
+import FieldCourseStatsTable from "./FieldCourseStatsTable";
 import LiveLeaderboardTable from "./LiveLeaderboardTable";
 import { tourLabel } from "../lib/mapping";
 
@@ -46,6 +47,7 @@ export default function UpcomingTournamentCard({ name, meta, showLeaderboard }: 
       )}
 
       <CourseFactsPanel tournamentName={name} />
+      <FieldCourseStatsTable tournamentName={name} />
       {showLeaderboard ? (
         <LiveLeaderboardTable tournamentName={name} />
       ) : (

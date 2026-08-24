@@ -15,6 +15,7 @@ import UpcomingTournamentCard from "./UpcomingTournamentCard";
 import WeatherStrip from "./WeatherStrip";
 import CourseHistoryTable from "./CourseHistoryTable";
 import CourseFactsPanel from "./CourseFactsPanel";
+import FieldCourseStatsTable from "./FieldCourseStatsTable";
 import LiveLeaderboardTable from "./LiveLeaderboardTable";
 import { fetchFresh } from "../lib/fetchFresh";
 
@@ -665,6 +666,7 @@ export default function Page() {
                       />
                     )}
                     <CourseFactsPanel tournamentName={tourn} />
+                    <FieldCourseStatsTable tournamentName={tourn} />
                     {tournamentStarted ? (
                       <LiveLeaderboardTable tournamentName={tourn} />
                     ) : (
