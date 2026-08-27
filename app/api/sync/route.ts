@@ -14,6 +14,7 @@ import { computePositions, PositionEntry } from "../../../lib/positions";
 import { nowInCentral } from "../../../lib/centralTime";
 import { normalizeName } from "../../../lib/nameNorm";
 import { noCacheJson } from "../../../lib/noCacheJson";
+import { recordCompletedRounds, computeLowRoundStanding, getRoundScoreHistory, inferCurrentRound } from "../../../lib/roundScores";
 
 const SYNC_LOCK_MS = 45000;
 
@@ -314,7 +315,7 @@ export async function GET() {
         // these aren't supported there. Round-stat personal plays
         // (Score/GIR/Birdies/etc) don't need the full field and fall
         // through to the regular per-player pipeline below just fine.
-        if (useDpwt && ["WINNER", "TOP_N", "MAKE_CUT", "H2H", "TIE", "R1_LEADER"].includes(parsed.label)) {
+        if (useDpwt && ["WINNER", "TOP_N", "MAKE_CUT", "H2H", "TIE", "R1_LEADER", "LOW_ROUND"].includes(parsed.label)) {
           errors.push(`${bet.player ?? bet.t}: ${parsed.label} isn't supported yet for DP World Tour tournaments (no full-field feed)`);
           continue;
         }
@@ -505,6 +506,48 @@ export async function GET() {
           } else if (match.thru === 18 && match.total !== null) {
             bet.status = "miss";
           }
+          continue;
+        }
+
+        if (parsed.label === "LOW_ROUND") {
+          if (useOpen) {
+            errors.push(`${bet.player}: Lowest Round tracking isn't supported yet for theopen.com tournaments`);
+            continue;
+          }
+
+          // Every completed round gets permanently recorded the moment it's
+          // seen at thru===18 - the live leaderboard only ever shows the
+          // CURRENT round's score, so once the tournament moves on to the
+          // next round, an earlier round's individual score is gone from
+          // this feed for good unless it was captured when it happened.
+          const currentRound = inferCurrentRound(bet.t, bets, archivedBetsForStartCheck);
+          if (currentRound) {
+            await recordCompletedRounds(tournamentId, currentRound, pgaPlayers!);
+          }
+
+          const history = await getRoundScoreHistory(tournamentId);
+          const standing = computeLowRoundStanding(history);
+
+          const match = findPlayerMatch(bet.player, pgaPlayers!);
+          const playerRounds = match
+            ? Object.values(history).flat().filter((e) => e.playerId === match.id)
+            : [];
+          const playerBest = playerRounds.length ? Math.min(...playerRounds.map((e) => e.score)) : null;
+
+          bet.auto = {
+            thru: match?.thru ?? null,
+            scoreToPar: match?.total ?? null,
+            birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
+            updatedAt: new Date().toISOString(),
+            lowRoundHolder: standing ? standing.holders.map((h) => h.name).join(", ") : null,
+            lowRoundScore: standing ? standing.minScore : null,
+            playerBestRound: playerBest,
+          };
+          updatedCount += 1;
+          // Always graded by hand, same as WINNER_SCORE - confirming
+          // nobody still playing (in this round or a later one) can still
+          // beat or tie the current low needs the whole field to finish
+          // every round, which isn't something to guess at automatically.
           continue;
         }
 

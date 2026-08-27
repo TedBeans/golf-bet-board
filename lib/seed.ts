@@ -25,6 +25,14 @@ export type AutoStats = {
                                  // above actually belong to. Round 1 until it's fully finished
                                  // (thru === 18), then Round 2 - prevents thru/scoreToPar from
                                  // staying frozen on a completed Round 1 once Round 2 has started.
+  lowRoundHolder?: string | null; // personal LOW_ROUND bets only - who currently holds the
+                                   // tournament's lowest single-round score so far (comma-joined
+                                   // if tied). Purely informational - grading is always manual,
+                                   // same as WINNER_SCORE, since confirming nobody still playing
+                                   // can beat/tie it needs the whole field to finish every round.
+  lowRoundScore?: number | null; // personal LOW_ROUND bets only - that lowest round's score to par
+  playerBestRound?: number | null; // personal LOW_ROUND bets only - this specific bet's player's
+                                    // own best round recorded so far, for context against the record
 };
 
 export type Bet = {

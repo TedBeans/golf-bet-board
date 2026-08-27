@@ -59,6 +59,14 @@ export function parseBetType(text: string): ParsedBet {
   if ((m = t.match(/^(?:end of\s+)?(?:r1|round\s*1)\s+leader$/i))) {
     return { type: "generic", label: "R1_LEADER", target: null, targetDisplay: "—" };
   }
+  // Lowest 18-hole round of the tournament - whoever's single best round
+  // (any of the 4) is the lowest of the whole field. Needs every player's
+  // per-round score, not just this one player's, so - like WINNER_SCORE -
+  // this only ever tracks and displays live, grading is always by hand
+  // (see lib/roundScores.ts for how the running record gets tracked).
+  if ((m = t.match(/^lowest\s+(?:18[\s-]hole\s+)?round$/i))) {
+    return { type: "generic", label: "LOW_ROUND", target: null, targetDisplay: "—" };
+  }
 
   if ((m = t.match(/^front 9:\s*([+-]?\d+|E)\s+or better$/i))) {
     const val = /^E$/i.test(m[1]) ? 0 : parseInt(m[1], 10);
@@ -273,6 +281,7 @@ export function friendlyLabel(label: string, segment?: "front9" | "back9", holeN
     case "TOP_N": return "Top N";
     case "MAKE_CUT": return "Make Cut";
     case "R1_LEADER": return "R1 Leader";
+    case "LOW_ROUND": return "Lowest Round";
     case "H2H": return "H2H";
     case "TIE": return "Tie";
     default: return "Stat";

@@ -21,3 +21,4 @@ export const PARLAYS_KEY = "golf-bet-board:parlays";
 export const PARLAY_ARCHIVE_KEY = "golf-bet-board:parlay-archive";
 export const DG_CUTLINE_KEY = "golf-bet-board:dg-cutline-probs";
 export const FIELD_STATS_KEY_PREFIX = "golf-bet-board:field-stats:"; // + tournamentId
+export const ROUND_SCORES_KEY_PREFIX = "golf-bet-board:round-scores:"; // + tournamentId - see lib/roundScores.ts

@@ -50,6 +50,9 @@ const MAKECUT_RE = /^(.*?)\s+(?:to\s+)?make\s+(?:the\s+)?cut$/i;
 // Accepts "R1 Leader", "Round 1 Leader", "End of R1 Leader", "End of
 // Round 1 Leader" - all stored as the same canonical "R1 Leader" phrase.
 const R1LEADER_RE = /^(.*?)\s+(?:end of\s+)?(?:r1|round\s*1)\s+leader$/i;
+// Accepts "Lowest Round", "Low Round", "Lowest 18 Hole Round" - all
+// stored as the canonical "Lowest Round" phrase.
+const LOW_ROUND_RE = /^(.*?)\s+(?:lowest|low)\s+(?:18[\s-]hole\s+)?round$/i;
 
 // Round-scoped single-hole outcome bets: "Player [Round N] Hole M Birdie
 // or Better" - same idea as ROUND_STAT_RE below (Round N optional,
@@ -151,6 +154,9 @@ export function parsePersonalText(text: string, forDate: string | undefined, map
     } else if ((m = descriptor.match(R1LEADER_RE))) {
       player = m[1].trim();
       phrase = "R1 Leader";
+    } else if ((m = descriptor.match(LOW_ROUND_RE))) {
+      player = m[1].trim();
+      phrase = "Lowest Round";
     } else if ((m = descriptor.match(PERSONAL_HOLE_SCORE_RE))) {
       player = m[1].trim();
       const roundNum = m[2] ? parseInt(m[2], 10) : currentDefaultRound;

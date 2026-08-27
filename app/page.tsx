@@ -55,6 +55,11 @@ function legLiveDetail(bet: Bet): string {
       : subjectThru ?? opponentThru ?? null;
     return `${matchPlayStatus(bet.auto?.scoreToPar ?? null, bet.auto?.opponentScoreToPar ?? null)} thru ${thru ?? "—"}`;
   }
+  if (p.label === "LOW_ROUND") {
+    const record = bet.auto?.lowRoundScore !== null && bet.auto?.lowRoundScore !== undefined ? formatScore(bet.auto.lowRoundScore) : "—";
+    const holder = bet.auto?.lowRoundHolder || "TBD";
+    return `Record ${record} (${holder})`;
+  }
   const valueDisplay = p.label === "SCORE" || p.label === "WINNER_SCORE" ? formatScore(bet.stat) : bet.stat ?? "—";
   const thruDisplay = !bet.thru ? "—" : bet.thru;
   return `${valueDisplay} thru ${thruDisplay}`;
@@ -1147,6 +1152,16 @@ export default function Page() {
                             <span className="detail-hi">
                               Hole {parsed.holeNumber}: {b.auto?.scoreToPar === null || b.auto?.scoreToPar === undefined ? "not played yet" : holeScoreName(b.auto.scoreToPar)}
                             </span>
+                          ) : parsed.label === "LOW_ROUND" ? (
+                            <>
+                              Record: {b.auto?.lowRoundScore !== null && b.auto?.lowRoundScore !== undefined ? formatScore(b.auto.lowRoundScore) : "—"}
+                              {" "}({b.auto?.lowRoundHolder || "no complete rounds yet"})
+                              {b.auto?.playerBestRound !== null && b.auto?.playerBestRound !== undefined && (
+                                <span className={b.auto.playerBestRound === b.auto.lowRoundScore ? "detail-hi" : ""}>
+                                  {" · "}{b.player}'s best: {formatScore(b.auto.playerBestRound)}
+                                </span>
+                              )}
+                            </>
                           ) : (["SCORE", "GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "WINNER_SCORE"].includes(parsed.label)) ? (
                             null
                           ) : (
