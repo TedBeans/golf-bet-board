@@ -14,7 +14,11 @@ import { computePositions, PositionEntry } from "../../../lib/positions";
 import { nowInCentral } from "../../../lib/centralTime";
 import { normalizeName } from "../../../lib/nameNorm";
 import { noCacheJson } from "../../../lib/noCacheJson";
-import { recordCompletedRounds, computeLowRoundStanding, getRoundScoreHistory, inferCurrentRound } from "../../../lib/roundScores";
+import { recordCompletedRounds, computeLowRoundStanding, getRoundScoreHistory, inferCurrentRound, RoundScoreHistory } from "../../../lib/roundScores";
+import {
+  fetchDgEuroLiveModel, findDgEuroPlayerMatch, computeDgEuroRoundStats, computeDgEuroTotalToPar,
+  dgEuroRoundsPlayed, findDgEuroLeader, computeDgEuroHoleScore, DgEuroLiveModel,
+} from "../../../lib/dgEuroLiveModel";
 
 const SYNC_LOCK_MS = 45000;
 
@@ -139,6 +143,43 @@ export async function GET() {
     const match = findDataGolfPlayerMatch(playerName, dataGolfCache);
     return match ? match.cutProb : null;
   }
+  // DP World Tour full-field data, scraped from DataGolf's own live-model
+  // page rather than europeantour.com (Akamai-blocked - see lib/dpwt.ts).
+  // Fetched at most once per sync pass regardless of how many DPWT bets
+  // need it. undefined = not attempted yet this pass; null = attempted and
+  // failed - treated as "nothing available this pass" for every DPWT bet,
+  // same fail-silent approach as dataGolfCache above, never blocking a
+  // sync pass over one tournament's data source being briefly unavailable.
+  let dgEuroCache: DgEuroLiveModel | null | undefined = undefined;
+  async function getDgEuroModel(): Promise<DgEuroLiveModel | null> {
+    if (dgEuroCache === undefined) {
+      try {
+        dgEuroCache = await fetchDgEuroLiveModel();
+      } catch {
+        dgEuroCache = null;
+      }
+    }
+    return dgEuroCache;
+  }
+  // Matches getPgaRoundStat/getOpenRoundStat's exact contract - {id, thru,
+  // scoreToPar} | null, roundNum null meaning tournament-cumulative. "id"
+  // here is the DataGolf player_num (not dg_id), since that's the key
+  // needed to look this same player back up in playerScores/scorecard.
+  function getDpwtRoundStat(model: DgEuroLiveModel, playerName: string, roundNum: number | null) {
+    const row = findDgEuroPlayerMatch(playerName, model.players);
+    if (!row) return null;
+    if (roundNum === null) {
+      const scoreToPar = computeDgEuroTotalToPar(model, row.playerNum);
+      let thru: number | null = null;
+      for (const r of dgEuroRoundsPlayed(model, row.playerNum)) {
+        const stats = computeDgEuroRoundStats(model, row.playerNum, r);
+        if (stats) thru = (thru ?? 0) + stats.thru;
+      }
+      return { id: row.playerNum, thru, scoreToPar };
+    }
+    const stats = computeDgEuroRoundStats(model, row.playerNum, roundNum);
+    return { id: row.playerNum, thru: stats?.thru ?? null, scoreToPar: stats?.scoreToPar ?? null };
+  }
   // Field-wide position rankings for personal Winner/Top N bets - computed
   // once per tournament per sync pass (several personal bets often share
   // the same tournament), not once per bet.
@@ -165,6 +206,51 @@ export async function GET() {
     }
     const r = computeOpenStats(row, roundNum);
     return { id: row.id, thru: r.thru, scoreToPar: r.scoreToPar };
+  }
+
+  // DPWT equivalent of findRound1Leaders (lib/pgaMatch.ts) - same logic,
+  // same accepted risk (a player who hasn't teed off round 1 at all yet is
+  // indistinguishable here from one who genuinely has no round-1 data, so
+  // this can't rule them out either - same known limitation as the PGA
+  // version). Only difference: uses this module's own hole-by-hole round
+  // stats instead of the PGA leaderboard's total===score trick, since
+  // DataGolf's blob doesn't need that trick - it labels each row with
+  // which round it's for directly.
+  function findDgEuroRound1Leaders(model: DgEuroLiveModel): Round1LeaderInfo {
+    const round1Rows = model.players
+      .map((p) => ({ p, stats: computeDgEuroRoundStats(model, p.playerNum, 1) }))
+      .filter((x): x is { p: typeof x.p; stats: NonNullable<typeof x.stats> } => x.stats !== null);
+    if (round1Rows.length === 0) return null;
+
+    const stillMidRound = round1Rows.some((x) => x.stats.thru < 18);
+    if (stillMidRound) return null;
+
+    const finished = round1Rows.filter((x) => x.stats.thru === 18);
+    if (finished.length === 0) return null;
+    const minScore = Math.min(...finished.map((x) => x.stats.scoreToPar));
+    const tied = finished.filter((x) => x.stats.scoreToPar === minScore);
+    return { tiedIds: new Set(tied.map((x) => x.p.playerNum)), divisor: tied.length, minScore };
+  }
+
+  // DPWT Lowest Round doesn't need Redis persistence the way PGA Tour's
+  // does (see lib/roundScores.ts) - DataGolf's blob already retains full
+  // hole-by-hole detail for every round played so far, not just the
+  // current one, so this can just be recomputed fresh from it each sync
+  // pass. Only counts fully-completed rounds (thru===18), matching the
+  // same gate the PGA Tour version applies before recording a round.
+  function dgEuroToRoundScoreHistory(model: DgEuroLiveModel): RoundScoreHistory {
+    const history: RoundScoreHistory = {};
+    for (const p of model.players) {
+      for (const r of dgEuroRoundsPlayed(model, p.playerNum)) {
+        const stats = computeDgEuroRoundStats(model, p.playerNum, r);
+        if (stats && stats.thru === 18) {
+          const key = String(r);
+          if (!history[key]) history[key] = [];
+          history[key].push({ playerId: p.playerNum, name: p.displayName, score: stats.scoreToPar });
+        }
+      }
+    }
+    return history;
   }
 
   async function getPgaRoundStat(tournamentId: string, pgaPlayers: PgaPlayerRow[], playerName: string, roundNum: number | null) {
@@ -309,15 +395,20 @@ export async function GET() {
         const useDpwt = tournamentMap.dataSource === "dpwt";
 
         // Tournament-long personal plays (Winner/Top N/Make Cut/H2H/Tie/R1
-        // Leader) all need a full-field leaderboard to determine position
-        // or a tied-leader group - DP World Tour has no confirmed
-        // single-call full-field feed (see lib/dpwt.ts header comment), so
-        // these aren't supported there. Round-stat personal plays
-        // (Score/GIR/Birdies/etc) don't need the full field and fall
-        // through to the regular per-player pipeline below just fine.
-        if (useDpwt && ["WINNER", "TOP_N", "MAKE_CUT", "H2H", "TIE", "R1_LEADER", "LOW_ROUND"].includes(parsed.label)) {
-          errors.push(`${bet.player ?? bet.t}: ${parsed.label} isn't supported yet for DP World Tour tournaments (no full-field feed)`);
-          continue;
+        // Leader/Lowest Round) all need full-field data - europeantour.com
+        // itself has no usable feed for that (Akamai-blocked, see
+        // lib/dpwt.ts), but DataGolf's own live-model page for this tour
+        // does, scraped independently in lib/dgEuroLiveModel.ts. Each block
+        // below gets a DPWT branch alongside its existing PGA Tour/
+        // theopen.com ones, using the same getDpwtRoundStat/positions
+        // pattern as everything else.
+        let dgEuroModel: DgEuroLiveModel | null = null;
+        if (useDpwt) {
+          dgEuroModel = await getDgEuroModel();
+          if (!dgEuroModel) {
+            errors.push(`${bet.player ?? bet.t}: couldn't reach DataGolf's DP World Tour data this pass`);
+            continue;
+          }
         }
 
         if (useOpen) {
@@ -342,6 +433,8 @@ export async function GET() {
                   const s = computeOpenStats(p, null);
                   return { id: p.id, totalToPar: s.holesPlayed > 0 ? s.totalToPar : null };
                 })
+              : useDpwt
+              ? dgEuroModel!.players.map((p) => ({ id: p.playerNum, totalToPar: computeDgEuroTotalToPar(dgEuroModel!, p.playerNum) }))
               : pgaPlayers!.map((p) => ({ id: p.id, totalToPar: p.total }));
             positions = computePositions(entries);
             positionsCache.set(bet.t, positions);
@@ -349,6 +442,8 @@ export async function GET() {
 
           const stat = useOpen
             ? await getOpenRoundStat(openPlayers!, bet.player, null)
+            : useDpwt
+            ? getDpwtRoundStat(dgEuroModel!, bet.player, null)
             : await getPgaRoundStat(tournamentId, pgaPlayers!, bet.player, null);
           if (!stat) {
             errors.push(`${bet.player}: no match on leaderboard (personal play)`);
@@ -379,6 +474,8 @@ export async function GET() {
                   const s = computeOpenStats(p, null);
                   return { id: p.id, totalToPar: s.holesPlayed > 0 ? s.totalToPar : null };
                 })
+              : useDpwt
+              ? dgEuroModel!.players.map((p) => ({ id: p.playerNum, totalToPar: computeDgEuroTotalToPar(dgEuroModel!, p.playerNum) }))
               : pgaPlayers!.map((p) => ({ id: p.id, totalToPar: p.total }));
             positions = computePositions(entries);
             positionsCache.set(bet.t, positions);
@@ -386,9 +483,13 @@ export async function GET() {
 
           const r1 = useOpen
             ? await getOpenRoundStat(openPlayers!, bet.player, 1)
+            : useDpwt
+            ? getDpwtRoundStat(dgEuroModel!, bet.player, 1)
             : await getPgaRoundStat(tournamentId, pgaPlayers!, bet.player, 1);
           const r2 = useOpen
             ? await getOpenRoundStat(openPlayers!, bet.player, 2)
+            : useDpwt
+            ? getDpwtRoundStat(dgEuroModel!, bet.player, 2)
             : await getPgaRoundStat(tournamentId, pgaPlayers!, bet.player, 2);
 
           if (!r1) {
@@ -396,7 +497,13 @@ export async function GET() {
             continue;
           }
 
-          const dgCutProb = await getDataGolfCutProb(bet.player);
+          // DataGolf's own live make-cut probability - for DPWT, this
+          // tour's own blob already carries it per player (see
+          // DgEuroPlayerRow.cutProb), no separate fetch needed. For PGA
+          // Tour it's a genuinely separate page/fetch (getDataGolfCutProb).
+          const dgCutProb = useDpwt
+            ? findDgEuroPlayerMatch(bet.player, dgEuroModel!.players)?.cutProb ?? null
+            : await getDataGolfCutProb(bet.player);
 
           // For display: always show the tournament cumulative score and
           // total holes completed across all rounds (same as TOP_N legs).
@@ -405,6 +512,8 @@ export async function GET() {
           // nobody has teed off yet. Grading still uses r1/r2 individually.
           const cumulative = useOpen
             ? await getOpenRoundStat(openPlayers!, bet.player, null)
+            : useDpwt
+            ? getDpwtRoundStat(dgEuroModel!, bet.player, null)
             : await getPgaRoundStat(tournamentId, pgaPlayers!, bet.player, null);
 
           const roundOneFinished = r1.thru === 18;
@@ -445,11 +554,14 @@ export async function GET() {
             continue;
           }
 
-          const match = findPlayerMatch(bet.player, pgaPlayers!);
+          const match = useDpwt ? findDgEuroPlayerMatch(bet.player, dgEuroModel!.players) : findPlayerMatch(bet.player, pgaPlayers!);
           if (!match) {
             errors.push(`${bet.player}: no match on leaderboard (personal play)`);
             continue;
           }
+          const matchId = useDpwt ? (match as any).playerNum : (match as any).id;
+          const matchThru = useDpwt ? getDpwtRoundStat(dgEuroModel!, bet.player, null)?.thru ?? null : (match as any).thru;
+          const matchTotal = useDpwt ? getDpwtRoundStat(dgEuroModel!, bet.player, null)?.scoreToPar ?? null : (match as any).total;
 
           // Live position reuses the same whole-field standings as WINNER/
           // TOP_N above - while Round 1 is the only round played, "current
@@ -457,27 +569,30 @@ export async function GET() {
           // reads correctly even before the field-wide lock below fires.
           let positions = positionsCache.get(bet.t);
           if (!positions) {
-            const entries: PositionEntry[] = pgaPlayers!.map((p) => ({ id: p.id, totalToPar: p.total }));
+            const entries: PositionEntry[] = useDpwt
+              ? dgEuroModel!.players.map((p) => ({ id: p.playerNum, totalToPar: computeDgEuroTotalToPar(dgEuroModel!, p.playerNum) }))
+              : pgaPlayers!.map((p) => ({ id: p.id, totalToPar: p.total }));
             positions = computePositions(entries);
             positionsCache.set(bet.t, positions);
           }
 
-          bet.thru = match.thru;
-          bet.stat = match.total;
+          bet.thru = matchThru;
+          bet.stat = matchTotal;
           bet.auto = {
-            thru: match.thru,
-            scoreToPar: match.total,
+            thru: matchThru,
+            scoreToPar: matchTotal,
             birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
             updatedAt: new Date().toISOString(),
-            position: positions.get(match.id) ?? null,
+            position: positions.get(matchId) ?? null,
           };
           updatedCount += 1;
 
           // Field-wide Round 1 lock - computed once per tournament per sync
-          // pass (see findRound1Leaders for exactly what this waits on).
+          // pass (see findRound1Leaders/findDgEuroRound1Leaders for exactly
+          // what this waits on).
           let r1Info = r1LeaderCache.get(bet.t);
           if (r1Info === undefined) {
-            r1Info = findRound1Leaders(pgaPlayers!);
+            r1Info = useDpwt ? findDgEuroRound1Leaders(dgEuroModel!) : findRound1Leaders(pgaPlayers!);
             r1LeaderCache.set(bet.t, r1Info);
           }
           if (!r1Info) {
@@ -500,10 +615,10 @@ export async function GET() {
           const settledForMs = Date.now() - new Date(bet.r1LockCandidateSince).getTime();
           if (settledForMs < CONFIRMATION_WINDOW_MS) continue;
 
-          if (r1Info.tiedIds.has(match.id)) {
+          if (r1Info.tiedIds.has(matchId)) {
             bet.status = "hit";
             bet.deadHeatDivisor = r1Info.divisor;
-          } else if (match.thru === 18 && match.total !== null) {
+          } else if (matchThru === 18 && matchTotal !== null) {
             bet.status = "miss";
           }
           continue;
@@ -515,28 +630,42 @@ export async function GET() {
             continue;
           }
 
-          // Every completed round gets permanently recorded the moment it's
-          // seen at thru===18 - the live leaderboard only ever shows the
-          // CURRENT round's score, so once the tournament moves on to the
-          // next round, an earlier round's individual score is gone from
-          // this feed for good unless it was captured when it happened.
-          const currentRound = inferCurrentRound(bet.t, bets, archivedBetsForStartCheck);
-          if (currentRound) {
-            await recordCompletedRounds(tournamentId, currentRound, pgaPlayers!);
+          let history: RoundScoreHistory;
+          let matchThru: number | null;
+          let matchScore: number | null;
+          let matchId: string | null;
+
+          if (useDpwt) {
+            history = dgEuroToRoundScoreHistory(dgEuroModel!);
+            const match = findDgEuroPlayerMatch(bet.player, dgEuroModel!.players);
+            const stat = match ? getDpwtRoundStat(dgEuroModel!, bet.player, null) : null;
+            matchThru = stat?.thru ?? null;
+            matchScore = stat?.scoreToPar ?? null;
+            matchId = match?.playerNum ?? null;
+          } else {
+            // Every completed round gets permanently recorded the moment
+            // it's seen at thru===18 - the live leaderboard only ever shows
+            // the CURRENT round's score, so once the tournament moves on to
+            // the next round, an earlier round's individual score is gone
+            // from this feed for good unless it was captured when it happened.
+            const currentRound = inferCurrentRound(bet.t, bets, archivedBetsForStartCheck);
+            if (currentRound) {
+              await recordCompletedRounds(tournamentId, currentRound, pgaPlayers!);
+            }
+            history = await getRoundScoreHistory(tournamentId);
+            const match = findPlayerMatch(bet.player, pgaPlayers!);
+            matchThru = match?.thru ?? null;
+            matchScore = match?.total ?? null;
+            matchId = match?.id ?? null;
           }
 
-          const history = await getRoundScoreHistory(tournamentId);
           const standing = computeLowRoundStanding(history);
-
-          const match = findPlayerMatch(bet.player, pgaPlayers!);
-          const playerRounds = match
-            ? Object.values(history).flat().filter((e) => e.playerId === match.id)
-            : [];
+          const playerRounds = matchId ? Object.values(history).flat().filter((e) => e.playerId === matchId) : [];
           const playerBest = playerRounds.length ? Math.min(...playerRounds.map((e) => e.score)) : null;
 
           bet.auto = {
-            thru: match?.thru ?? null,
-            scoreToPar: match?.total ?? null,
+            thru: matchThru,
+            scoreToPar: matchScore,
             birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
             updatedAt: new Date().toISOString(),
             lowRoundHolder: standing ? standing.holders.map((h) => h.name).join(", ") : null,
@@ -557,9 +686,13 @@ export async function GET() {
 
           const subjectStat = useOpen
             ? await getOpenRoundStat(openPlayers!, bet.player, roundNum)
+            : useDpwt
+            ? getDpwtRoundStat(dgEuroModel!, bet.player, roundNum)
             : await getPgaRoundStat(tournamentId, pgaPlayers!, bet.player, roundNum);
           const opponentStat = useOpen
             ? await getOpenRoundStat(openPlayers!, opponentName, roundNum)
+            : useDpwt
+            ? getDpwtRoundStat(dgEuroModel!, opponentName, roundNum)
             : await getPgaRoundStat(tournamentId, pgaPlayers!, opponentName, roundNum);
 
           if (!subjectStat || !opponentStat) {
@@ -592,9 +725,13 @@ export async function GET() {
           } else {
             const subjectFinal = useOpen
               ? await getOpenRoundStat(openPlayers!, bet.player, FINAL_ROUND)
+              : useDpwt
+              ? getDpwtRoundStat(dgEuroModel!, bet.player, FINAL_ROUND)
               : await getPgaRoundStat(tournamentId, pgaPlayers!, bet.player, FINAL_ROUND);
             const opponentFinal = useOpen
               ? await getOpenRoundStat(openPlayers!, opponentName, FINAL_ROUND)
+              : useDpwt
+              ? getDpwtRoundStat(dgEuroModel!, opponentName, FINAL_ROUND)
               : await getPgaRoundStat(tournamentId, pgaPlayers!, opponentName, FINAL_ROUND);
             bothFinished = subjectFinal?.thru === 18 && opponentFinal?.thru === 18;
           }
@@ -636,21 +773,103 @@ export async function GET() {
       }
 
       if (tournamentMap.dataSource === "dpwt") {
-        // DP World Tour: confirmed via a real curl test (full browser-
-        // matching headers, still blocked) that the scorecard endpoint
-        // sits behind Akamai Bot Manager - the "Access Denied" response
-        // comes straight from errors.edgesuite.net, Akamai's own domain.
-        // That's TLS/browser fingerprinting at a layer no HTTP header can
-        // influence, not a missing-header problem - a server-side fetch
-        // (ours, or a bare curl) fundamentally cannot get past it the way
-        // a real browser does. So every bet type on this tour is graded
-        // by hand with the board's WIN/LOSS buttons - Round Score/
-        // Birdies/Bogeys/Pars/Hole Score join Fairways/GIR/Tournament
-        // Score, which were already manual for unrelated reasons (no live
-        // shot feed, no full-field feed). Deliberately a silent no-op,
-        // not an error - this is the expected, by-design state for this
-        // tour right now, not a failure. See lib/dpwt.ts header comment
-        // for the full history if a workaround ever becomes worth chasing.
+        // europeantour.com itself remains Akamai-blocked (see lib/dpwt.ts
+        // for the full curl-test history) - but DataGolf's own live-model
+        // page for this tour isn't, and carries hole-by-hole strokes plus
+        // each hole's par for every round played (see lib/dgEuroLiveModel.ts,
+        // including a real discrepancy caught and worked around there
+        // before trusting any of this). GIR/Fairways stay manual - nothing
+        // in this blob exposes hit/miss data the way the leaderboard does
+        // for score.
+        const model = await getDgEuroModel();
+        if (!model) {
+          errors.push(`${bet.t}: couldn't reach DataGolf's DP World Tour data this pass`);
+          continue;
+        }
+
+        if (parsed.label === "GIR" || parsed.label === "FAIRWAYS") {
+          // No data source for this on DP World Tour - stays manual,
+          // same as it's always been. Deliberately not an error.
+          continue;
+        }
+
+        if (parsed.label === "WINNER_SCORE") {
+          const leader = findDgEuroLeader(model);
+          if (!leader) {
+            errors.push(`${bet.t}: couldn't find a tournament leader (DP World Tour)`);
+            continue;
+          }
+          const leaderStat = getDpwtRoundStat(model, leader.player.displayName, null);
+          bet.thru = leaderStat?.thru ?? null;
+          bet.stat = leader.totalToPar;
+          bet.auto = {
+            thru: leaderStat?.thru ?? null,
+            scoreToPar: leader.totalToPar,
+            birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
+            updatedAt: new Date().toISOString(),
+            leaderName: leader.player.displayName,
+          };
+          updatedCount += 1;
+          continue;
+        }
+
+        const dpwtRow = findDgEuroPlayerMatch(bet.player, model.players);
+        if (!dpwtRow) {
+          errors.push(`${bet.player}: no match on DataGolf's DP World Tour data`);
+          continue;
+        }
+        const dpwtRoundNum = roundNumberFromLabel(bet.r);
+
+        if (parsed.label === "HOLE_SCORE" && parsed.holeNumber) {
+          const lookup = dpwtRoundNum ? computeDgEuroHoleScore(model, dpwtRow.playerNum, dpwtRoundNum, parsed.holeNumber) : { thru: 0 as const, diff: null };
+          bet.thru = lookup.thru;
+          bet.stat = lookup.diff;
+          bet.auto = {
+            thru: lookup.thru, scoreToPar: lookup.diff,
+            birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
+            updatedAt: new Date().toISOString(),
+          };
+          if (bet.status === "live") {
+            const graded = autoGradeStatus(parsed, bet.stat, bet.thru);
+            if (graded) bet.status = graded;
+          }
+          updatedCount += 1;
+          continue;
+        }
+
+        const dpwtStats = dpwtRoundNum ? computeDgEuroRoundStats(model, dpwtRow.playerNum, dpwtRoundNum) : null;
+
+        bet.thru = dpwtStats?.thru ?? null;
+        bet.auto = {
+          thru: dpwtStats?.thru ?? null,
+          scoreToPar: dpwtStats?.scoreToPar ?? null,
+          birdies: dpwtStats?.birdies ?? null,
+          bogeys: dpwtStats?.bogeys ?? null,
+          pars: dpwtStats?.pars ?? null,
+          eagles: dpwtStats?.eagles ?? null,
+          doubleBogeys: dpwtStats?.doubleBogeys ?? null,
+          gir: null, fairways: null,
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (dpwtStats) {
+          if (parsed.label === "SCORE") {
+            bet.stat = dpwtStats.scoreToPar;
+          } else if (parsed.label === "BIRDIES") {
+            bet.stat = dpwtStats.birdies + dpwtStats.eagles; // birdiesOrBetter, matching every other tour's convention
+          } else if (parsed.label === "BOGEYS") {
+            bet.stat = dpwtStats.bogeys + dpwtStats.doubleBogeys; // bogeysOrWorse
+          } else if (parsed.label === "PARS") {
+            bet.stat = dpwtStats.pars;
+          }
+        }
+
+        if (bet.status === "live") {
+          const graded = autoGradeStatus(parsed, bet.stat, bet.thru);
+          if (graded) bet.status = graded;
+        }
+
+        updatedCount += 1;
         continue;
       }
 

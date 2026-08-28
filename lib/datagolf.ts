@@ -42,7 +42,7 @@ export type DataGolfPlayerRow = {
 // actual string it represents. Handles \uXXXX explicitly since a naive
 // single-char-after-backslash replace would otherwise mangle any escaped
 // unicode (accented player names in particular) into literal "u00xx" text.
-function unescapeJsStringLiteral(raw: string): string {
+export function unescapeJsStringLiteral(raw: string): string {
   let out = "";
   for (let i = 0; i < raw.length; i++) {
     const c = raw[i];
