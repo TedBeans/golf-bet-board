@@ -59,7 +59,7 @@ const LOW_ROUND_RE = /^(.*?)\s+(?:lowest|low)\s+(?:18[\s-]hole\s+)?round$/i;
 // defaults to the header's round), but for a specific hole's outcome
 // instead of a running stat. See lib/parseHoleScore.ts for why this is a
 // genuinely different shape from every Over/Under-based category.
-const PERSONAL_HOLE_SCORE_RE = /^(.*?)\s+(?:Round\s+(\d+)\s+)?hole\s+(\d{1,2})\s+(eagle|birdie|par|bogey|double bogey)(?:\s+or\s+(better|worse))?$/i;
+const PERSONAL_HOLE_SCORE_RE = /^(.*?)\s+(?:Round\s+(\d+)\s+)?hole\s+#?\s*(\d{1,2})\s+(eagle|birdie|par|bogey|double bogey)(?:\s+or\s+(better|worse))?$/i;
 
 // Round-scoped stat bets: "Player [Round N] Over/Under X.X [Category]"
 // e.g. "Tommy Fleetwood Round 1 Over 11.5 Pars"

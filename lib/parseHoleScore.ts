@@ -11,10 +11,10 @@
 // line in this app, just swapping the Over/Under+line+category chunk for
 // "Hole N <outcome>".
 const HOLE_SCORE_LINE_RE =
-  /^(.*?)\s+hole\s+(\d{1,2})\s+(eagle|birdie|par|bogey|double bogey)(?:\s+or\s+(better|worse))?\s+([+-]\d+)\s*\(\s*([A-Za-z]{2,5})\s*\)(?:\s+for\s+([\d.]+)\s*units?)?\s*$/i;
+  /^(.*?)\s+hole\s+#?\s*(\d{1,2})\s+(eagle|birdie|par|bogey|double bogey)(?:\s+or\s+(better|worse))?\s+([+-]\d+)\s*\(\s*([A-Za-z]{2,5})\s*\)(?:\s+for\s+([\d.]+)\s*units?)?\s*$/i;
 
 export function isHoleScoreLine(line: string): boolean {
-  return /\bhole\s+\d{1,2}\s+(eagle|birdie|par|bogey|double\s+bogey)\b/i.test(line);
+  return /\bhole\s+#?\s*\d{1,2}\s+(eagle|birdie|par|bogey|double\s+bogey)\b/i.test(line);
 }
 
 export type HoleScoreLineMatch = {
