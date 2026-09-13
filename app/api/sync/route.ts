@@ -839,6 +839,22 @@ export async function GET() {
 
         const dpwtStats = dpwtRoundNum ? computeDgEuroRoundStats(model, dpwtRow.playerNum, dpwtRoundNum) : null;
 
+        if (!dpwtStats) {
+          // Don't silently leave bet.auto at null with no explanation -
+          // that's indistinguishable from "working but genuinely nothing
+          // to report yet" and was a real gap that made a previous bug
+          // invisible. Report exactly what's missing: either the round
+          // number itself didn't parse from bet.r, or this player/round
+          // combination has no hole data in DataGolf's blob yet (could be
+          // legitimate - not teed off - or could be the round key not
+          // existing yet in player_scores for anyone this early).
+          errors.push(
+            dpwtRoundNum
+              ? `${bet.player}: no hole data yet for round ${dpwtRoundNum} (DP World Tour, DataGolf)`
+              : `${bet.player}: couldn't determine round number from "${bet.r}" (DP World Tour)`
+          );
+        }
+
         bet.thru = dpwtStats?.thru ?? null;
         bet.auto = {
           thru: dpwtStats?.thru ?? null,
