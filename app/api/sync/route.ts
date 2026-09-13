@@ -455,6 +455,7 @@ export async function GET() {
             : await getPgaRoundStat(tournamentId, pgaPlayers!, bet.player, null);
           if (!stat) {
             errors.push(`${bet.player}: no match on leaderboard (personal play)`);
+            if (bet.autoEnabled) { bet.thru = null; bet.auto = null; } // don't leave stale auto data looking current
             continue;
           }
 
@@ -502,6 +503,7 @@ export async function GET() {
 
           if (!r1) {
             errors.push(`${bet.player}: no match on leaderboard (personal play)`);
+            if (bet.autoEnabled) { bet.thru = null; bet.auto = null; } // don't leave stale auto data looking current
             continue;
           }
 
@@ -565,6 +567,7 @@ export async function GET() {
           const match = useDpwt ? findDgEuroPlayerMatch(bet.player, dgEuroModel!.players) : findPlayerMatch(bet.player, pgaPlayers!);
           if (!match) {
             errors.push(`${bet.player}: no match on leaderboard (personal play)`);
+            if (bet.autoEnabled) { bet.thru = null; bet.auto = null; } // don't leave stale auto data looking current
             continue;
           }
           const matchId = useDpwt ? (match as any).playerNum : (match as any).id;
@@ -705,6 +708,7 @@ export async function GET() {
 
           if (!subjectStat || !opponentStat) {
             errors.push(`${bet.player} vs ${opponentName}: couldn't match both players on the leaderboard`);
+            if (bet.autoEnabled) { bet.thru = null; bet.auto = null; } // don't leave stale auto data looking current
             continue;
           }
 
@@ -823,7 +827,18 @@ export async function GET() {
 
         const dpwtRow = findDgEuroPlayerMatch(bet.player, model.players);
         if (!dpwtRow) {
-          errors.push(`${bet.player}: no match on DataGolf's DP World Tour data`);
+          errors.push(`${bet.player}: no match on DataGolf's DP World Tour data - check the name is spelled exactly as DataGolf has it`);
+          // A failed match must never leave stale auto data sitting there
+          // looking current - a real case showed exactly this (a one-
+          // letter name typo caused the match to correctly fail, but the
+          // bet card kept showing an old number from before the typo
+          // started failing, indistinguishable from live tracking). Only
+          // clear it when the bet is actually on auto - a manual override
+          // is intentional and shouldn't be wiped by a sync failure.
+          if (bet.autoEnabled) {
+            bet.thru = null;
+            bet.auto = null;
+          }
           continue;
         }
         const dpwtRoundNum = roundNumberFromLabel(bet.r);
@@ -1052,6 +1067,7 @@ export async function GET() {
       const row = findPlayerMatch(bet.player, players);
       if (!row) {
         errors.push(`${bet.player}: no match on leaderboard`);
+        if (bet.autoEnabled) { bet.thru = null; bet.auto = null; } // don't leave stale auto data looking current
         continue;
       }
 
