@@ -174,15 +174,12 @@ export async function GET() {
       // (row.currentScore) directly rather than recomputing it from
       // hole-by-hole data, which a real case showed can lag behind it
       // during live play (see getDgEuroCurrentRoundStat's header comment
-      // for the full story). Thru still sums finalized holes across every
-      // round via hole-by-hole data, since the leaderboard itself only
-      // ever shows thru for whichever round is currently active, going
-      // blank once a round finishes and the next hasn't started yet.
-      let thru: number | null = null;
-      for (const r of dgEuroRoundsPlayed(model, row.playerNum)) {
-        const stats = computeDgEuroRoundStats(model, row.playerNum, r);
-        if (stats) thru = (thru ?? 0) + stats.thru;
-      }
+      // for the full story). Thru uses the leaderboard's own current-round
+      // thru directly too - a previous version tried summing finalized
+      // holes across every round via hole-by-hole data, but that depended
+      // on player_scores retaining every prior round, which a real case
+      // (round 4, rounds 1-3 no longer present) proved isn't reliable.
+      const thru = typeof row.thru === "number" ? row.thru : row.thru === "F" ? 18 : null;
       return { id: row.playerNum, thru, scoreToPar: row.currentScore };
     }
     const stats = getDgEuroCurrentRoundStat(model, row, roundNum);
@@ -240,12 +237,18 @@ export async function GET() {
     return { tiedIds: new Set(tied.map((x) => x.p.playerNum)), divisor: tied.length, minScore };
   }
 
-  // DPWT Lowest Round doesn't need Redis persistence the way PGA Tour's
-  // does (see lib/roundScores.ts) - DataGolf's blob already retains full
-  // hole-by-hole detail for every round played so far, not just the
-  // current one, so this can just be recomputed fresh from it each sync
-  // pass. Only counts fully-completed rounds (thru===18), matching the
-  // same gate the PGA Tour version applies before recording a round.
+  // DPWT Lowest Round doesn't use Redis persistence the way PGA Tour's
+  // does (see lib/roundScores.ts) - this was originally built on the
+  // assumption that DataGolf's blob retains full hole-by-hole detail for
+  // every round played, not just the current one. A real case has since
+  // shown that assumption is false: by round 4 of a tournament, rounds
+  // 1-3 had no hole data left in player_scores at all (see
+  // getDgEuroCurrentRoundStat's header comment for the full story this
+  // surfaced). In practice this means Lowest Round tracking here can only
+  // reliably see whichever round(s) still happen to be present in
+  // player_scores at sync time - a known, currently-accepted limitation,
+  // not a bug to silently paper over. Still gates on thru===18 (fully
+  // completed) before recording a round, same as the PGA Tour version.
   function dgEuroToRoundScoreHistory(model: DgEuroLiveModel): RoundScoreHistory {
     const history: RoundScoreHistory = {};
     for (const p of model.players) {

@@ -34,6 +34,7 @@ export type DgEuroPlayerRow = {
   currentPos: string | null;
   currentScore: number | null; // cumulative total to par - verified reliable against hand-summed hole-by-hole data
   thru: number | string | null; // current round holes completed ("F" once finished)
+  today: number | null; // this round's score to par, per DataGolf's own "Today" column
   round: number | null; // which round current_pos/current_score/thru refer to
   courseCode: string | null;
   cutProb: number | null; // 0-100, 1dp - DataGolf's own live make-cut probability, informational only like the PGA Tour equivalent
@@ -107,6 +108,7 @@ export function extractDgEuroBlob(html: string): DgEuroLiveModel {
           currentPos: r.current_pos != null ? String(r.current_pos) : null,
           currentScore: typeof r.current_score === "number" ? r.current_score : null,
           thru: r.thru ?? null,
+          today: typeof r.today === "number" ? r.today : null,
           round: typeof r.round === "number" ? r.round : null,
           courseCode: r.course ?? null,
           cutProb: typeof r.cut === "number" && !isNaN(r.cut) ? Math.round(r.cut * 1000) / 10 : null,
@@ -233,14 +235,20 @@ export type DgEuroCurrentRoundStat = {
 // problem, not a timing lag, so this deliberately only falls back for
 // the live round, never a historical one.
 //
-// The fallback: thru comes straight from the main row's own thru field
-// (already round-scoped, not cumulative). scoreToPar is derived by
-// subtracting every earlier round's hole-by-hole total (reliable, since
-// those rounds are no longer in progress) from the cumulative total the
-// leaderboard reports - there's no other round-specific summary field
-// available (the blob's own "today" field was found unreliable - see
-// this module's header comment). Birdies/Bogeys/Pars/Eagles can't be
-// recovered without hole detail and stay null until it catches up.
+// The fallback trusts the blob's own "today" field directly - exactly
+// what DataGolf's own UI shows as the round's score, so it matches what
+// a human comparing against the live site sees. An earlier version of
+// this fallback tried to derive the score by subtracting every earlier
+// round's hole-by-hole total from the cumulative current_score instead,
+// on the assumption that player_scores retains full tournament history -
+// a real case proved that assumption false (by round 4, rounds 1-3 had
+// no hole data left in player_scores at all, silently zeroing out the
+// subtraction and leaving the full cumulative -17 total misattributed to
+// a single round). "today" is only trusted once the player has actually
+// started this round (thru > 0 per the leaderboard's own thru field) -
+// an earlier, separate capture found "today" stuck at 0 for every player
+// during a different tournament's very first round, indistinguishable
+// from "hasn't teed off" without that check.
 export function getDgEuroCurrentRoundStat(model: DgEuroLiveModel, mainRow: DgEuroPlayerRow, roundNum: number): DgEuroCurrentRoundStat {
   const holeStats = computeDgEuroRoundStats(model, mainRow.playerNum, roundNum);
   if (holeStats) {
@@ -252,17 +260,11 @@ export function getDgEuroCurrentRoundStat(model: DgEuroLiveModel, mainRow: DgEur
   }
 
   const empty: DgEuroCurrentRoundStat = { scoreToPar: null, thru: null, birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, fromHoleData: false };
-  if (roundNum !== model.currentRound || mainRow.currentScore === null) return empty;
+  if (roundNum !== model.currentRound) return empty;
 
-  const priorRounds = dgEuroRoundsPlayed(model, mainRow.playerNum).filter((r) => r < roundNum);
-  let priorTotal = 0;
-  for (const r of priorRounds) {
-    const s = computeDgEuroRoundStats(model, mainRow.playerNum, r);
-    if (s) priorTotal += s.scoreToPar;
-  }
-  const scoreToPar = mainRow.currentScore - priorTotal;
   const thru = typeof mainRow.thru === "number" ? mainRow.thru : mainRow.thru === "F" ? 18 : null;
-  return { ...empty, scoreToPar, thru };
+  if (!thru || thru <= 0 || mainRow.today === null) return empty;
+  return { ...empty, scoreToPar: mainRow.today, thru };
 }
 
 // Every round (1-4) this player has any recorded holes for, per the
