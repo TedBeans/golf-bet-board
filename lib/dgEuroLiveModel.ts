@@ -35,6 +35,7 @@ export type DgEuroPlayerRow = {
   currentScore: number | null; // cumulative total to par - verified reliable against hand-summed hole-by-hole data
   thru: number | string | null; // current round holes completed ("F" once finished)
   today: number | null; // this round's score to par, per DataGolf's own "Today" column
+  teetime: string | null; // bare "H:MM" local tournament time, no AM/PM marker - see convertDgEuroTeeTime
   round: number | null; // which round current_pos/current_score/thru refer to
   courseCode: string | null;
   cutProb: number | null; // 0-100, 1dp - DataGolf's own live make-cut probability, informational only like the PGA Tour equivalent
@@ -54,6 +55,7 @@ export type DgEuroLiveModel = {
   players: DgEuroPlayerRow[];
   currentRound: number | null; // others.max_round - the tour-wide current round, given directly rather than inferred
   eventName: string | null;
+  eventFlag: string | null; // others.event_flag - 3-letter host-country code, used to look up the tournament's local timezone (see DPWT_COUNTRY_TIMEZONES)
   playerScores: any; // kept raw - shape is {[playerNum]: {[round]: {"1".."18": strokes|null, course_code, ...}}}
   scorecard: any; // kept raw - shape is {[courseCode]: {"1".."18": {par, yardage, ...}}}
 };
@@ -109,6 +111,7 @@ export function extractDgEuroBlob(html: string): DgEuroLiveModel {
           currentScore: typeof r.current_score === "number" ? r.current_score : null,
           thru: r.thru ?? null,
           today: typeof r.today === "number" ? r.today : null,
+          teetime: typeof r.teetime === "string" ? r.teetime : null,
           round: typeof r.round === "number" ? r.round : null,
           courseCode: r.course ?? null,
           cutProb: typeof r.cut === "number" && !isNaN(r.cut) ? Math.round(r.cut * 1000) / 10 : null,
@@ -118,11 +121,13 @@ export function extractDgEuroBlob(html: string): DgEuroLiveModel {
       const maxRoundRaw = found.others?.max_round;
       const currentRound = maxRoundRaw != null ? parseInt(String(maxRoundRaw), 10) : null;
       const eventName = found.others?.event_name?.[0]?.event_name ?? null;
+      const eventFlag = typeof found.others?.event_flag === "string" ? found.others.event_flag : null;
 
       return {
         players,
         currentRound: currentRound !== null && !isNaN(currentRound) ? currentRound : null,
         eventName,
+        eventFlag,
         playerScores: found.player_scores ?? {},
         scorecard: found.scorecard ?? {},
       };
@@ -350,4 +355,106 @@ export function findDgEuroPlayerMatch(betPlayerName: string, players: DgEuroPlay
   if (candidates.length === 1) return candidates[0];
 
   return null;
+}
+
+// --- Tee time conversion -----------------------------------------------
+// DataGolf gives tee times as a bare "H:MM" string in the tournament's own
+// local time, with no AM/PM marker and no date attached (unlike PGA
+// Tour's own tee-time feed, which gives an absolute UTC timestamp directly
+// - see the existing PGA tee-time auto-fill in app/api/sync/route.ts).
+// Two things have to be inferred here that PGA Tour's feed doesn't require:
+
+// 1) AM vs PM. Real tee times only ever fall within a normal single-wave
+// window (roughly 6am-4pm local) - never genuinely ambiguous within that
+// range. Cross-validated against a real case: Shane Lowry's own round-4
+// tee time showed as bare "2:05" in the raw blob, but DataGolf's own UI
+// labeled it "2:05 PM" - and checked against the device clock plus his
+// actual holes-played progress at the time, an 8:05 AM Central start
+// (2:05 PM Irish minus the 6-hour Ireland-Central gap in effect that
+// week) lined up exactly with how many holes he'd played. Hour 7-11 is
+// AM, hour 12 or 1-6 is PM.
+function inferAmPm(hour12: number): "AM" | "PM" {
+  return hour12 >= 7 && hour12 <= 11 ? "AM" : "PM";
+}
+
+function to24Hour(hour12: number, period: "AM" | "PM"): number {
+  if (period === "AM") return hour12 === 12 ? 0 : hour12;
+  return hour12 === 12 ? 12 : hour12 + 12;
+}
+
+// 2) Which timezone "local" even means. DataGolf gives the host country's
+// 3-letter flag code (others.event_flag) but not a timezone directly, so
+// this maps the countries actually encountered so far to an IANA zone.
+// This is NOT an exhaustive map of every country DP World Tour visits
+// across a season (20+ countries spanning Europe, Africa, the Middle
+// East, and Asia) - an unmapped country fails loudly (no auto-fill,
+// nothing silently guessed) rather than defaulting somewhere that might
+// be wrong. Add to this list as new host countries come up.
+const DPWT_COUNTRY_TIMEZONES: Record<string, string> = {
+  IRL: "Europe/Dublin",
+  ENG: "Europe/London",
+  SCO: "Europe/London",
+  WAL: "Europe/London",
+  NIR: "Europe/London",
+  ESP: "Europe/Madrid",
+  FRA: "Europe/Paris",
+  ITA: "Europe/Rome",
+  GER: "Europe/Berlin",
+  NED: "Europe/Amsterdam",
+  POR: "Europe/Lisbon",
+  RSA: "Africa/Johannesburg",
+  UAE: "Asia/Dubai",
+  QAT: "Asia/Qatar",
+  KSA: "Asia/Riyadh",
+  AUS: "Australia/Sydney",
+};
+
+// How far ahead of UTC (in minutes) the given IANA timezone is, AT the
+// given instant - computed from the actual current DST state via
+// Intl.DateTimeFormat rather than a hardcoded offset, so this stays
+// correct across DST transitions in either country without needing
+// updates twice a year.
+function getUtcOffsetMinutes(timeZone: string, atDate: Date): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone, hourCycle: "h23",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+  const parts = dtf.formatToParts(atDate);
+  const map: Record<string, string> = {};
+  for (const p of parts) map[p.type] = p.value;
+  const asIfUtc = Date.UTC(+map.year, +map.month - 1, +map.day, +map.hour, +map.minute, +map.second);
+  return (asIfUtc - atDate.getTime()) / 60000;
+}
+
+// Converts a wall-clock time (today's date, in sourceTimeZone) to its
+// Central-time equivalent, DST-aware in both directions.
+function convertLocalTimeToCentral(hour24: number, minute: number, sourceTimeZone: string, referenceDate: Date = new Date()): string {
+  const dateParts = new Intl.DateTimeFormat("en-US", { timeZone: sourceTimeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(referenceDate);
+  const map: Record<string, string> = {};
+  for (const p of dateParts) map[p.type] = p.value;
+  const naiveUtcMs = Date.UTC(+map.year, +map.month - 1, +map.day, hour24, minute, 0);
+  const offsetMin = getUtcOffsetMinutes(sourceTimeZone, new Date(naiveUtcMs));
+  const trueInstant = new Date(naiveUtcMs - offsetMin * 60000);
+  return new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit", hour12: true }).format(trueInstant);
+}
+
+// Converts a DataGolf bare "H:MM" tee time (in the tournament's own local
+// time) to a Central-time "H:MM AM/PM" string, or null if the event's
+// host country isn't in DPWT_COUNTRY_TIMEZONES or the string doesn't
+// parse - never a silent wrong guess.
+export function convertDgEuroTeeTime(teetime: string, eventFlag: string | null): string | null {
+  if (!eventFlag) return null;
+  const timeZone = DPWT_COUNTRY_TIMEZONES[eventFlag.toUpperCase()];
+  if (!timeZone) return null;
+
+  const m = teetime.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const hour12 = parseInt(m[1], 10);
+  const minute = parseInt(m[2], 10);
+  if (hour12 < 1 || hour12 > 12 || minute < 0 || minute > 59) return null;
+
+  const period = inferAmPm(hour12);
+  const hour24 = to24Hour(hour12, period);
+  return convertLocalTimeToCentral(hour24, minute, timeZone);
 }

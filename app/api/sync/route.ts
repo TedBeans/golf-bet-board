@@ -17,7 +17,7 @@ import { noCacheJson } from "../../../lib/noCacheJson";
 import { recordCompletedRounds, computeLowRoundStanding, getRoundScoreHistory, inferCurrentRound, RoundScoreHistory } from "../../../lib/roundScores";
 import {
   fetchDgEuroLiveModel, findDgEuroPlayerMatch, computeDgEuroRoundStats,
-  dgEuroRoundsPlayed, findDgEuroLeader, computeDgEuroHoleScore, getDgEuroCurrentRoundStat, DgEuroLiveModel,
+  dgEuroRoundsPlayed, findDgEuroLeader, computeDgEuroHoleScore, getDgEuroCurrentRoundStat, convertDgEuroTeeTime, DgEuroLiveModel,
 } from "../../../lib/dgEuroLiveModel";
 
 const SYNC_LOCK_MS = 45000;
@@ -64,6 +64,7 @@ export async function GET() {
   // most one fetch per tournament+round that actually has a missing time.
   // PGA-sourced tournaments only - The Open uses its own feed.
   const teeTimeCache = new Map<string, PgaTeeTimeRow[]>();
+  let dgEuroModelForTeeTimes: DgEuroLiveModel | null | undefined = undefined;
   let teeTimesChanged = false;
   function normTT(s: string): string {
     return normalizeName(s).replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim();
@@ -82,6 +83,24 @@ export async function GET() {
   for (const b of bets) {
     if (b.personal || b.time) continue;
     const tm = mapping.tournaments?.[b.t];
+    if (tm?.dataSource === "dpwt") {
+      if (dgEuroModelForTeeTimes === undefined) {
+        try {
+          dgEuroModelForTeeTimes = await fetchDgEuroLiveModel();
+        } catch {
+          dgEuroModelForTeeTimes = null;
+        }
+      }
+      if (!dgEuroModelForTeeTimes) continue;
+      const match = findDgEuroPlayerMatch(b.player, dgEuroModelForTeeTimes.players);
+      if (!match?.teetime) continue;
+      const central = convertDgEuroTeeTime(match.teetime, dgEuroModelForTeeTimes.eventFlag);
+      if (central) {
+        b.time = central;
+        teeTimesChanged = true;
+      }
+      continue;
+    }
     if (!tm?.pgaId || tm.dataSource === "theopen") continue;
     const roundNum = parseInt((b.r || "").match(/(\d+)/)?.[1] || "0", 10);
     if (!roundNum) continue;
