@@ -16,8 +16,8 @@ import { normalizeName } from "../../../lib/nameNorm";
 import { noCacheJson } from "../../../lib/noCacheJson";
 import { recordCompletedRounds, computeLowRoundStanding, getRoundScoreHistory, inferCurrentRound, RoundScoreHistory } from "../../../lib/roundScores";
 import {
-  fetchDgEuroLiveModel, findDgEuroPlayerMatch, computeDgEuroRoundStats, computeDgEuroTotalToPar,
-  dgEuroRoundsPlayed, findDgEuroLeader, computeDgEuroHoleScore, DgEuroLiveModel,
+  fetchDgEuroLiveModel, findDgEuroPlayerMatch, computeDgEuroRoundStats,
+  dgEuroRoundsPlayed, findDgEuroLeader, computeDgEuroHoleScore, getDgEuroCurrentRoundStat, DgEuroLiveModel,
 } from "../../../lib/dgEuroLiveModel";
 
 const SYNC_LOCK_MS = 45000;
@@ -169,16 +169,24 @@ export async function GET() {
     const row = findDgEuroPlayerMatch(playerName, model.players);
     if (!row) return null;
     if (roundNum === null) {
-      const scoreToPar = computeDgEuroTotalToPar(model, row.playerNum);
+      // Tournament cumulative view - matches getPgaRoundStat's own
+      // convention exactly: trust the leaderboard's own cumulative total
+      // (row.currentScore) directly rather than recomputing it from
+      // hole-by-hole data, which a real case showed can lag behind it
+      // during live play (see getDgEuroCurrentRoundStat's header comment
+      // for the full story). Thru still sums finalized holes across every
+      // round via hole-by-hole data, since the leaderboard itself only
+      // ever shows thru for whichever round is currently active, going
+      // blank once a round finishes and the next hasn't started yet.
       let thru: number | null = null;
       for (const r of dgEuroRoundsPlayed(model, row.playerNum)) {
         const stats = computeDgEuroRoundStats(model, row.playerNum, r);
         if (stats) thru = (thru ?? 0) + stats.thru;
       }
-      return { id: row.playerNum, thru, scoreToPar };
+      return { id: row.playerNum, thru, scoreToPar: row.currentScore };
     }
-    const stats = computeDgEuroRoundStats(model, row.playerNum, roundNum);
-    return { id: row.playerNum, thru: stats?.thru ?? null, scoreToPar: stats?.scoreToPar ?? null };
+    const stats = getDgEuroCurrentRoundStat(model, row, roundNum);
+    return { id: row.playerNum, thru: stats.thru, scoreToPar: stats.scoreToPar };
   }
   // Field-wide position rankings for personal Winner/Top N bets - computed
   // once per tournament per sync pass (several personal bets often share
@@ -434,7 +442,7 @@ export async function GET() {
                   return { id: p.id, totalToPar: s.holesPlayed > 0 ? s.totalToPar : null };
                 })
               : useDpwt
-              ? dgEuroModel!.players.map((p) => ({ id: p.playerNum, totalToPar: computeDgEuroTotalToPar(dgEuroModel!, p.playerNum) }))
+              ? dgEuroModel!.players.map((p) => ({ id: p.playerNum, totalToPar: p.currentScore }))
               : pgaPlayers!.map((p) => ({ id: p.id, totalToPar: p.total }));
             positions = computePositions(entries);
             positionsCache.set(bet.t, positions);
@@ -475,7 +483,7 @@ export async function GET() {
                   return { id: p.id, totalToPar: s.holesPlayed > 0 ? s.totalToPar : null };
                 })
               : useDpwt
-              ? dgEuroModel!.players.map((p) => ({ id: p.playerNum, totalToPar: computeDgEuroTotalToPar(dgEuroModel!, p.playerNum) }))
+              ? dgEuroModel!.players.map((p) => ({ id: p.playerNum, totalToPar: p.currentScore }))
               : pgaPlayers!.map((p) => ({ id: p.id, totalToPar: p.total }));
             positions = computePositions(entries);
             positionsCache.set(bet.t, positions);
@@ -570,7 +578,7 @@ export async function GET() {
           let positions = positionsCache.get(bet.t);
           if (!positions) {
             const entries: PositionEntry[] = useDpwt
-              ? dgEuroModel!.players.map((p) => ({ id: p.playerNum, totalToPar: computeDgEuroTotalToPar(dgEuroModel!, p.playerNum) }))
+              ? dgEuroModel!.players.map((p) => ({ id: p.playerNum, totalToPar: p.currentScore }))
               : pgaPlayers!.map((p) => ({ id: p.id, totalToPar: p.total }));
             positions = computePositions(entries);
             positionsCache.set(bet.t, positions);
@@ -837,20 +845,20 @@ export async function GET() {
           continue;
         }
 
-        const dpwtStats = dpwtRoundNum ? computeDgEuroRoundStats(model, dpwtRow.playerNum, dpwtRoundNum) : null;
+        const dpwtStats = dpwtRoundNum ? getDgEuroCurrentRoundStat(model, dpwtRow, dpwtRoundNum) : null;
 
-        if (!dpwtStats) {
+        if (!dpwtStats || dpwtStats.scoreToPar === null) {
           // Don't silently leave bet.auto at null with no explanation -
           // that's indistinguishable from "working but genuinely nothing
           // to report yet" and was a real gap that made a previous bug
           // invisible. Report exactly what's missing: either the round
-          // number itself didn't parse from bet.r, or this player/round
-          // combination has no hole data in DataGolf's blob yet (could be
-          // legitimate - not teed off - or could be the round key not
-          // existing yet in player_scores for anyone this early).
+          // number itself didn't parse from bet.r, or there's genuinely
+          // nothing usable yet for this round from either hole-by-hole
+          // detail or the leaderboard summary fallback (getDgEuroCurrentRoundStat
+          // already tries both before giving up).
           errors.push(
             dpwtRoundNum
-              ? `${bet.player}: no hole data yet for round ${dpwtRoundNum} (DP World Tour, DataGolf)`
+              ? `${bet.player}: no data yet for round ${dpwtRoundNum} (DP World Tour, DataGolf)`
               : `${bet.player}: couldn't determine round number from "${bet.r}" (DP World Tour)`
           );
         }
@@ -868,15 +876,22 @@ export async function GET() {
           updatedAt: new Date().toISOString(),
         };
 
-        if (dpwtStats) {
+        if (dpwtStats && dpwtStats.scoreToPar !== null) {
           if (parsed.label === "SCORE") {
             bet.stat = dpwtStats.scoreToPar;
-          } else if (parsed.label === "BIRDIES") {
-            bet.stat = dpwtStats.birdies + dpwtStats.eagles; // birdiesOrBetter, matching every other tour's convention
-          } else if (parsed.label === "BOGEYS") {
-            bet.stat = dpwtStats.bogeys + dpwtStats.doubleBogeys; // bogeysOrWorse
-          } else if (parsed.label === "PARS") {
-            bet.stat = dpwtStats.pars;
+          } else if (dpwtStats.fromHoleData) {
+            // Birdies/Bogeys/Pars can't be derived from the fallback path
+            // (no hole-by-hole detail to count from) - only set these when
+            // the stats genuinely came from real hole data, otherwise
+            // leave bet.stat alone rather than let null+null silently
+            // become 0 and grade as if zero birdies were confirmed.
+            if (parsed.label === "BIRDIES") {
+              bet.stat = dpwtStats.birdies! + dpwtStats.eagles!; // birdiesOrBetter, matching every other tour's convention
+            } else if (parsed.label === "BOGEYS") {
+              bet.stat = dpwtStats.bogeys! + dpwtStats.doubleBogeys!; // bogeysOrWorse
+            } else if (parsed.label === "PARS") {
+              bet.stat = dpwtStats.pars;
+            }
           }
         }
 

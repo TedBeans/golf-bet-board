@@ -212,6 +212,59 @@ export function computeDgEuroHoleScore(model: DgEuroLiveModel, playerNum: string
   return { thru: 1, diff: strokes - par };
 }
 
+export type DgEuroCurrentRoundStat = {
+  scoreToPar: number | null;
+  thru: number | null;
+  birdies: number | null;
+  bogeys: number | null;
+  pars: number | null;
+  eagles: number | null;
+  doubleBogeys: number | null;
+  fromHoleData: boolean; // false when this came from the fallback below, not real hole-by-hole detail
+};
+
+// computeDgEuroRoundStats requires hole-by-hole detail to exist for the
+// round in question - but a real case showed that data lagging behind
+// the tour's own faster-updating leaderboard summary fields during live
+// play (a player already 2 holes into their round per current_pos/thru,
+// with nothing yet in player_scores for that round). This only matters
+// for whichever round is CURRENTLY being played tour-wide (model.currentRound) -
+// a genuinely past round missing hole data would be a different, real
+// problem, not a timing lag, so this deliberately only falls back for
+// the live round, never a historical one.
+//
+// The fallback: thru comes straight from the main row's own thru field
+// (already round-scoped, not cumulative). scoreToPar is derived by
+// subtracting every earlier round's hole-by-hole total (reliable, since
+// those rounds are no longer in progress) from the cumulative total the
+// leaderboard reports - there's no other round-specific summary field
+// available (the blob's own "today" field was found unreliable - see
+// this module's header comment). Birdies/Bogeys/Pars/Eagles can't be
+// recovered without hole detail and stay null until it catches up.
+export function getDgEuroCurrentRoundStat(model: DgEuroLiveModel, mainRow: DgEuroPlayerRow, roundNum: number): DgEuroCurrentRoundStat {
+  const holeStats = computeDgEuroRoundStats(model, mainRow.playerNum, roundNum);
+  if (holeStats) {
+    return {
+      scoreToPar: holeStats.scoreToPar, thru: holeStats.thru,
+      birdies: holeStats.birdies, bogeys: holeStats.bogeys, pars: holeStats.pars,
+      eagles: holeStats.eagles, doubleBogeys: holeStats.doubleBogeys, fromHoleData: true,
+    };
+  }
+
+  const empty: DgEuroCurrentRoundStat = { scoreToPar: null, thru: null, birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, fromHoleData: false };
+  if (roundNum !== model.currentRound || mainRow.currentScore === null) return empty;
+
+  const priorRounds = dgEuroRoundsPlayed(model, mainRow.playerNum).filter((r) => r < roundNum);
+  let priorTotal = 0;
+  for (const r of priorRounds) {
+    const s = computeDgEuroRoundStats(model, mainRow.playerNum, r);
+    if (s) priorTotal += s.scoreToPar;
+  }
+  const scoreToPar = mainRow.currentScore - priorTotal;
+  const thru = typeof mainRow.thru === "number" ? mainRow.thru : mainRow.thru === "F" ? 18 : null;
+  return { ...empty, scoreToPar, thru };
+}
+
 // Every round (1-4) this player has any recorded holes for, per the
 // player_scores blob directly - used by Lowest Round tracking, which
 // (unlike PGA Tour's equivalent in lib/roundScores.ts) doesn't need its
