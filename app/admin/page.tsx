@@ -970,6 +970,56 @@ export default function AdminPage() {
     });
   }
 
+  // Fixes a typo'd player name across every bet with an exact match -
+  // live and archived alike. Edits bet.player in place rather than
+  // deleting/recreating, so parlay legs (which reference a bet by its
+  // stable id, not by name - see lib/parlay.ts) keep working without
+  // needing to be rebuilt, and any bet whose name matching was failing
+  // because of the typo starts matching correctly again too.
+  const [renameFrom, setRenameFrom] = useState("");
+  const [renameTo, setRenameTo] = useState("");
+  function renamePlayer() {
+    const from = renameFrom.trim();
+    const to = renameTo.trim();
+    if (!from || !to) {
+      setImportMsg("Enter both the current (typo'd) name and the corrected name.");
+      return;
+    }
+    const liveFixed = bets.map((b) => (b.player === from ? { ...b, player: to } : b));
+    const archiveFixed = archive.map((b) => (b.player === from ? { ...b, player: to } : b));
+    const liveChanged = liveFixed.filter((b, i) => b.player !== bets[i]?.player).length;
+    const archiveChanged = archiveFixed.filter((b, i) => b.player !== archive[i]?.player).length;
+    const total = liveChanged + archiveChanged;
+
+    if (total === 0) {
+      setImportMsg(`No bets found with player name exactly "${from}" - check spelling/capitalization.`);
+      return;
+    }
+
+    Promise.all([
+      fetchFresh("/api/bets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passcode, bets: liveFixed }),
+      }),
+      fetchFresh("/api/archive", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passcode, archive: archiveFixed }),
+      }),
+    ]).then(([r1, r2]) => {
+      if (r1.ok && r2.ok) {
+        setBets(liveFixed);
+        setArchive(archiveFixed);
+        setImportMsg(`Renamed "${from}" to "${to}" on ${total} bet(s) (parlay legs referencing them are unaffected - they'll show the corrected name automatically).`);
+        setRenameFrom("");
+        setRenameTo("");
+      } else {
+        setImportMsg("Save failed - check passcode.");
+      }
+    });
+  }
+
   function backfillMissingUnits() {
     const liveFixed = bets.map((b) =>
       b.oddsPrice && !b.oddsUnits ? { ...b, oddsUnits: String(defaultUnitsToWinOne(b.oddsPrice)) } : b
@@ -1086,6 +1136,38 @@ export default function AdminPage() {
       <button className="add-btn-inline" onClick={backfillMissingUnits} style={{ marginBottom: 12 }}>
         Backfill missing units on existing bets
       </button>
+
+      <div style={{ marginBottom: 12, padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 4 }}>
+        <div className="subline" style={{ marginBottom: 8 }}>
+          Fix a typo'd player name (live and archived bets) - edits the name in place, so parlays
+          referencing that bet don't need to be rebuilt.
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <input
+            type="text"
+            value={renameFrom}
+            onChange={(e) => setRenameFrom(e.target.value)}
+            placeholder="Current (typo'd) name, e.g. Jacob Bridgemen"
+            style={{
+              flex: "1 1 200px", background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 12,
+              padding: "6px 8px", borderRadius: 3,
+            }}
+          />
+          <input
+            type="text"
+            value={renameTo}
+            onChange={(e) => setRenameTo(e.target.value)}
+            placeholder="Corrected name, e.g. Jacob Bridgeman"
+            style={{
+              flex: "1 1 200px", background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 12,
+              padding: "6px 8px", borderRadius: 3,
+            }}
+          />
+          <button className="add-btn-inline" onClick={renamePlayer}>Rename</button>
+        </div>
+      </div>
       <textarea
         value={importText}
         onChange={(e) => setImportText(e.target.value)}
