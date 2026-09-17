@@ -578,11 +578,18 @@ export default function AdminPage() {
   const [dpwtTeeTimeOverwrite, setDpwtTeeTimeOverwrite] = useState<Record<string, boolean>>({});
 
   // Matches parsed (time, playerName) entries against every live bet in
-  // this tournament that's missing a time - regular and personal alike,
-  // since this tour has no automated tee-time source to gate on the way
-  // the PGA Tour auto-fill does. Same normalizeName-based fuzzy match
-  // (exact, then last-name-only, then substring) as every other name
-  // matcher in this app.
+  // this tournament that's missing a time - regular and personal alike.
+  // Kept as a fallback: regular bets on this tour normally get their tee
+  // time automatically from DataGolf's own live data (converted to
+  // Central directly - see convertDgEuroTeeTime in lib/dgEuroLiveModel.ts
+  // and the auto-fill loop in app/api/sync/route.ts), so this manual path
+  // is for personal plays (which the automatic fill doesn't touch) or a
+  // country DataGolf's own host-country mapping doesn't cover yet. Unlike
+  // the automatic fill, this does NOT convert timezones - it only
+  // reformats DP World Tour's own 24-hour local display into a 12-hour
+  // label, so a time entered here is still local to the tournament, not
+  // Central. Same normalizeName-based fuzzy match (exact, then
+  // last-name-only, then substring) as every other name matcher in this app.
   function applyDpwtTeeTimes(tourn: string) {
     const raw = dpwtTeeTimeDrafts[tourn] || "";
     const overwrite = !!dpwtTeeTimeOverwrite[tourn];
@@ -631,6 +638,39 @@ export default function AdminPage() {
     }).then((r) => {
       setSaveMsg(r.ok ? `Set tee times for ${filled} bet(s) in ${tourn}.` : "Save failed - check passcode.");
       setTimeout(() => setSaveMsg(""), 5000);
+    });
+  }
+
+  // Clears tee times on every regular (non-personal) bet in this
+  // tournament, so the automatic DataGolf-based tee-time fill in
+  // app/api/sync/route.ts picks them back up on its next pass and
+  // re-fills them correctly - that auto-fill only ever fills a bet with
+  // NO time at all, never revisits one that already has something set
+  // (right or wrong), so this is the way to force a redo. Meant for
+  // fixing a batch that went in wrong - e.g. via the paste tool below,
+  // which reformats DP World Tour's own 24-hour local display into a
+  // 12-hour label but does NOT convert timezones, unlike the automatic
+  // fill.
+  function clearDpwtTeeTimes(tourn: string) {
+    let cleared = 0;
+    const nextBets = bets.map((b) => {
+      if (b.t !== tourn || b.personal || !b.time) return b;
+      cleared++;
+      return { ...b, time: "" };
+    });
+    if (cleared === 0) {
+      setSaveMsg("No regular bets in this tournament currently have a time set.");
+      setTimeout(() => setSaveMsg(""), 4000);
+      return;
+    }
+    setBets(nextBets);
+    fetchFresh("/api/bets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, bets: nextBets }),
+    }).then((r) => {
+      setSaveMsg(r.ok ? `Cleared ${cleared} tee time(s) in ${tourn} - they'll re-fill from DataGolf on the next sync.` : "Save failed - check passcode.");
+      setTimeout(() => setSaveMsg(""), 6000);
     });
   }
 
@@ -1698,9 +1738,22 @@ export default function AdminPage() {
                     {dpwtTeeTimeOverwrite[tourn]
                       ? "Overwrite mode: will replace times on every matched bet, even ones already set."
                       : "Only fills bets that don't already have a time set - safe to paste again each round."}
-                    {" "}No auto-fetch for this tour yet (see the roster note above), so this needs a fresh
-                    paste whenever new tee times post.
+                    {" "}Heads up: this reformats DP World Tour's own 24-hour local display into a
+                    12-hour label but does not convert timezones - the time shown is still local to
+                    the tournament, not Central. For automatic Central-time tee times, see below instead.
                   </span>
+                </div>
+
+                <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid var(--line)" }}>
+                  <div className="subline">
+                    Regular bets on this tour auto-fill their tee time from DataGolf's own live data,
+                    already converted to Central time - no paste needed for that. If a bet is showing
+                    a wrong time (stuck from before a revision, or from the paste tool above), clear it
+                    here and it'll pick up the correct converted time on the next sync pass.
+                  </div>
+                  <button className="add-btn-inline" style={{ marginTop: 6 }} onClick={() => clearDpwtTeeTimes(tourn)}>
+                    Clear tee times (re-fill from DataGolf)
+                  </button>
                 </div>
               </div>
             )}

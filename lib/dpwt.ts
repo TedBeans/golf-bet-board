@@ -1,8 +1,14 @@
 // DP World Tour (europeantour.com) integration.
 //
-// STATUS: not live-graded right now. Every bet type on this tour is
-// manual (WIN/LOSS buttons on the board), same as it always was for
-// Fairways/GIR/Tournament Score - see below for why.
+// STATUS: europeantour.com's own feed is still unusable server-side (see
+// below) - but that's no longer the whole story for this tour. Most bet
+// types (Winner, Top N, Make Cut, H2H, Tie, R1 Leader, Lowest Round,
+// Score, Birdies, Bogeys, Pars, Hole Score, and tee times) are now live-
+// graded automatically via DataGolf's own live-model page instead - a
+// completely different site, not affected by the Akamai block below. See
+// lib/dgEuroLiveModel.ts for that integration. Only GIR and Fairways
+// remain manual on this tour - nothing in DataGolf's data exposes
+// hit/miss detail for those.
 //
 // HISTORY, for whoever revisits this later:
 //
