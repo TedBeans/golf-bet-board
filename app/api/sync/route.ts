@@ -94,6 +94,18 @@ export async function GET() {
       if (!dgEuroModelForTeeTimes) continue;
       const match = findDgEuroPlayerMatch(b.player, dgEuroModelForTeeTimes.players);
       if (!match?.teetime) continue;
+      // match.teetime is whatever round the blob's own row for this
+      // player currently shows (match.round), not necessarily the round
+      // this specific bet is for - if DataGolf hasn't rolled the player's
+      // row over to the new round yet (e.g. round 2 hasn't posted for
+      // them, or sync ran in the gap before it did), match.round would
+      // still be 1 while this bet is for round 2, and applying it without
+      // this check would silently attach a leftover round-1 time to a
+      // round-2 bet. Only fill when they agree - otherwise leave it
+      // blank and let a later sync pass pick it up once the blob catches
+      // up to the right round.
+      const betRoundNum = roundNumberFromLabel(b.r);
+      if (match.round !== betRoundNum) continue;
       const central = convertDgEuroTeeTime(match.teetime, dgEuroModelForTeeTimes.eventFlag);
       if (central) {
         b.time = central;
