@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../lib/seed";
 import { Mapping, EMPTY_MAPPING, tourLabel } from "../lib/mapping";
-import { parseBetType, trend, smartTrend, trendClassName, timeToMinutes, friendlyLabel, formatScore, parseScoreInput, matchPlayStatus, holeScoreName, holeScoreHitMissValues, ParsedBet } from "../lib/betLogic";
+import { parseBetType, trend, smartTrend, trendClassName, timeToMinutes, friendlyLabel, formatScore, parseScoreInput, matchPlayStatus, holeScoreName, holeScoreHitMissValues, projectOutcome, ParsedBet } from "../lib/betLogic";
 import { positionRank } from "../lib/positions";
 import { sortByPersonalOrder } from "../lib/personalOrder";
 import { Parlay, ParlayLegRef, LegStatus, resolveLegStatuses, deriveParlayStatus } from "../lib/parlay";
 import { computeUnitResult, formatUnits } from "../lib/units";
 import HoleScorecardModal from "./HoleScorecardModal";
+import BetFilterModal from "./BetFilterModal";
 import GolfFlagIcon from "./GolfFlagIcon";
 import UpcomingTournamentCard from "./UpcomingTournamentCard";
 import WeatherStrip from "./WeatherStrip";
@@ -326,6 +327,12 @@ export default function Page() {
   const [archive, setArchive] = useState<Bet[]>([]);
   const [liveParlays, setLiveParlays] = useState<Parlay[]>([]);
   const [expandedWeather, setExpandedWeather] = useState<Set<string>>(new Set());
+  // Which pill/summary was clicked, if any - drives the BetFilterModal
+  // overlay. Holds the already-computed bet list directly rather than a
+  // filter spec, so the same modal works for both a status filter (Win/
+  // Loss/Live/TBD pills) and a pre-computed list (the projected win/loss
+  // breakdown below).
+  const [filterModal, setFilterModal] = useState<{ label: string; bets: Bet[] } | null>(null);
   const [cutlineProbs, setCutlineProbs] = useState<{ score: number; prob: number }[]>([]);
   const [scorecardModal, setScorecardModal] = useState<{ betId: string; tournament: string; round: string; player: string; loading: boolean; scorecard: any | null; position?: string | null; totalToPar?: number | null; message?: string; summary?: any } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -505,6 +512,40 @@ export default function Page() {
   // same as they're already excluded from the regular recaps.
   bets.filter((b) => !b.personal).forEach((b) => (counts[b.status] = (counts[b.status] || 0) + 1));
 
+  // Projected final record - every already-confirmed win/loss, plus a
+  // "where does this land if it stopped right now" read on every bet
+  // still live (see projectOutcome in lib/betLogic.ts). A live bet with
+  // no sensible projection yet (no stat data, or a bet type with nothing
+  // to pace against) is left out of both the win and loss side rather
+  // than guessed into one.
+  let projectedWins = counts.hit;
+  let projectedLosses = counts.miss;
+  let projectedUnits = 0;
+  const projectedWinBets: Bet[] = [];
+  const projectedLossBets: Bet[] = [];
+  bets
+    .filter((b) => !b.personal)
+    .forEach((b) => {
+      if (b.status === "hit" || b.status === "miss") {
+        projectedUnits += computeUnitResult(b.oddsPrice, b.oddsUnits, b.status, b.deadHeatDivisor) ?? 0;
+        return;
+      }
+      if (b.status !== "live") return;
+      const parsed = parseBetType(b.bet);
+      const cutLine = mapping.tournaments?.[b.t]?.cutLine;
+      const outcome = projectOutcome(parsed, b, cutLine);
+      if (outcome === "win") {
+        projectedWins++;
+        projectedWinBets.push(b);
+        projectedUnits += computeUnitResult(b.oddsPrice, b.oddsUnits, "hit", b.deadHeatDivisor) ?? 0;
+      } else if (outcome === "loss") {
+        projectedLosses++;
+        projectedLossBets.push(b);
+        projectedUnits += computeUnitResult(b.oddsPrice, b.oddsUnits, "miss", b.deadHeatDivisor) ?? 0;
+      }
+    });
+  const projectedUndetermined = counts.live - projectedWinBets.length - projectedLossBets.length;
+
   const regularBets = bets.filter((b) => !b.personal);
   // hidden is an admin-only display toggle - the bet still exists, still
   // syncs, and still works as a parlay leg (see LegRow/legLiveDetail above,
@@ -565,11 +606,27 @@ export default function Page() {
           )}
         </div>
         <div className="summary">
-          <div className="pill hit">WIN <b>{counts.hit || 0}</b></div>
-          <div className="pill miss">LOSS <b>{counts.miss || 0}</b></div>
-          <div className="pill live">LIVE <b>{counts.live || 0}</b></div>
-          <div className="pill pending">TBD <b>{counts.pending || 0}</b></div>
+          <div className="pill hit" style={{ cursor: "pointer" }} onClick={() => setFilterModal({ label: "WIN", bets: regularBets.filter((b) => b.status === "hit") })}>WIN <b>{counts.hit || 0}</b></div>
+          <div className="pill miss" style={{ cursor: "pointer" }} onClick={() => setFilterModal({ label: "LOSS", bets: regularBets.filter((b) => b.status === "miss") })}>LOSS <b>{counts.miss || 0}</b></div>
+          <div className="pill live" style={{ cursor: "pointer" }} onClick={() => setFilterModal({ label: "LIVE", bets: regularBets.filter((b) => b.status === "live") })}>LIVE <b>{counts.live || 0}</b></div>
+          <div className="pill pending" style={{ cursor: "pointer" }} onClick={() => setFilterModal({ label: "TBD", bets: regularBets.filter((b) => b.status === "pending") })}>TBD <b>{counts.pending || 0}</b></div>
         </div>
+        {(projectedWinBets.length > 0 || projectedLossBets.length > 0) && (
+          <div className="summary" style={{ marginTop: 6 }}>
+            <span className="subline">
+              Projected final: {projectedWins}-{projectedLosses} ({formatUnits(projectedUnits)})
+              {" · "}
+              <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setFilterModal({ label: "Projecting to WIN", bets: projectedWinBets })}>
+                {projectedWinBets.length} on pace to win
+              </span>
+              {", "}
+              <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setFilterModal({ label: "Projecting to LOSE", bets: projectedLossBets })}>
+                {projectedLossBets.length} on pace to lose
+              </span>
+              {projectedUndetermined > 0 && ` · ${projectedUndetermined} too early to call`}
+            </span>
+          </div>
+        )}
         {saving && <span className="saving">saving…</span>}
         {syncNote && <div className="sync-note">{syncNote}</div>}
         {lastSynced && Date.now() - lastSynced.getTime() > 5 * 60 * 1000 && (
@@ -637,10 +694,10 @@ export default function Page() {
                 {isSuspended && <span className="susp-badge">SUSP</span>}
               </div>
               <div className="tourn-summary">
-                <span className="tsum win">WIN {tc.hit || 0}</span>
-                <span className="tsum loss">LOSS {tc.miss || 0}</span>
-                <span className="tsum live">LIVE {tc.live || 0}</span>
-                <span className="tsum tbd">TBD {tc.pending || 0}</span>
+                <span className="tsum win" style={{ cursor: "pointer" }} onClick={() => setFilterModal({ label: `WIN - ${tourn}`, bets: tournBets.filter((b) => b.status === "hit") })}>WIN {tc.hit || 0}</span>
+                <span className="tsum loss" style={{ cursor: "pointer" }} onClick={() => setFilterModal({ label: `LOSS - ${tourn}`, bets: tournBets.filter((b) => b.status === "miss") })}>LOSS {tc.miss || 0}</span>
+                <span className="tsum live" style={{ cursor: "pointer" }} onClick={() => setFilterModal({ label: `LIVE - ${tourn}`, bets: tournBets.filter((b) => b.status === "live") })}>LIVE {tc.live || 0}</span>
+                <span className="tsum tbd" style={{ cursor: "pointer" }} onClick={() => setFilterModal({ label: `TBD - ${tourn}`, bets: tournBets.filter((b) => b.status === "pending") })}>TBD {tc.pending || 0}</span>
               </div>
             </div>
             {showWeatherSection && (
@@ -1216,6 +1273,14 @@ export default function Page() {
           </div>
         )}
       </main>
+
+      {filterModal && (
+        <BetFilterModal
+          title={filterModal.label}
+          bets={filterModal.bets}
+          onClose={() => setFilterModal(null)}
+        />
+      )}
     </>
   );
 }

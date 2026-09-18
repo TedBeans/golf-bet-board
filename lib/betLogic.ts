@@ -1,6 +1,9 @@
 export const HOLES_IN_ROUND = 18;
 export const HOLES_IN_NINE = 9;
 
+import { Bet } from "./seed";
+import { positionRank } from "./positions";
+
 export type ParsedBet = {
   type: "max" | "min" | "exact" | "generic";
   label: string;
@@ -459,5 +462,68 @@ export function autoStatValue(
     const m = auto.fairways?.match(/(\d+)/);
     return m ? parseInt(m[1], 10) : null;
   }
+  return null;
+}
+
+// "If this stopped right now, which side of the line is it currently on" -
+// a live read for every bet type, not the more conservative "is this
+// mathematically locked in" check autoGradeStatus does (a bet can
+// project as a win here well before autoGradeStatus would ever commit
+// that grade, since pace can still turn). Used for a projected
+// win/loss/units summary alongside the real one - never for actual
+// grading. Returns null when there's genuinely no sensible way to
+// project yet (no stat data, or a bet type with no fixed target to
+// compare against at all, like Lowest Round or a field-wide winning
+// score).
+//
+// cutLine is the tournament's Make Cut threshold (from Admin -> Tournaments,
+// not part of the bet itself) - only needed for MAKE_CUT bets, omit for
+// everything else.
+export function projectOutcome(parsed: ParsedBet, bet: Bet, cutLine?: number | null): "win" | "loss" | null {
+  const stat = bet.stat;
+  const auto = bet.auto;
+
+  // Always graded by hand - no fixed personal target to pace against (a
+  // field-wide record, or "who holds the lowest round so far" rather than
+  // a yes/no line), so there's nothing to meaningfully project. Excluded
+  // rather than guessed.
+  if (parsed.label === "WINNER_SCORE" || parsed.label === "LOW_ROUND") return null;
+
+  if (parsed.label === "WINNER" || parsed.label === "R1_LEADER") {
+    const pos = positionRank(auto?.position ?? null);
+    if (pos === null) return null;
+    return pos === 1 ? "win" : "loss";
+  }
+  if (parsed.label === "TOP_N") {
+    const pos = positionRank(auto?.position ?? null);
+    if (pos === null || parsed.topN === null || parsed.topN === undefined) return null;
+    return pos <= parsed.topN ? "win" : "loss";
+  }
+  if (parsed.label === "MAKE_CUT") {
+    // bet.stat here is the active round's score ALONE (see the sync
+    // route's MAKE_CUT block) - the cumulative round1+round2 total that
+    // actually needs comparing against the cut line lives on
+    // auto.scoreToPar instead.
+    if (cutLine === null || cutLine === undefined) return null;
+    const combined = auto?.scoreToPar ?? null;
+    if (combined === null) return null;
+    return combined <= cutLine ? "win" : "loss";
+  }
+  if (parsed.label === "H2H") {
+    if (stat === null || stat === undefined || auto?.opponentScoreToPar === null || auto?.opponentScoreToPar === undefined) return null;
+    return stat < auto.opponentScoreToPar ? "win" : "loss"; // lower score wins; currently level projects as a loss (a true push is a manual call anyway)
+  }
+  if (parsed.label === "TIE") {
+    if (stat === null || stat === undefined || auto?.opponentScoreToPar === null || auto?.opponentScoreToPar === undefined) return null;
+    return stat === auto.opponentScoreToPar ? "win" : "loss";
+  }
+
+  // Everything else (SCORE/GIR/BIRDIES/BOGEYS/PARS/FAIRWAYS/HOLE_SCORE) is
+  // a straightforward min/max/exact comparison against a fixed target.
+  if (parsed.type === "generic" || parsed.target === null || parsed.target === undefined) return null;
+  if (stat === null || stat === undefined || isNaN(stat)) return null;
+  if (parsed.type === "max") return stat <= parsed.target ? "win" : "loss";
+  if (parsed.type === "min") return stat >= parsed.target ? "win" : "loss";
+  if (parsed.type === "exact") return stat === parsed.target ? "win" : "loss";
   return null;
 }
