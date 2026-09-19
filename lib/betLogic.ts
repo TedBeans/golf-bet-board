@@ -226,6 +226,23 @@ export function smartTrend(
   return "warn";
 }
 
+// Shared holes-total resolution for every pace-aware call site (the color
+// class below AND projectOutcome's win/loss call) so they can never quietly
+// diverge on what "a full round" means for a given bet - e.g. a Front 9 bet
+// paced against 18 in one place and 9 in the other.
+function resolveHolesTotal(parsed: ParsedBet, holesTotal?: number): number {
+  return (
+    holesTotal ??
+    (parsed.label === "WINNER_SCORE"
+      ? HOLES_IN_TOURNAMENT
+      : parsed.segment
+      ? HOLES_IN_NINE
+      : parsed.label === "FAIRWAYS"
+      ? 14
+      : HOLES_IN_ROUND)
+  );
+}
+
 // Returns the actual CSS class to use for a stat value - one unified green/
 // yellow/red pace scheme (see smartTrend above) for every bet type that has
 // a fixed target to pace against. holesTotal is always recomputed here from
@@ -238,15 +255,7 @@ export function trendClassName(
   thru: number | null,
   holesTotal?: number
 ): string {
-  const effectiveHolesTotal =
-    holesTotal ??
-    (parsed.label === "WINNER_SCORE"
-      ? HOLES_IN_TOURNAMENT
-      : parsed.segment
-      ? HOLES_IN_NINE
-      : parsed.label === "FAIRWAYS"
-      ? 14
-      : HOLES_IN_ROUND);
+  const effectiveHolesTotal = resolveHolesTotal(parsed, holesTotal);
   if (PACE_LABELS.includes(parsed.label)) {
     return `pace-${smartTrend(parsed, stat, thru, effectiveHolesTotal)}`;
   }
@@ -536,8 +545,26 @@ export function projectOutcome(parsed: ParsedBet, bet: Bet, cutLine?: number | n
     return stat === auto.opponentScoreToPar ? "win" : "loss";
   }
 
-  // Everything else (SCORE/GIR/BIRDIES/BOGEYS/PARS/FAIRWAYS/HOLE_SCORE) is
-  // a straightforward min/max/exact comparison against a fixed target.
+  // SCORE/GIR/BIRDIES/BOGEYS/PARS/FAIRWAYS are pace bets (PACE_LABELS) - a
+  // count that's still under the final target mid-round isn't "winning" on
+  // its own (2 birdies through 6 holes is a 6-birdie pace against a 4.5
+  // line), so this reuses smartTrend's pace-vs-required-pace read rather
+  // than a literal snapshot comparison. good -> win, bad -> loss, warn/
+  // neutral (including too-early-to-tell) -> null, same as every other
+  // "too early to call" case in this function.
+  if (PACE_LABELS.includes(parsed.label)) {
+    if (parsed.type === "generic" || parsed.target === null || parsed.target === undefined) return null;
+    const thru = bet.thru ?? null;
+    const holesTotal = resolveHolesTotal(parsed);
+    const result = smartTrend(parsed, stat, thru, holesTotal);
+    if (result === "good") return "win";
+    if (result === "bad") return "loss";
+    return null;
+  }
+
+  // HOLE_SCORE: a single hole has no pace to project - it's already either
+  // decided (the hole was played and either hit the target or didn't) or
+  // not yet played, a straightforward exact/min/max comparison.
   if (parsed.type === "generic" || parsed.target === null || parsed.target === undefined) return null;
   if (stat === null || stat === undefined || isNaN(stat)) return null;
   if (parsed.type === "max") return stat <= parsed.target ? "win" : "loss";

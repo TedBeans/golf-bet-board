@@ -57,6 +57,13 @@ export default function BetFilterModal({
               <div className="subline" style={{ fontWeight: 700, marginBottom: 4 }}>{tourn}</div>
               {groups[tourn].map((b) => {
                 const parsed = parseBetType(b.bet);
+                // Only Score/Tournament Score bets are a to-par figure that
+                // wants the +/E/- prefix - a birdie or greens count (or any
+                // other plain count) isn't "par", so it renders as a bare
+                // number instead. Same distinction legLiveDetail already
+                // makes for the in-progress line elsewhere on this page.
+                const valueDisplay =
+                  parsed.label === "SCORE" || parsed.label === "WINNER_SCORE" ? formatScore(b.stat) : b.stat ?? "—";
                 return (
                   <div key={b.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
@@ -67,7 +74,7 @@ export default function BetFilterModal({
                         </div>
                       </div>
                       <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                        <div>{formatScore(b.stat)}{b.thru !== null && b.thru !== undefined ? ` thru ${b.thru}` : ""}</div>
+                        <div>{valueDisplay}{b.thru !== null && b.thru !== undefined ? ` thru ${b.thru}` : ""}</div>
                         {b.oddsPrice && (
                           <div className="subline">{b.sportsbook || "DK"} {b.oddsPrice}</div>
                         )}
