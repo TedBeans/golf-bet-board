@@ -190,6 +190,29 @@ export function computeDgEuroRoundStats(model: DgEuroLiveModel, playerNum: strin
   return { scoreToPar, thru, birdies, bogeys, pars, eagles, doubleBogeys };
 }
 
+// computeDgEuroRoundStats collapses several distinct failure causes into a
+// single null, which is fine for grading (fall back either way) but leaves
+// the sync route with no way to tell "hole data hasn't posted yet" apart
+// from "this event's data is broken in some way that won't just resolve on
+// its own" - the exact ambiguity that made tonight's birdies gap impossible
+// to diagnose without a manual page capture. Only called when
+// computeDgEuroRoundStats already returned null, to report WHY - never
+// changes what gets graded, only what gets logged to the errors panel.
+export function diagnoseDgEuroRoundStatsGap(model: DgEuroLiveModel, playerNum: string, roundNum: number): string {
+  const playerRounds = model.playerScores?.[playerNum];
+  if (!playerRounds) return "no player_scores entry at all for this player (any round)";
+  const round = playerRounds[String(roundNum)];
+  if (!round) return `no player_scores entry for round ${roundNum} specifically (other rounds may be present)`;
+  const courseCode = round.course_code;
+  const courseHoles = model.scorecard?.[courseCode];
+  if (!courseHoles) return `round entry exists but scorecard has no course "${courseCode}" - par lookup can't resolve, so no hole can count even if strokes are present`;
+  const holesWithStrokes = Array.from({ length: 18 }, (_, i) => i + 1).filter(
+    (h) => typeof round[String(h)] === "number"
+  ).length;
+  if (holesWithStrokes === 0) return "round + course found, but every hole's stroke value is null/missing - genuinely no holes posted yet";
+  return `round + course found with ${holesWithStrokes} hole(s) of strokes, but none parsed to a valid par - likely a scorecard par field format issue`;
+}
+
 // Field leader by cumulative total-to-par (self-computed, same reasoning
 // as computeDgEuroTotalToPar) - used for tournament-long "winning score"
 // bets, mirroring findLeader/findOpenLeader's role for the other tours.

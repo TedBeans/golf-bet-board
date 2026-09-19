@@ -18,6 +18,7 @@ import { recordCompletedRounds, computeLowRoundStanding, getRoundScoreHistory, i
 import {
   fetchDgEuroLiveModel, findDgEuroPlayerMatch, computeDgEuroRoundStats,
   dgEuroRoundsPlayed, findDgEuroLeader, computeDgEuroHoleScore, getDgEuroCurrentRoundStat, convertDgEuroTeeTime, DgEuroLiveModel,
+  diagnoseDgEuroRoundStatsGap,
 } from "../../../lib/dgEuroLiveModel";
 
 const SYNC_LOCK_MS = 45000;
@@ -955,6 +956,19 @@ export async function GET() {
             } else if (parsed.label === "PARS") {
               bet.stat = dpwtStats.pars;
             }
+          } else if (
+            (parsed.label === "BIRDIES" || parsed.label === "BOGEYS" || parsed.label === "PARS") &&
+            dpwtRoundNum
+          ) {
+            // This is the exact gap that made tonight's birdies stall
+            // impossible to diagnose without a manual capture: Score kept
+            // updating off the "today" fallback while Birdies silently sat
+            // at its last value with nothing logged. Surface WHY hole data
+            // isn't available yet, right in the errors panel, instead of
+            // requiring a page-source pull to find out after the fact.
+            errors.push(
+              `${bet.player}: Birdies/Bogeys/Pars not updated this sync - ${diagnoseDgEuroRoundStatsGap(model, dpwtRow.playerNum, dpwtRoundNum)} (DP World Tour, DataGolf)`
+            );
           }
         }
 
