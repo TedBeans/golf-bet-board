@@ -845,11 +845,25 @@ export async function GET() {
             errors.push(`${bet.t}: couldn't find a tournament leader (DP World Tour)`);
             continue;
           }
-          const leaderStat = getDpwtRoundStat(model, leader.player.displayName, null);
-          bet.thru = leaderStat?.thru ?? null;
+          // Cumulative tournament thru, not just the current round's -
+          // deliberately NOT summing hole-by-hole across rounds here
+          // (player_scores doesn't reliably retain prior rounds, see the
+          // getDgEuroCurrentRoundStat header for the real case that broke
+          // that approach). Instead: leader.player.round already says
+          // which round current thru belongs to, so completed prior
+          // rounds are assumed full (18 each) - no dependency on
+          // player_scores retaining anything beyond what's already
+          // trusted for the current round.
+          const roundThru =
+            typeof leader.player.thru === "number" ? leader.player.thru : leader.player.thru === "F" ? 18 : null;
+          const cumulativeThru =
+            leader.player.round !== null && roundThru !== null
+              ? (leader.player.round - 1) * 18 + roundThru
+              : roundThru;
+          bet.thru = cumulativeThru;
           bet.stat = leader.totalToPar;
           bet.auto = {
-            thru: leaderStat?.thru ?? null,
+            thru: cumulativeThru,
             scoreToPar: leader.totalToPar,
             birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
             updatedAt: new Date().toISOString(),
@@ -972,11 +986,16 @@ export async function GET() {
             errors.push(`${bet.t}: couldn't find a tournament leader (theopen)`);
             continue;
           }
-          const leaderStats = computeOpenStats(leader.player, roundNumberFromLabel(bet.r));
-          bet.thru = leaderStats.thru;
+          // roundNumber: null → cumulative across every round played so
+          // far (holesPlayed), same convention getOpenRoundStat already
+          // uses for tournament-wide views - NOT roundNumberFromLabel(bet.r),
+          // which would only give this one round's holes and silently
+          // pace a 72-hole bet against 18.
+          const leaderStats = computeOpenStats(leader.player, null);
+          bet.thru = leaderStats.holesPlayed;
           bet.stat = leader.totalToPar;
           bet.auto = {
-            thru: leaderStats.thru,
+            thru: leaderStats.holesPlayed,
             scoreToPar: leader.totalToPar,
             birdies: null, bogeys: null, pars: null, eagles: null, doubleBogeys: null, gir: null, fairways: null,
             updatedAt: new Date().toISOString(),
@@ -1079,10 +1098,17 @@ export async function GET() {
           errors.push(`${bet.t}: couldn't find a tournament leader`);
           continue;
         }
-        bet.thru = leader.thru;
+        // Pace this against holes played across the WHOLE tournament, not
+        // just the leader's current round - leader.thru is only the
+        // current-round figure (e.g. 18 after a finished R2), which would
+        // silently pace a 72-hole bet against 18 holes. getPgaRoundStat's
+        // null-roundNum branch already does the real cumulative-thru sum
+        // (used elsewhere for the same reason) - reuse it here.
+        const leaderCumulative = await getPgaRoundStat(tournamentId, players, leader.displayName, null);
+        bet.thru = leaderCumulative?.thru ?? leader.thru;
         bet.stat = leader.total;
         bet.auto = {
-          thru: leader.thru,
+          thru: leaderCumulative?.thru ?? leader.thru,
           scoreToPar: leader.total,
           birdies: null,
           bogeys: null,

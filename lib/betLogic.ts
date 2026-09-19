@@ -1,5 +1,10 @@
 export const HOLES_IN_ROUND = 18;
 export const HOLES_IN_NINE = 9;
+// Standard 72-hole (4-round) event, same assumption already hardcoded
+// elsewhere in the sync route (FINAL_ROUND = 4 for tournament-long personal
+// plays) - used to pace a tournament-wide winning-score bet against the
+// leader's cumulative holes played, not just their current round's holes.
+export const HOLES_IN_TOURNAMENT = 72;
 
 import { Bet } from "./seed";
 import { positionRank } from "./positions";
@@ -179,16 +184,22 @@ export function trend(parsed: ParsedBet, stat: number | null, thru: number | nul
   return "neutral";
 }
 
-const PACE_LABELS = ["GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "SCORE"];
+const PACE_LABELS = ["GIR", "BIRDIES", "BOGEYS", "PARS", "FAIRWAYS", "SCORE", "WINNER_SCORE"];
 
 // For count-based bets (greens/birdies/bogeys/pars) and round score, compares
 // the pace you're actually keeping (stat so far ÷ holes played) against the
 // pace you'd need to sustain to hit the target (target ÷ holes) - a 3-point
 // buffer either side of that required pace gives green/yellow/red instead of
 // just green/red, so you get an early read well before the round's worst/
-// best-case bound would otherwise kick in. The tournament-winner bet is the
-// one thing that still falls back to the simpler trend() below, since a
-// field-wide "winning score" has no fixed target of its own to pace against.
+// best-case bound would otherwise kick in. WINNER_SCORE (tournament winning
+// score) paces the same way, against the whole 72-hole event rather than one
+// round - but it's the field leader's pace, not any specific bet's own
+// player, and the caller MUST pass the leader's cumulative holes played
+// across the whole tournament as `thru` (not just their current round's
+// thru) or this silently paces against the wrong denominator. See
+// getPgaRoundStat/getDpwtRoundStat's null-roundNum branch and
+// computeOpenStats(player, null) for the cumulative-thru sources already
+// used elsewhere in the sync route for exactly this reason.
 export function smartTrend(
   parsed: ParsedBet,
   stat: number | null,
@@ -228,7 +239,14 @@ export function trendClassName(
   holesTotal?: number
 ): string {
   const effectiveHolesTotal =
-    holesTotal ?? (parsed.segment ? HOLES_IN_NINE : (parsed.label === "FAIRWAYS" ? 14 : HOLES_IN_ROUND));
+    holesTotal ??
+    (parsed.label === "WINNER_SCORE"
+      ? HOLES_IN_TOURNAMENT
+      : parsed.segment
+      ? HOLES_IN_NINE
+      : parsed.label === "FAIRWAYS"
+      ? 14
+      : HOLES_IN_ROUND);
   if (PACE_LABELS.includes(parsed.label)) {
     return `pace-${smartTrend(parsed, stat, thru, effectiveHolesTotal)}`;
   }
