@@ -138,6 +138,19 @@ export function parseBetType(text: string): ParsedBet {
     const val = /^E$/i.test(m[1]) ? 0 : parseFloat(m[1]);
     return { type: "min", label: "WINNER_SCORE", target: val, targetDisplay: "≥ " + (/^E$/i.test(m[1]) ? "E" : m[1]) };
   }
+  // Team match-play points total (Presidents Cup/Ryder Cup style, e.g.
+  // "Team USA Total Points Over 16.5") - which team is stored in b.player
+  // ("Team USA"), same pattern as WINNER_SCORE storing the field leader in
+  // player="Field", so the phrase itself only needs the number. No live
+  // data source exists for this yet (unlike WINNER_SCORE, which at least
+  // gets a leader's score auto-tracked) - always graded by hand, see the
+  // autoGradeStatus/projectOutcome exclusions below.
+  if ((m = t.match(/^points\s+over\s+(\d+(?:\.\d+)?)$/i))) {
+    return { type: "min", label: "TEAM_POINTS", target: parseFloat(m[1]), targetDisplay: "≥ " + m[1] };
+  }
+  if ((m = t.match(/^points\s+under\s+(\d+(?:\.\d+)?)$/i))) {
+    return { type: "max", label: "TEAM_POINTS", target: parseFloat(m[1]), targetDisplay: "≤ " + m[1] };
+  }
   // Single-hole outcome props ("Casey Jarvis Hole Score - Hole 1: Birdie
   // or Better") - a real DraftKings market, distinct from every other bet
   // type here: those all grade off a round-wide stat (total birdies,
@@ -307,6 +320,7 @@ export function friendlyLabel(label: string, segment?: "front9" | "back9", holeN
     case "PARS": return "Pars";
     case "HOLE_SCORE": return "Hole Score";
     case "WINNER_SCORE": return "Tournament Score";
+    case "TEAM_POINTS": return "Points";
     case "WINNER": return "Winner";
     case "TOP_N": return "Top N";
     case "MAKE_CUT": return "Make Cut";
@@ -331,7 +345,7 @@ export function autoGradeStatus(
   holesTotal = 18
 ): "hit" | "miss" | null {
   if (parsed.type === "generic") return null;
-  if (parsed.label === "WINNER_SCORE") return null; // always graded by hand
+  if (parsed.label === "WINNER_SCORE" || parsed.label === "TEAM_POINTS") return null; // always graded by hand
   if (stat === null || stat === undefined) return null;
   if (parsed.target === null || parsed.target === undefined) return null;
   if (thru === null || thru === undefined) return null;
@@ -514,7 +528,7 @@ export function projectOutcome(parsed: ParsedBet, bet: Bet, cutLine?: number | n
   // field-wide record, or "who holds the lowest round so far" rather than
   // a yes/no line), so there's nothing to meaningfully project. Excluded
   // rather than guessed.
-  if (parsed.label === "WINNER_SCORE" || parsed.label === "LOW_ROUND") return null;
+  if (parsed.label === "WINNER_SCORE" || parsed.label === "LOW_ROUND" || parsed.label === "TEAM_POINTS") return null;
 
   if (parsed.label === "WINNER" || parsed.label === "R1_LEADER") {
     const pos = positionRank(auto?.position ?? null);

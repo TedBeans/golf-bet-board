@@ -81,6 +81,17 @@ export default function AdminPage() {
   const [winnerWagerDollars, setWinnerWagerDollars] = useState("");
   const [winnerDate, setWinnerDate] = useState(() => nowInCentral().dateStr);
   const [winnerMsg, setWinnerMsg] = useState("");
+  // Team match-play points total (Presidents Cup/Ryder Cup) - same shape
+  // as the Winning Score form above, minus the strokes-to-par conversion
+  // step, since a points total has no course par to convert against.
+  const [teamPointsTournament, setTeamPointsTournament] = useState("");
+  const [teamPointsTeamName, setTeamPointsTeamName] = useState("");
+  const [teamPointsSide, setTeamPointsSide] = useState<"Under" | "Over">("Over");
+  const [teamPointsLine, setTeamPointsLine] = useState("");
+  const [teamPointsOdds, setTeamPointsOdds] = useState("");
+  const [teamPointsWagerDollars, setTeamPointsWagerDollars] = useState("");
+  const [teamPointsDate, setTeamPointsDate] = useState(() => nowInCentral().dateStr);
+  const [teamPointsMsg, setTeamPointsMsg] = useState("");
 
   const [forceMsg, setForceMsg] = useState("");
   const [tab, setTab] = useState<"bets" | "tournaments" | "parlays">("bets");
@@ -807,6 +818,60 @@ export default function AdminPage() {
       });
   }
 
+  function submitTeamPointsBet() {
+    const line = parseFloat(teamPointsLine);
+    const dollars = parseFloat(teamPointsWagerDollars);
+    if (!teamPointsTournament || !teamPointsTeamName.trim() || isNaN(line) || !teamPointsOdds.trim() || isNaN(dollars)) {
+      setTeamPointsMsg("Fill in the tournament, team name, points line, odds, and wager first.");
+      return;
+    }
+    const phrase = teamPointsSide === "Over" ? `Points Over ${teamPointsLine}` : `Points Under ${teamPointsLine}`;
+
+    const newBet: Bet = {
+      id: "b_teampts_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+      t: teamPointsTournament,
+      r: "Team Points",
+      time: "",
+      player: teamPointsTeamName.trim(),
+      bet: phrase,
+      stat: null,
+      thru: null,
+      status: "pending",
+      autoEnabled: false, // no live data source for team match-play points yet - graded entirely by hand
+      auto: null,
+      oddsLine: `${teamPointsSide} ${teamPointsLine}`,
+      oddsPrice: teamPointsOdds.trim(),
+      oddsUnits: String(Math.round((dollars / (settings.unitSizeDollars || 50)) * 100) / 100),
+      loadedDate: teamPointsDate,
+    };
+
+    fetchFresh("/api/bets")
+      .then((r) => r.json())
+      .then((d) => {
+        const current: Bet[] = d.bets || [];
+        const merged = [...current, newBet];
+        return fetchFresh("/api/bets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ passcode, bets: merged }),
+        }).then((r) => ({ r, merged }));
+      })
+      .then(({ r, merged }) => {
+        if (r.ok) {
+          setBets(merged);
+          setTeamPointsMsg(`Added. No auto-tracking for this yet - update the stat box or WIN/LOSS by hand as the matches play out.`);
+          setTeamPointsTeamName("");
+          setTeamPointsLine("");
+          setTeamPointsOdds("");
+          setTeamPointsWagerDollars("");
+          setTeamPointsDate(nowInCentral().dateStr);
+        } else {
+          setTeamPointsMsg("Failed to save - check passcode.");
+        }
+        setTimeout(() => setTeamPointsMsg(""), 5000);
+      });
+  }
+
   function previewImport() {
     setImportMsg("");
     const parLookup = (t: string, segment?: "front9" | "back9") => {
@@ -1333,6 +1398,124 @@ export default function AdminPage() {
           Add bet
         </button>
         {winnerMsg && <div className="subline" style={{ marginTop: 8 }}>{winnerMsg}</div>}
+      </div>
+
+      <h1 style={{ marginTop: 36, marginBottom: 4 }}>Add a team points bet</h1>
+      <div className="subline" style={{ marginBottom: 12 }}>
+        For team match-play total-points lines (Presidents Cup, Ryder Cup).
+        No live data source for this yet, so it's never auto-tracked -
+        update the stat box or the WIN/IN PROGRESS/LOSS buttons by hand as
+        sessions finish.
+      </div>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <label style={{ display: "block", marginBottom: 10, fontSize: 12 }}>
+          Tournament
+          <select
+            value={teamPointsTournament}
+            onChange={(e) => setTeamPointsTournament(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+              padding: "8px 10px", borderRadius: 3,
+            }}
+          >
+            <option value="">— choose —</option>
+            {tournaments.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </label>
+
+        <label style={{ display: "block", marginBottom: 10, fontSize: 12 }}>
+          Team name (e.g. Team USA)
+          <input
+            placeholder="Team USA"
+            value={teamPointsTeamName}
+            onChange={(e) => setTeamPointsTeamName(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+              padding: "8px 10px", borderRadius: 3,
+            }}
+          />
+        </label>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <label style={{ flex: 1, fontSize: 12 }}>
+            Side
+            <select
+              value={teamPointsSide}
+              onChange={(e) => setTeamPointsSide(e.target.value as "Under" | "Over")}
+              style={{
+                width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                padding: "8px 10px", borderRadius: 3,
+              }}
+            >
+              <option value="Over">Over</option>
+              <option value="Under">Under</option>
+            </select>
+          </label>
+          <label style={{ flex: 1, fontSize: 12 }}>
+            Line (points, e.g. 16.5)
+            <input
+              placeholder="16.5"
+              value={teamPointsLine}
+              onChange={(e) => setTeamPointsLine(e.target.value)}
+              style={{
+                width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                padding: "8px 10px", borderRadius: 3,
+              }}
+            />
+          </label>
+        </div>
+
+        <label style={{ display: "block", marginBottom: 10, fontSize: 12 }}>
+          Odds (e.g. -150)
+          <input
+            placeholder="-150"
+            value={teamPointsOdds}
+            onChange={(e) => setTeamPointsOdds(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+              padding: "8px 10px", borderRadius: 3,
+            }}
+          />
+        </label>
+
+        <label style={{ display: "block", marginBottom: 10, fontSize: 12 }}>
+          Wager ($)
+          <input
+            type="number"
+            placeholder="25"
+            value={teamPointsWagerDollars}
+            onChange={(e) => setTeamPointsWagerDollars(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+              padding: "8px 10px", borderRadius: 3,
+            }}
+          />
+        </label>
+
+        <label style={{ display: "block", marginBottom: 12, fontSize: 12 }}>
+          Date
+          <input
+            type="date"
+            value={teamPointsDate}
+            onChange={(e) => setTeamPointsDate(e.target.value)}
+            style={{
+              width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+              color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+              padding: "8px 10px", borderRadius: 3,
+            }}
+          />
+        </label>
+
+        <button className="add-btn-inline" onClick={submitTeamPointsBet} style={{ width: "100%", padding: 10 }}>
+          Add bet
+        </button>
+        {teamPointsMsg && <div className="subline" style={{ marginTop: 8 }}>{teamPointsMsg}</div>}
       </div>
 
       <h1 style={{ marginTop: 36, marginBottom: 4 }}>TedBeans Plays</h1>
