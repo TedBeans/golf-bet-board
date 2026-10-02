@@ -177,10 +177,14 @@ export default function AdminPage() {
 
   function tryUnlock() {
     setLockError("");
-    fetchFresh("/api/mapping", {
+    // Dedicated, read-only passcode check (/api/auth) - deliberately NOT
+    // /api/mapping, which does a full overwrite of the tournament mapping
+    // store on every successful POST. Checking a passcode is never allowed
+    // to double as a destructive write; see app/api/auth/route.ts.
+    fetchFresh("/api/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ passcode, mapping }),
+      body: JSON.stringify({ passcode }),
     }).then((r) => {
       if (r.ok) {
         setUnlocked(true);
