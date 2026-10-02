@@ -127,6 +127,8 @@ export default function AdminPage() {
   // instead of forcing a long scroll through every field of every
   // tournament ever added just to find the one you want.
   const [expandedTournaments, setExpandedTournaments] = useState<Set<string>>(new Set());
+  const [importMappingText, setImportMappingText] = useState("");
+  const [importMappingMsg, setImportMappingMsg] = useState("");
   const [parlayLabel, setParlayLabel] = useState("");
   const [parlayOdds, setParlayOdds] = useState("");
   const [parlayWagerDollars, setParlayWagerDollars] = useState("");
@@ -202,6 +204,42 @@ export default function AdminPage() {
     if (!name || mapping.tournaments[name]) return;
     setMapping((m) => ({ ...m, tournaments: { ...m.tournaments, [name]: { pgaId: "" } } }));
     setNewTournName("");
+  }
+
+  // Bulk-restore path for rebuilding the mapping after it's been wiped (or
+  // for seeding a batch of tournaments at once) without clicking through
+  // the full form once per tournament. Expects {"Tournament Name": {field:
+  // value, ...}, ...} - a FIELD-LEVEL merge, same as updateTourn: only the
+  // keys present in the pasted object are touched for that tournament, so
+  // re-pasting the same batch is always safe, and pasting a partial update
+  // for a tournament that already has other fields set (cutLine, a dpwt
+  // sub-object, etc.) never wipes what's already there. Only updates local
+  // state - still requires Save Mapping below to persist, same as every
+  // other edit on this tab.
+  function importMappingJson() {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(importMappingText);
+    } catch {
+      setImportMappingMsg("Couldn't parse that as JSON - check for a stray comma or missing quote.");
+      return;
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      setImportMappingMsg('Expected an object like {"Tournament Name": {"venue": "...", ...}, ...}.');
+      return;
+    }
+    const entries = Object.entries(parsed as Record<string, unknown>);
+    setMapping((m) => {
+      const nextTournaments = { ...m.tournaments };
+      for (const [name, fields] of entries) {
+        if (!fields || typeof fields !== "object") continue;
+        nextTournaments[name] = { ...nextTournaments[name], pgaId: nextTournaments[name]?.pgaId ?? "", ...(fields as any) };
+      }
+      return { ...m, tournaments: nextTournaments };
+    });
+    setImportMappingMsg(`Merged ${entries.length} tournament(s) - click Save Mapping below to persist.`);
+    setImportMappingText("");
+    setTimeout(() => setImportMappingMsg(""), 6000);
   }
 
   function removeTournament(name: string) {
@@ -1831,6 +1869,31 @@ export default function AdminPage() {
           }}
         />
         <button className="add-btn-inline" onClick={addTournament}>Add</button>
+      </div>
+
+      <h1 style={{ marginBottom: 4 }}>Bulk-restore mapping</h1>
+      <div className="subline" style={{ marginBottom: 12 }}>
+        Paste {`{"Tournament Name": {"venue": "...", "roundPar": 72, ...}, ...}`} to
+        set several tournaments' fields at once instead of clicking through
+        the form per tournament. Only the fields you include are touched -
+        anything already set on a field you don't mention (cutLine, a dpwt
+        sub-object, etc.) is left alone, so this is always safe to re-run.
+        Still requires Save Mapping below to actually persist.
+      </div>
+      <textarea
+        placeholder='{"Example Championship": {"venue": "Example Club", "location": "Example, ST", "startDate": "2026-01-01", "endDate": "2026-01-04", "dateRange": "January 1-4, 2026", "latitude": 0, "longitude": 0, "roundPar": 72, "dataSource": "pgatour", "courseType": "parkland"}}'
+        value={importMappingText}
+        onChange={(e) => setImportMappingText(e.target.value)}
+        rows={8}
+        style={{
+          width: "100%", marginBottom: 8, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+          color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 12,
+          padding: "8px 10px", borderRadius: 3, resize: "vertical",
+        }}
+      />
+      <div style={{ marginBottom: 24 }}>
+        <button className="add-btn-inline" onClick={importMappingJson}>Merge into mapping</button>
+        {importMappingMsg && <div className="subline" style={{ marginTop: 8 }}>{importMappingMsg}</div>}
       </div>
 
       <h1 style={{ marginBottom: 4 }}>Auto-sync setup</h1>
