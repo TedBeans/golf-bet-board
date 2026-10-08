@@ -1157,7 +1157,7 @@ export default function Page() {
                           </div>
                           <div className="sc-cell">
                             <div className="sc-label">{friendlyLabel(parsed.label, parsed.segment)}</div>
-                            {parsed.label === "SCORE" ? (
+                            {parsed.label === "SCORE" || parsed.label === "WINNER_SCORE" ? (
                               <input
                                 disabled={!unlocked}
                                 className={`sc-input ${trendClassName(parsed, b.stat, b.thru)}`}
