@@ -216,10 +216,32 @@ export function diagnoseDgEuroRoundStatsGap(model: DgEuroLiveModel, playerNum: s
 // Field leader by cumulative total-to-par (self-computed, same reasoning
 // as computeDgEuroTotalToPar) - used for tournament-long "winning score"
 // bets, mirroring findLeader/findOpenLeader's role for the other tours.
+//
+// computeDgEuroTotalToPar returning null means NO round for this player
+// produced a usable hole-by-hole total - not necessarily "this player has
+// no score," just that the hole-by-hole detail hasn't posted yet (the
+// same lag getDgEuroCurrentRoundStat already falls back for on individual
+// round-level bets - see its header comment) or isn't resolvable for some
+// other reason (e.g. a course-code mismatch). Unlike that per-round
+// fallback, this one previously had NONE at all: if every player in the
+// field hit that gap at once (realistic early/mid-round, especially right
+// after a new round starts), the whole leader search came back with
+// nothing and the bet just sat at null indefinitely with no error logged
+// to explain why. Falling back to the blob's own current_score field -
+// DataGolf's live cumulative total, documented on DgEuroPlayerRow as
+// verified reliable - only when the precise hole-by-hole total can't be
+// computed at all keeps the same precision-first precedence as the
+// round-level fallback, while no longer leaving the bet permanently blank
+// during a hole-by-hole lag.
+//
+// Known caveat, not yet hit in practice: a player with SOME rounds
+// resolving via hole data and others silently failing gets a partial sum
+// here, not null - so this fallback won't catch that case. Revisit if a
+// real instance of it ever shows up.
 export function findDgEuroLeader(model: DgEuroLiveModel): { player: DgEuroPlayerRow; totalToPar: number } | null {
   let best: { player: DgEuroPlayerRow; totalToPar: number } | null = null;
   for (const p of model.players) {
-    const total = computeDgEuroTotalToPar(model, p.playerNum);
+    const total = computeDgEuroTotalToPar(model, p.playerNum) ?? p.currentScore;
     if (total === null) continue;
     if (best === null || total < best.totalToPar) best = { player: p, totalToPar: total };
   }
