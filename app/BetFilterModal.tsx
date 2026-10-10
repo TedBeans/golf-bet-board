@@ -1,7 +1,7 @@
 "use client";
 
 import { Bet } from "../lib/seed";
-import { parseBetType, formatScore, friendlyLabel } from "../lib/betLogic";
+import { parseBetType, formatScore, friendlyLabel, trendClassName } from "../lib/betLogic";
 
 type Kind = "win" | "loss" | "live" | "tbd";
 
@@ -193,6 +193,14 @@ export default function BetFilterModal({
                 // makes for the in-progress line elsewhere on this page.
                 const valueDisplay =
                   parsed.label === "SCORE" || parsed.label === "WINNER_SCORE" ? formatScore(b.stat) : b.stat ?? "—";
+                // A WIN/LOSS list is already settled - the modal's own
+                // green/red theme says everything. A LIVE (or Projecting)
+                // row is still moving though, so the value itself gets the
+                // same pace-aware red/yellow/green used on the main board
+                // (trendClassName - see lib/betLogic.ts) rather than a flat
+                // amber, so you can tell who's actually on pace to hit
+                // their number without leaving this list.
+                const paceClass = b.status === "live" ? trendClassName(parsed, b.stat, b.thru) : null;
                 return (
                   <div
                     key={b.id}
@@ -212,7 +220,10 @@ export default function BetFilterModal({
                         </div>
                       </div>
                       <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                        <div style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 16, color: theme.accent }}>
+                        <div
+                          className={paceClass ?? undefined}
+                          style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, fontSize: 16, color: paceClass ? undefined : theme.accent }}
+                        >
                           {valueDisplay}{b.thru !== null && b.thru !== undefined ? <span style={{ color: "var(--cream-dim)", fontWeight: 400, fontSize: 12 }}> thru {b.thru}</span> : ""}
                         </div>
                         {b.oddsPrice && (
