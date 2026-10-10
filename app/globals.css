@@ -107,6 +107,20 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
 .fs1{ top:-30%; opacity:0.55; animation: sheetdrift 26s linear infinite; }
 .fs2{ top:5%; opacity:0.4; animation: sheetdrift 34s linear infinite reverse; animation-delay: -9s; }
 .fs3{ top:40%; opacity:0.45; animation: sheetdrift 30s linear infinite; animation-delay: -18s; }
+/* BetFilterModal (the Win/Loss/Live/TBD pop-outs) - entrance animation and
+   a soft pulse for the live status dot, kept global since this is the
+   first modal in the project to want either. */
+@keyframes filterModalIn{
+  from{ opacity:0; transform: translateY(10px) scale(0.97); }
+  to{ opacity:1; transform: translateY(0) scale(1); }
+}
+.filter-modal-card{ animation: filterModalIn 0.16s cubic-bezier(0.2,0.8,0.3,1); }
+@keyframes statusDotPulse{
+  0%, 100%{ box-shadow: 0 0 0 0 currentColor; opacity:1; }
+  50%{ box-shadow: 0 0 0 4px transparent; opacity:0.75; }
+}
+.filter-modal-dot.live{ animation: statusDotPulse 1.6s ease-in-out infinite; }
+
 @keyframes sheetdrift{
   0%{ transform: translateX(-65%); }
   100%{ transform: translateX(65%); }
