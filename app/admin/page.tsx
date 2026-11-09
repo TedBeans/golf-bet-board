@@ -62,6 +62,9 @@ export default function AdminPage() {
   const [bets, setBets] = useState<Bet[]>([]);
   const [mapping, setMapping] = useState<Mapping>(EMPTY_MAPPING);
   const [saveMsg, setSaveMsg] = useState("");
+  const [tournRenameFrom, setTournRenameFrom] = useState("");
+  const [tournRenameTo, setTournRenameTo] = useState("");
+  const [tournRenameMsg, setTournRenameMsg] = useState("");
 
   const [importText, setImportText] = useState("");
   const [betsDate, setBetsDate] = useState(() => nowInCentral().dateStr);
@@ -801,6 +804,52 @@ export default function AdminPage() {
           fetchFresh("/api/parlay-archive").then((r) => r.json()).then((d2) => setParlayArchiveList(d2.archive || []));
         }
         setTimeout(() => setSaveMsg(""), 8000);
+      });
+  }
+
+  // Renames a tournament everywhere it's stored as a name - bets, archive,
+  // both parlay collections, and its mapping.tournaments config (pgaId,
+  // dpwt ids, course facts, dates, etc. all move over to the new name
+  // intact). For when the tournament itself changes name mid-season (a
+  // sponsorship swap, a venue-driven rebrand) rather than the
+  // punctuation-only cleanup fixTournamentNamePunctuation handles above.
+  function renameTournament() {
+    const from = tournRenameFrom.trim();
+    const to = tournRenameTo.trim();
+    if (!from || !to) {
+      setTournRenameMsg("Pick the tournament to rename and type the new name.");
+      return;
+    }
+    fetchFresh("/api/rename-tournament", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode, from, to }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.ok) {
+          setTournRenameMsg(d.error || "Rename failed - check passcode.");
+          setTimeout(() => setTournRenameMsg(""), 4000);
+          return;
+        }
+        const totalChanged = d.betsChanged + d.archiveChanged + d.parlayLegsChanged;
+        setTournRenameMsg(
+          `Renamed "${d.from}" -> "${d.to}": ${totalChanged} record(s)` +
+            (d.mappingMoved ? ", config moved over" : d.mappingSkipped ? `, but "${d.to}" already had its own config so the old config was dropped` : "") +
+            "."
+        );
+        setTournRenameFrom("");
+        setTournRenameTo("");
+        // Same reasoning as fixTournamentNamePunctuation: this can touch
+        // bets, archive, both parlay collections, and the mapping - just
+        // refetch everything rather than patching four shapes of local
+        // state by hand.
+        fetchFresh("/api/bets").then((r) => r.json()).then((d2) => setBets(d2.bets || []));
+        fetchFresh("/api/archive").then((r) => r.json()).then((d2) => setArchive(d2.archive || []));
+        fetchFresh("/api/parlays").then((r) => r.json()).then((d2) => setLiveParlays(d2.parlays || []));
+        fetchFresh("/api/parlay-archive").then((r) => r.json()).then((d2) => setParlayArchiveList(d2.archive || []));
+        fetchFresh("/api/mapping").then((r) => r.json()).then((d2) => setMapping(d2.mapping || EMPTY_MAPPING));
+        setTimeout(() => setTournRenameMsg(""), 8000);
       });
   }
 
@@ -1658,6 +1707,40 @@ export default function AdminPage() {
           this merges them by stripping the stray trailing punctuation. Safe
           to click even if nothing needs fixing.
         </span>
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>Rename a tournament</div>
+        <div className="subline" style={{ marginBottom: 8 }}>
+          For when the tournament itself changes name mid-season (sponsorship
+          swap, venue rebrand, etc.) - e.g. "Good Good Championship" becoming
+          "Austin Championship". Renames it everywhere: every bet, archived
+          bet, and parlay leg, plus its saved config in the Tournaments tab
+          (pgaId, dates, course facts, DP World Tour ids - all of it moves
+          over to the new name).
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <select
+            value={tournRenameFrom}
+            onChange={(e) => setTournRenameFrom(e.target.value)}
+            style={{ minWidth: 220 }}
+          >
+            <option value="">Select tournament...</option>
+            {tournaments.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <span className="subline">→</span>
+          <input
+            type="text"
+            placeholder="New tournament name"
+            value={tournRenameTo}
+            onChange={(e) => setTournRenameTo(e.target.value)}
+            style={{ minWidth: 220 }}
+          />
+          <button className="add-btn-inline" onClick={renameTournament} disabled={!tournRenameFrom || !tournRenameTo.trim()}>
+            Rename
+          </button>
+        </div>
+        {tournRenameMsg && <div className="subline" style={{ marginTop: 6 }}>{tournRenameMsg}</div>}
       </div>
 
       {Object.entries(
