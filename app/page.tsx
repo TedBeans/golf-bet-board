@@ -636,7 +636,7 @@ export default function Page() {
         )}
       </header>
 
-      <main>
+      <main className="desktop-grid-root">
         {regularBets.length === 0 && (
           <>
             <div className="empty">

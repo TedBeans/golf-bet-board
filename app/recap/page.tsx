@@ -190,6 +190,7 @@ function ParlayArchiveList({ parlays }: { parlays: Parlay[] }) {
           <span className={totalUnits >= 0 ? "tsum win" : "tsum loss"}>{formatUnits(totalUnits)}</span>
         </div>
       </div>
+      <div className="desktop-grid">
       {parlays
         .slice()
         .sort((a, b) => (b.archivedAt || "").localeCompare(a.archivedAt || ""))
@@ -245,6 +246,7 @@ function ParlayArchiveList({ parlays }: { parlays: Parlay[] }) {
             </div>
           );
         })}
+      </div>
     </div>
   );
 }
@@ -472,6 +474,7 @@ export default function RecapPage() {
             {selectedDate && (
               <div>
                 <div className="round-label">{selectedDate}</div>
+                <div className="desktop-grid">
                 {Object.keys(selectedGroups).map((key) => {
                   const [t, r] = key.split("|||");
                   const groupBets = selectedGroups[key];
@@ -490,6 +493,7 @@ export default function RecapPage() {
                     </div>
                   );
                 })}
+                </div>
               </div>
             )}
           </>
@@ -529,6 +533,7 @@ export default function RecapPage() {
                   <div className="subline" style={{ marginBottom: 8, fontSize: 12, color: "var(--gold-bright)" }}>
                     {tour.toUpperCase()}
                   </div>
+                  <div className="desktop-grid">
                   {byTour[tour].map((t) => {
               const bets = tournMap[t];
               const agg = aggregate(bets);
@@ -594,6 +599,7 @@ export default function RecapPage() {
                 </div>
               );
             })}
+                  </div>
                 </div>
               ));
             })()}
@@ -644,6 +650,7 @@ export default function RecapPage() {
                   <div className="subline" style={{ marginBottom: 8, fontSize: 12, color: "var(--gold-bright)" }}>
                     {tour.toUpperCase()}
                   </div>
+                  <div className="desktop-grid">
                   {byTour[tour].map((t) => {
               const tBets = personalTournMap[t];
               const isOpen = expandedTourn === `tedbeans:${t}`;
@@ -671,6 +678,7 @@ export default function RecapPage() {
                 </div>
               );
                   })}
+                  </div>
                 </div>
               ));
             })()}

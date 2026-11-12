@@ -1289,11 +1289,14 @@ export default function AdminPage() {
           }}
         />
       </label>
-      <button className="add-btn-inline" onClick={backfillMissingUnits} style={{ marginBottom: 12 }}>
-        Backfill missing units on existing bets
-      </button>
+      <div className="desktop-grid desktop-grid-tight" style={{ marginBottom: 12 }}>
+      <div style={{ padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 4, display: "flex", alignItems: "center" }}>
+        <button className="add-btn-inline" onClick={backfillMissingUnits}>
+          Backfill missing units on existing bets
+        </button>
+      </div>
 
-      <div style={{ marginBottom: 12, padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 4 }}>
+      <div style={{ padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 4 }}>
         <div className="subline" style={{ marginBottom: 8 }}>
           Fix a typo'd player name (live and archived bets) - edits the name in place, so parlays
           referencing that bet don't need to be rebuilt.
@@ -1323,6 +1326,7 @@ export default function AdminPage() {
           />
           <button className="add-btn-inline" onClick={renamePlayer}>Rename</button>
         </div>
+      </div>
       </div>
       <textarea
         value={importText}
@@ -1697,7 +1701,8 @@ export default function AdminPage() {
         still works exactly the same as a parlay leg.
       </div>
 
-      <div style={{ marginBottom: 20 }}>
+      <div className="desktop-grid desktop-grid-tight" style={{ marginBottom: 20 }}>
+      <div style={{ padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 4 }}>
         <button className="add-btn-inline" onClick={fixTournamentNamePunctuation}>
           Merge duplicate tournament buckets (punctuation)
         </button>
@@ -1709,7 +1714,7 @@ export default function AdminPage() {
         </span>
       </div>
 
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 4 }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Rename a tournament</div>
         <div className="subline" style={{ marginBottom: 8 }}>
           For when the tournament itself changes name mid-season (sponsorship
@@ -1741,6 +1746,7 @@ export default function AdminPage() {
           </button>
         </div>
         {tournRenameMsg && <div className="subline" style={{ marginTop: 6 }}>{tournRenameMsg}</div>}
+      </div>
       </div>
 
       {Object.entries(
@@ -1819,6 +1825,7 @@ export default function AdminPage() {
         decided. Use this only if one will never fully resolve (withdrawal,
         etc.) and you want to file it away manually.
       </div>
+      <div className="desktop-grid">
       {roundGroups.map((g) => (
         <div key={`${g.t}|||${g.r}`} className="card" style={{ marginBottom: 10 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1848,6 +1855,7 @@ export default function AdminPage() {
           </div>
         </div>
       ))}
+      </div>
       {forceMsg && <div className="subline" style={{ marginBottom: 8 }}>{forceMsg}</div>}
 
       <h1 style={{ marginTop: 36, marginBottom: 4 }}>Archived rounds</h1>
@@ -1859,6 +1867,7 @@ export default function AdminPage() {
         got force-archived under the wrong tournament or round name.
       </div>
       {archiveGroups.length === 0 && <div className="subline">Nothing archived yet.</div>}
+      <div className="desktop-grid">
       {Object.entries(
         archiveGroups.reduce((acc: Record<string, typeof archiveGroups>, g) => {
           (acc[g.t] = acc[g.t] || []).push(g);
@@ -1928,6 +1937,7 @@ export default function AdminPage() {
           </div>
         );
       })}
+      </div>
       </>
       )}
 
@@ -1997,6 +2007,7 @@ export default function AdminPage() {
         </span>
       </div>
 
+      <div className="desktop-grid">
       {tournaments.map((tourn) => {
         const tm = mapping.tournaments[tourn];
         const isSuspended = !!tm?.suspendedType && tm.suspendedType !== "none";
@@ -2446,6 +2457,7 @@ export default function AdminPage() {
           </div>
         );
       })}
+      </div>
 
       <button className="add-btn-inline" onClick={saveMapping} style={{ width: "100%", padding: 10 }}>
         Save mapping
@@ -2638,6 +2650,7 @@ export default function AdminPage() {
       {(liveParlays.length > 0 || parlayArchiveList.length > 0) && (
         <>
           <div className="round-label">All parlays (tap name or odds to edit)</div>
+          <div className="desktop-grid">
           {[...liveParlays, ...parlayArchiveList].map((p) => {
             return (
             <div key={p.id} className="card" style={{ marginBottom: 8 }}>
@@ -2692,6 +2705,7 @@ export default function AdminPage() {
             </div>
             );
           })}
+          </div>
         </>
       )}
       </>

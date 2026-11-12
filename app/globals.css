@@ -69,6 +69,69 @@ h1 span{ color: var(--gold-bright); }
 .lock-error{ color: var(--clay); font-size:10px; }
 
 main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
+
+/* Desktop layout. Every page keeps the ~640px phone-width column as its
+   base (nothing below changes at mobile/tablet widths) - these rules
+   only kick in once there's a real monitor's worth of space, and are
+   additive/opt-in per page rather than one blanket rule, since some
+   pages (the live board, Admin's various per-item card lists) are flat
+   lists of same-weight cards that reflow nicely into columns, while
+   others (Admin's linear paste-and-preview forms) are a single
+   top-to-bottom workflow that should just get wider, not column-ized. */
+
+/* Baseline: raise every page's ceiling so long paragraphs/textareas
+   (Admin especially) aren't stuck at phone width even when nothing else
+   on the page opts into the grid treatment below. */
+@media (min-width: 860px){
+  main{ max-width: 920px; }
+}
+@media (min-width: 1300px){
+  main{ max-width: 1080px; }
+}
+
+/* Opt-in for a page whose entire <main> is a flat list of same-weight
+   cards (the live board's per-tournament blocks). Reflows them into real
+   side-by-side columns instead of one long phone-width column. Uses
+   auto-fit/minmax so it collapses back to a single (now-wider) column on
+   its own as the window narrows - no separate "undo the grid" media
+   query needed. Rows aren't height-matched across columns (plain CSS
+   grid, not masonry) - fine here since a short card next to a tall one
+   just leaves empty space beside it rather than every row snapping to
+   the tallest card's height. */
+@media (min-width: 900px){
+  main.desktop-grid-root{
+    max-width: 1680px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+    align-items: start;
+    gap: 22px 30px;
+  }
+  main.desktop-grid-root > *{ min-width: 0; } /* grid items can shrink below their content's natural width */
+}
+
+/* Same idea, scoped to one list INSIDE a page rather than the whole
+   <main> - for Admin, where most of the page is a linear form but
+   specific sections (the round/tournament/parlay card lists) are flat
+   card lists that benefit the same way. Add this class to the element
+   that directly wraps the repeated cards. */
+.desktop-grid{ margin-bottom: 14px; }
+@media (min-width: 900px){
+  .desktop-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    align-items: start;
+    gap: 14px 20px;
+  }
+  .desktop-grid > *{ min-width: 0; margin-bottom: 0 !important; }
+}
+/* Tighter variant for small, compact action/utility boxes (not full
+   content cards) - Admin's Backfill/Fix-name/Rename-tournament/Merge
+   panels, which read better as 2-3 narrower boxes in a row than as
+   full-width cards. */
+@media (min-width: 900px){
+  .desktop-grid-tight{ grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); }
+  .desktop-grid-tight > *{ height: 100%; }
+}
 .tourn{ margin-bottom: 26px; position: relative; }
 .tourn-head{
   display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:6px 14px;
