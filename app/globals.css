@@ -89,30 +89,33 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
   main{ max-width: 1080px; }
 }
 
-/* Opt-in for a page whose entire <main> is a flat list of same-weight
-   cards (the live board's per-tournament blocks). Reflows them into real
-   side-by-side columns instead of one long phone-width column. Uses
-   auto-fit/minmax so it collapses back to a single (now-wider) column on
-   its own as the window narrows - no separate "undo the grid" media
-   query needed. Rows aren't height-matched across columns (plain CSS
-   grid, not masonry) - fine here since a short card next to a tall one
-   just leaves empty space beside it rather than every row snapping to
-   the tallest card's height. */
+/* The live board (page.tsx) gets a wider ceiling than the baseline above -
+   a tournament section's header/summary pills read fine running the full
+   width of a monitor, and the bet cards underneath fill that width via
+   .desktop-grid (below), rather than trying to fit whole tournaments
+   side by side. A single tournament used to be made a grid ITEM itself,
+   which stretched a lone tournament to the full container width and blew
+   out its cards' internal flex rows (player name and status buttons
+   stranded far apart); keeping each tournament a normal full-width
+   section and grid-ing the cards inside it instead avoids that. */
 @media (min-width: 900px){
-  main.desktop-grid-root{
-    max-width: 1680px;
-    display: grid;
-    /* Capped upper bound (not 1fr) on purpose - with only one or two
-       tournaments live at once (common), an uncapped 1fr column stretches
-       that lone card to the full container width, which blows out its
-       internal flex rows (player name and status button end up stranded
-       far apart with a huge dead gap between them) instead of just
-       leaving empty space to the right like a normal left-aligned list. */
-    grid-template-columns: repeat(auto-fit, minmax(460px, 680px));
-    align-items: start;
-    gap: 22px 30px;
-  }
-  main.desktop-grid-root > *{ min-width: 0; } /* grid items can shrink below their content's natural width */
+  main.board-main{ max-width: 1200px; }
+}
+@media (min-width: 1500px){
+  main.board-main{ max-width: 1400px; }
+}
+
+/* Admin's real content <main> carries a fixed 560px cap of its own (kept
+   as the mobile/tablet width - its forms read better a bit narrower than
+   640px) and used an inline style for it, which silently beat every rule
+   above regardless of viewport width. Moved that cap into this class so
+   the desktop breakpoints below can actually win out over it. */
+main.admin-main{ max-width: 560px; }
+@media (min-width: 860px){
+  main.admin-main{ max-width: 1000px; }
+}
+@media (min-width: 1300px){
+  main.admin-main{ max-width: 1200px; }
 }
 
 /* Same idea, scoped to one list INSIDE a page rather than the whole

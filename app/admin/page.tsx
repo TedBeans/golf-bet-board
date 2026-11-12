@@ -1230,7 +1230,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main style={{ maxWidth: 560 }}>
+    <main className="admin-main">
       <div style={{ marginBottom: 16 }}>
         <Link href="/" className="admin-link">← back to board</Link>
       </div>

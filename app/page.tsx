@@ -636,7 +636,7 @@ export default function Page() {
         )}
       </header>
 
-      <main className="desktop-grid-root">
+      <main className="board-main">
         {regularBets.length === 0 && (
           <>
             <div className="empty">
@@ -793,6 +793,7 @@ export default function Page() {
               return (
                 <div key={round}>
                   <div className="round-label">{round}</div>
+                  <div className="desktop-grid">
                   {items.map((b) => {
                     const parsed = parseBetType(b.bet);
                     const cls = trendClassName(parsed, b.stat, b.thru);
@@ -993,6 +994,7 @@ export default function Page() {
                       </div>
                     );
                   })}
+                  </div>
                 </div>
               );
             })}
@@ -1008,6 +1010,7 @@ export default function Page() {
                 Tracked separately from straight-bet units
               </span>
             </div>
+            <div className="desktop-grid">
             {regularParlays.map((p) => {
               const legStatuses = resolveLegStatuses(p.legs, bets, archive);
               const status = deriveParlayStatus(legStatuses);
@@ -1031,6 +1034,7 @@ export default function Page() {
                 </div>
               );
             })}
+            </div>
           </div>
         )}
 
@@ -1046,6 +1050,7 @@ export default function Page() {
             {Object.keys(personalGroups).map((tourn) => (
               <div key={tourn}>
                 <div className="round-label">{tourn}</div>
+                <div className="desktop-grid">
                 {personalGroups[tourn].map((b) => {
                   const parsed = parseBetType(b.bet);
                   const posRank = positionRank(b.auto?.position ?? null);
@@ -1239,12 +1244,14 @@ export default function Page() {
                     </div>
                   );
                 })}
+                </div>
               </div>
             ))}
 
             {personalParlays.length > 0 && (
               <div style={{ marginTop: 10 }}>
                 <div className="round-label">Parlays</div>
+                <div className="desktop-grid">
                 {personalParlays.map((p) => {
                   const legStatuses = resolveLegStatuses(p.legs, bets, archive);
                   const status = deriveParlayStatus(legStatuses);
@@ -1268,6 +1275,7 @@ export default function Page() {
                     </div>
                   );
                 })}
+                </div>
               </div>
             )}
           </div>
