@@ -394,7 +394,7 @@ export default function RecapPage() {
         {archive.length === 0 && <div className="empty">No resolved rounds yet - they'll show up here once a round finishes.</div>}
 
         {view === "calendar" && archive.length > 0 && (
-          <>
+          <div className="calendar-wrap">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <button className="resume-btn" onClick={() => changeMonth(-1)}>← Prev</button>
               <div style={{ textAlign: "center" }}>
@@ -496,7 +496,7 @@ export default function RecapPage() {
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
 
         {view === "tournament" && archive.length > 0 && (

@@ -102,7 +102,13 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
   main.desktop-grid-root{
     max-width: 1680px;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+    /* Capped upper bound (not 1fr) on purpose - with only one or two
+       tournaments live at once (common), an uncapped 1fr column stretches
+       that lone card to the full container width, which blows out its
+       internal flex rows (player name and status button end up stranded
+       far apart with a huge dead gap between them) instead of just
+       leaving empty space to the right like a normal left-aligned list. */
+    grid-template-columns: repeat(auto-fit, minmax(460px, 680px));
     align-items: start;
     gap: 22px 30px;
   }
@@ -118,7 +124,10 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
 @media (min-width: 900px){
   .desktop-grid{
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    /* Same capped-upper-bound reasoning as main.desktop-grid-root above -
+       a fixed max instead of 1fr so a short list (even just one card)
+       doesn't stretch into an oversized, awkwardly-spaced single card. */
+    grid-template-columns: repeat(auto-fit, minmax(420px, 620px));
     align-items: start;
     gap: 14px 20px;
   }
@@ -131,6 +140,15 @@ main{ padding: 14px 16px; max-width: 640px; margin: 0 auto; }
 @media (min-width: 900px){
   .desktop-grid-tight{ grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); }
   .desktop-grid-tight > *{ height: 100%; }
+}
+/* Recap's calendar view (the month grid + whatever single round/day is
+   selected below it) reads worse the wider it gets - a 7-column month
+   grid with huge empty-feeling cells, and a single round's bet cards
+   with their score/thru figures stranded far apart. Caps it to a
+   sensible reading width and centers it, regardless of how wide <main>
+   itself has grown on desktop. */
+@media (min-width: 900px){
+  .calendar-wrap{ max-width: 760px; margin: 0 auto; }
 }
 .tourn{ margin-bottom: 26px; position: relative; }
 .tourn-head{
