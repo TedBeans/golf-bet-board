@@ -1,9 +1,17 @@
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
+import type { Metadata, Viewport } from "next";
 
-export const metadata = {
-  title: "Bet Board",
+export const metadata: Metadata = {
+  metadataBase: new URL("https://golf-bet-board.vercel.app"),
+  title: "Golf Bet Board",
   description: "Live tournament wager tracker",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#14171B",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
