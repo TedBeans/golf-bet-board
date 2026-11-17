@@ -48,11 +48,50 @@ export type Mapping = {
                                       // time, regardless of what the automatic "has this tournament
                                       // started" bet-status check says. A one-click escape hatch for
                                       // whenever that automatic check hasn't caught up yet.
+      altCourse?: {
+        // For a tournament that splits its field across two courses with
+        // different par for some rounds (e.g. The RSM Classic rotating
+        // Seaside/Plantation for Rounds 1-2, or the Pebble Beach Pro-Am's
+        // three-course stretch). roundPar/front9Par/back9Par above stay
+        // the course the field plays once it's down to one (e.g. Seaside
+        // for RSM's Rounds 3-4); this covers the named players on the
+        // OTHER course for the specific rounds the split applies to.
+        // Looked up via resolveRoundPar() below - nothing else needs to
+        // know this exists, and it naturally stops applying once a round
+        // isn't listed, so there's nothing to remember to clear later.
+        roundPar?: number;
+        front9Par?: number;
+        back9Par?: number;
+        rounds: string[]; // exact round labels this applies to, e.g. ["Round 1", "Round 2"]
+        players: string[]; // exact player names (as typed in bets) on the alt course for those rounds
+      };
     };
   };
 };
 
 export const EMPTY_MAPPING: Mapping = { tournaments: {} };
+
+// Resolves the correct round par for a given tournament/round/player,
+// accounting for a split-field tournament's altCourse override (see the
+// altCourse field above). Falls back to the tournament's primary
+// roundPar/front9Par/back9Par when no altCourse is configured, the round
+// isn't one it applies to, or the player isn't on its roster.
+export function resolveRoundPar(
+  tm: Mapping["tournaments"][string] | undefined,
+  round: string | undefined,
+  player: string | undefined,
+  segment?: "front9" | "back9"
+): number | undefined {
+  const alt = tm?.altCourse;
+  if (alt && round && player && alt.rounds.includes(round) && alt.players.includes(player)) {
+    if (segment === "front9") return alt.front9Par ?? tm?.front9Par;
+    if (segment === "back9") return alt.back9Par ?? tm?.back9Par;
+    return alt.roundPar ?? tm?.roundPar;
+  }
+  if (segment === "front9") return tm?.front9Par;
+  if (segment === "back9") return tm?.back9Par;
+  return tm?.roundPar;
+}
 
 // Short display label for whichever tour a tournament's data comes from -
 // used for the badge on the live board and for bucketing the recap pages

@@ -1,7 +1,7 @@
 import { Bet } from "./seed";
 import { defaultUnitsToWinOne } from "./units";
 import { deriveBetPhrase } from "./parseCombined";
-import { Mapping } from "./mapping";
+import { Mapping, resolveRoundPar } from "./mapping";
 import { nowInCentral } from "./centralTime";
 
 export type ParsePersonalResult = { bets: Bet[]; warnings: string[] };
@@ -212,7 +212,7 @@ export function parsePersonalText(text: string, forDate: string | undefined, map
         // way parseCombined does. Falls back to raw strokes if no par on
         // file (same "skip with a warning" behaviour as parseCombined).
         const tm = mapping?.tournaments?.[currentTournament];
-        const roundPar = tm?.roundPar;
+        const roundPar = resolveRoundPar(tm, `Round ${roundNum}`, player, undefined);
         const derived = deriveBetPhrase(
           isOver ? "Over" : "Under",
           String(line),

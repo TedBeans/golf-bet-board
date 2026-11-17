@@ -67,7 +67,7 @@ export function deriveBetPhrase(
 export function parseCombinedText(
   text: string,
   forDate: string | undefined,
-  parLookup: (tournament: string, segment?: Segment) => number | undefined
+  parLookup: (tournament: string, round: string, player: string, segment?: Segment) => number | undefined
 ): ParseResult {
   const rawLines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
 
@@ -193,7 +193,7 @@ export function parseCombinedText(
       continue;
     }
 
-    const phrase = deriveBetPhrase(side, lineValue, category, parLookup(currentTournament, segment), segment);
+    const phrase = deriveBetPhrase(side, lineValue, category, parLookup(currentTournament, currentRound, player, segment), segment);
     if (!phrase) {
       const parLabel = segment === "front9" ? "front-9 par" : segment === "back9" ? "back-9 par" : "round par";
       warnings.push(`No ${parLabel} on file for "${currentTournament}" - add one in the Tournaments tab to convert score bets. Skipped: "${line}"`);

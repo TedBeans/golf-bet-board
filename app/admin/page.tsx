@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Bet } from "../../lib/seed";
-import { Mapping, EMPTY_MAPPING } from "../../lib/mapping";
+import { Mapping, EMPTY_MAPPING, resolveRoundPar } from "../../lib/mapping";
 import { parseCombinedText, ParseResult } from "../../lib/parseCombined";
 import { parsePersonalText, ParsePersonalResult } from "../../lib/parsePersonal";
 import { sortByPersonalOrder } from "../../lib/personalOrder";
@@ -965,12 +965,8 @@ export default function AdminPage() {
 
   function previewImport() {
     setImportMsg("");
-    const parLookup = (t: string, segment?: "front9" | "back9") => {
-      const tm = mapping.tournaments[t];
-      if (segment === "front9") return tm?.front9Par;
-      if (segment === "back9") return tm?.back9Par;
-      return tm?.roundPar;
-    };
+    const parLookup = (t: string, round: string, player: string, segment?: "front9" | "back9") =>
+      resolveRoundPar(mapping.tournaments[t], round, player, segment);
     setPreview(parseCombinedText(importText, betsDate, parLookup));
   }
 
@@ -2016,7 +2012,7 @@ export default function AdminPage() {
           venue: string; location: string; latitude: number; longitude: number;
           startDate: string; endDate: string; notes: string; upcoming: boolean; roundPar: number;
           front9Par: number; back9Par: number; dataSource: string; cutLine: number;
-          courseType: string;
+          courseType: string; altCourse: Mapping["tournaments"][string]["altCourse"];
         }>) {
           setMapping((m) => ({
             ...m,
@@ -2255,6 +2251,123 @@ export default function AdminPage() {
                   }}
                 />
               </label>
+            </div>
+
+            <div style={{ marginTop: 14, padding: 10, border: "1px solid var(--line)", borderRadius: 4 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={!!tm?.altCourse}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      updateTourn({ altCourse: { rounds: [], players: [] } });
+                    } else {
+                      updateTourn({ altCourse: undefined });
+                    }
+                  }}
+                />
+                Field splits across two courses for some rounds (e.g. RSM Classic's
+                Seaside/Plantation rotation) - set this up instead of changing the
+                round par above
+              </label>
+              {tm?.altCourse && (
+                <div style={{ marginTop: 10 }}>
+                  <div className="subline" style={{ marginBottom: 8, lineHeight: 1.4 }}>
+                    The round par fields above stay the course most of the field plays
+                    (e.g. Seaside, once the field is down to one course). Fill in the
+                    OTHER course's par below, which rounds it applies to, and which
+                    players are on it - score bets for those players, in those rounds,
+                    convert using this instead. Everyone else, and every other round,
+                    still uses the par above.
+                  </div>
+                  <label style={{ display: "block", fontSize: 12 }}>
+                    Alt course round par
+                    <input
+                      placeholder="e.g. 72"
+                      value={tm.altCourse.roundPar ?? ""}
+                      onChange={(e) => updateTourn({
+                        altCourse: { ...tm.altCourse!, roundPar: parseInt(e.target.value, 10) || undefined },
+                      })}
+                      style={{
+                        width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                        color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                        padding: "8px 10px", borderRadius: 3,
+                      }}
+                    />
+                  </label>
+                  <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                    <label style={{ flex: 1, fontSize: 12 }}>
+                      Alt course front 9 par
+                      <input
+                        placeholder="e.g. 36"
+                        value={tm.altCourse.front9Par ?? ""}
+                        onChange={(e) => updateTourn({
+                          altCourse: { ...tm.altCourse!, front9Par: parseInt(e.target.value, 10) || undefined },
+                        })}
+                        style={{
+                          width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                          color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                          padding: "8px 10px", borderRadius: 3,
+                        }}
+                      />
+                    </label>
+                    <label style={{ flex: 1, fontSize: 12 }}>
+                      Alt course back 9 par
+                      <input
+                        placeholder="e.g. 36"
+                        value={tm.altCourse.back9Par ?? ""}
+                        onChange={(e) => updateTourn({
+                          altCourse: { ...tm.altCourse!, back9Par: parseInt(e.target.value, 10) || undefined },
+                        })}
+                        style={{
+                          width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                          color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                          padding: "8px 10px", borderRadius: 3,
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
+                    Rounds this applies to (comma-separated, e.g. "Round 1, Round 2")
+                    <input
+                      type="text"
+                      placeholder="Round 1, Round 2"
+                      value={coordDrafts[`${tourn}:altRounds`] ?? tm.altCourse.rounds.join(", ")}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setCoordDrafts((prev) => ({ ...prev, [`${tourn}:altRounds`]: v }));
+                        const rounds = v.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+                        updateTourn({ altCourse: { ...tm.altCourse!, rounds } });
+                      }}
+                      style={{
+                        width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                        color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                        padding: "8px 10px", borderRadius: 3,
+                      }}
+                    />
+                  </label>
+                  <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
+                    Players on the alt course for those rounds (one per line, exact
+                    names as they'll be typed in bets)
+                    <textarea
+                      placeholder={"Player One\nPlayer Two"}
+                      value={coordDrafts[`${tourn}:altPlayers`] ?? tm.altCourse.players.join("\n")}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setCoordDrafts((prev) => ({ ...prev, [`${tourn}:altPlayers`]: v }));
+                        const players = v.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
+                        updateTourn({ altCourse: { ...tm.altCourse!, players } });
+                      }}
+                      rows={4}
+                      style={{
+                        width: "100%", marginTop: 6, background: "rgba(0,0,0,0.25)", border: "1px solid var(--line)",
+                        color: "var(--cream)", fontFamily: "'JetBrains Mono',monospace", fontSize: 13,
+                        padding: "8px 10px", borderRadius: 3, resize: "vertical",
+                      }}
+                    />
+                  </label>
+                </div>
+              )}
             </div>
 
             <label style={{ display: "block", marginTop: 10, fontSize: 12 }}>
