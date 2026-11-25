@@ -1710,39 +1710,6 @@ export default function AdminPage() {
         </span>
       </div>
 
-      <div style={{ padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 4 }}>
-        <div style={{ fontWeight: 700, marginBottom: 4 }}>Rename a tournament</div>
-        <div className="subline" style={{ marginBottom: 8 }}>
-          For when the tournament itself changes name mid-season (sponsorship
-          swap, venue rebrand, etc.) - e.g. "Good Good Championship" becoming
-          "Austin Championship". Renames it everywhere: every bet, archived
-          bet, and parlay leg, plus its saved config in the Tournaments tab
-          (pgaId, dates, course facts, DP World Tour ids - all of it moves
-          over to the new name).
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <select
-            value={tournRenameFrom}
-            onChange={(e) => setTournRenameFrom(e.target.value)}
-            style={{ minWidth: 220 }}
-          >
-            <option value="">Select tournament...</option>
-            {tournaments.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <span className="subline">→</span>
-          <input
-            type="text"
-            placeholder="New tournament name"
-            value={tournRenameTo}
-            onChange={(e) => setTournRenameTo(e.target.value)}
-            style={{ minWidth: 220 }}
-          />
-          <button className="add-btn-inline" onClick={renameTournament} disabled={!tournRenameFrom || !tournRenameTo.trim()}>
-            Rename
-          </button>
-        </div>
-        {tournRenameMsg && <div className="subline" style={{ marginTop: 6 }}>{tournRenameMsg}</div>}
-      </div>
       </div>
 
       {Object.entries(
@@ -1958,6 +1925,40 @@ export default function AdminPage() {
           }}
         />
         <button className="add-btn-inline" onClick={addTournament}>Add</button>
+      </div>
+
+      <div style={{ padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 4, marginBottom: 24 }}>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>Rename a tournament</div>
+        <div className="subline" style={{ marginBottom: 8 }}>
+          For when the tournament itself changes name mid-season (sponsorship
+          swap, venue rebrand, etc.) - e.g. "Good Good Championship" becoming
+          "Austin Championship". Renames it everywhere: every bet, archived
+          bet, and parlay leg, plus its saved config in the Tournaments tab
+          (pgaId, dates, course facts, DP World Tour ids - all of it moves
+          over to the new name).
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <select
+            value={tournRenameFrom}
+            onChange={(e) => setTournRenameFrom(e.target.value)}
+            style={{ minWidth: 220 }}
+          >
+            <option value="">Select tournament...</option>
+            {tournaments.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <span className="subline">→</span>
+          <input
+            type="text"
+            placeholder="New tournament name"
+            value={tournRenameTo}
+            onChange={(e) => setTournRenameTo(e.target.value)}
+            style={{ minWidth: 220 }}
+          />
+          <button className="add-btn-inline" onClick={renameTournament} disabled={!tournRenameFrom || !tournRenameTo.trim()}>
+            Rename
+          </button>
+        </div>
+        {tournRenameMsg && <div className="subline" style={{ marginTop: 6 }}>{tournRenameMsg}</div>}
       </div>
 
       <h1 style={{ marginBottom: 4 }}>Bulk-restore mapping</h1>
